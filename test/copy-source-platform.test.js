@@ -79,19 +79,25 @@ test('probeHint：index.html 行内默认值与 zh.json 逐字相等（一个文
 // ── ③ 流语境的「音源」不许被误伤 ───────────────────────────
 
 test('播放取流 toast 的「音源」原样保留（防无差别替换把病句钉死）', () => {
+  // 已收编进语言包的两处（app.js 增量191、playlist.js 增量223）：源码只许留键名，
+  // 词典值单独钉（见下）。两处都钉 —— 只钉词典，源码可以悄悄换键；只钉源码，词典可以悄悄改词。
+  // 增量223 记账：此处原写「playlist.js 增量210」，而 210 已被 3761a15（取流失败分类补齐）
+  // 占用 —— 全量交叉引用撞号会让后续审查对不上账，故随本批修复一起改到 223。
+  for (const [f, owner] of [
+    [['js', 'app.js'], 'app.js'],
+    [['js', 'views', 'playlist.js'], 'playlist.js'],
+  ]) {
+    assert.ok(read(...f).includes("t('toast.preparingSource'"),
+      `${owner} 不再取 toast.preparingSource 键（取词旁路了？）`);
+  }
+  // home/search 还没收编（LEDGER 在账），仍是字面量 —— 字面量这一侧继续钉「音源」不许被改成「平台」
   for (const f of [
     ['js', 'views', 'home.js'],
-    ['js', 'views', 'playlist.js'],
     ['js', 'views', 'search.js'],
   ]) {
     assert.ok(read(...f).includes('正在准备音源：'),
       `${f.join('/')} 的「正在准备音源」被误改了`);
   }
-  // 增量191：app.js 的这条文案搬进了语言包（源码只留键名）。判据跟着搬家，但两处都钉 ——
-  // 只钉词典，源码可以悄悄换键；只钉源码，词典可以悄悄改词。
-  const appSrc = read('js', 'app.js');
-  assert.ok(appSrc.includes("t('toast.preparingSource'"),
-    'app.js 不再取 toast.preparingSource 键（取词旁路了？）');
   assert.ok(dict('zh')['toast.preparingSource'].includes('音源'),
     'toast.preparingSource 的「音源」被无差别替换改成了「平台」（病句）');
 });

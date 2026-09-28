@@ -47,10 +47,15 @@ function exportsOf(src) {
   return [...out].sort();
 }
 
-const EQ_PUBLIC = ['applyEqPreset', 'resetEq', 'restoreEqPresetSetting', 'saveEqSettings', 'setEqBand', 'toggleEqBypass'];
+const EQ_PUBLIC = [
+  'applyEqPreset', 'cycleEqPreset', 'resetEq', 'restoreEqPresetSetting',
+  'saveEqSettings', 'setEqBand', 'toggleEqBypass',
+];
 // 增量82：eq.js 另有两个仅供频谱可视化模块 import 的图访问器（不走 onclick/window）
-// 增量187：再加一个仅供单测/派生使用的纯函数 matchPresetName（同上，不经 player 中转）
-const EQ_ALL = [...EQ_PUBLIC, 'ensureAudioGraph', 'getAnalyser', 'matchPresetName'].sort();
+// 增量187：matchPresetName 纯函数（同上，不经 player 中转）
+// 增量223：preampTrimDb 输出级 trim 纯函数（ESM-only，链首 preamp 增益与单测消费；
+//          原名 clipGuardDb —— 名字承诺了「削波保护」而它只是听感取向的固定 trim）
+const EQ_ALL = [...EQ_PUBLIC, 'ensureAudioGraph', 'getAnalyser', 'matchPresetName', 'preampTrimDb'].sort();
 
 // ── A. 音频图已接通（正向钉，增量77）────────────────────────
 test('eq.js: eqFilters 存在填充点（EQ 已接入音频图，回退即红）', () => {
@@ -121,14 +126,29 @@ test('eq.js: 启动恢复接线在首次 playing（用户手势后），不在�
 });
 
 // ── C. 公开面（拆分的核心约束） ────────────────────────
-test('eq.js: 公开面恰为 9 个函数（6 个 UI 面 + 2 个增量82 图访问器 + 1 个增量187 派生纯函数）', () => {
+test('eq.js: 公开面恰为 11 个函数（7 个 UI 面 + 2 个图访问器 + 2 个派生纯函数）', () => {
   assert.deepEqual(
     exportsOf(EQ_CODE), EQ_ALL,
     'eq.js 的 export 面变化了，player.js 的 re-export、window 挂载与 visualizer 的 import 需同步'
   );
 });
 
-test('player.js: 从 ./player/eq.js import 的恰是 6 个 UI 函数（图访问器不经 player 中转）', () => {
+// 增量223：preampTrimDb 是 ESM-only 导出（player.js 的 import/再导出面里没有它），
+// 但它**不是**没人用 —— _mirrorToGraph 逐次曲线变化都在调它。这条钉的是「不许有人
+// 顺手把它挪进 player.js 的桥接面」：那是 7 个 HTML onclick 认的面，多一个名字就多
+// 一处 window 挂载与 re-export 的同步负担，而它对 onclick 毫无用处。
+test('eq.js: preampTrimDb 不许混进 player.js 的桥接面（ESM-only，与 visualizer 同路）', () => {
+  assert.ok(!EQ_PUBLIC.includes('preampTrimDb'), '它不是 UI 面，混进去会让「7 个函数」这层台账失真');
+  const m = PLAYER_CODE.match(/import\s*\{([^}]*)\}\s*from\s*'\.\/player\/eq\.js'/);
+  assert.ok(m && !/\bpreampTrimDb\b/.test(m[1]), 'player.js 不该 import 它（它归 eq.js 内部与单测消费）');
+  assert.match(
+    EQ_CODE,
+    /preampNode\.gain\.value\s*=\s*Math\.pow\(10,\s*preampTrimDb\(eff\)\s*\/\s*20\)/,
+    'preamp 增益必须由 preampTrimDb 驱动，不许就地心算第二份 trim（否则改名/改口径会漏掉镜像点）'
+  );
+});
+
+test('player.js: 从 ./player/eq.js import 的恰是 7 个 UI 函数（图访问器不经 player 中转）', () => {
   // 注意：不能用 [\s\S]*? 桥接——前面的 stats.js import 会先被匹配到。
   // 用 [^}]* 限定在单个 import 语句的括号内，并锚定 eq.js 的 from。
   const m = PLAYER_CODE.match(/import\s*\{([^}]*)\}\s*from\s*'\.\/player\/eq\.js'/);
@@ -144,7 +164,7 @@ test('player.js: re-export 了 eq.js 的全部公开函数', () => {
   assert.deepEqual(reexported, EQ_PUBLIC, 're-export 的名字集合与 eq.js 的 export 面不一致');
 });
 
-test('player.js: 6 个 EQ 函数仍挂在 window 上（index.html onclick 的存活前提）', () => {
+test('player.js: 7 个 EQ 函数仍挂在 window 上（index.html onclick 的存活前提）', () => {
   for (const n of EQ_PUBLIC) {
     assert.ok(
       new RegExp(`window\\.${n}\\s*=`).test(PLAYER_CODE),

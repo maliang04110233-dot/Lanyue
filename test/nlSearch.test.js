@@ -108,14 +108,18 @@ test('service: 总数超上限按先查询先截断', async () => {
 });
 
 test('service: 并行扇出（不串行等待）', async () => {
+  // 判据不用墙钟（CI 抖动会把 55ms 阈值打红）：看「第一个完成时已发起几个」。
+  // 串行实现第一个完成时只发起过 1 个；并行扇出在任何完成前就已把三个都发起。
   const started = [];
+  let startedAtFirstDone = null;
   const searchAll = async (k) => {
     started.push(k);
     await new Promise(res => setTimeout(res, 20));
+    if (startedAtFirstDone === null) startedAtFirstDone = started.length;
     return [];
   };
-  const t0 = Date.now();
   await searchByPhrase({ phrase: 'x', rewrite: async () => ['a', 'b', 'c'], searchAll });
-  assert.deepStrictEqual(started, ['a', 'b', 'c'], '三个查询应在第一个完成前全部发起');
-  assert.ok(Date.now() - t0 < 55, '并行总耗时应远小于串行 60ms');
+  assert.strictEqual(startedAtFirstDone, 3,
+    '第一个查询完成时三个都必须已发起（并行扇出，不是串行等待）');
+  assert.deepStrictEqual(started, ['a', 'b', 'c']);
 });

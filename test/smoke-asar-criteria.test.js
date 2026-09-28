@@ -6,7 +6,7 @@
  * 更要紧的是它会训练人"跳过这条看下一条"，那正是假绿进来的通道。两个成因：
  *
  *   成因①「ESM-only 导出无人 import」这一支把消费方**只**数渲染层别的模块：
- *     `exportedNamesOf(eq.js)` 得到 9 个导出，减掉 player.js 桥接的 6 个 ⇒ 3 个
+ *     `exportedNamesOf(eq.js)` 得到 12 个导出（11 函数 + PRESET_CUSTOM），减掉 player.js 桥接的 7 个 ⇒ 5 个
  *     ESM-only，其中 `matchPresetName`（增量187 为"高亮由曲线现推"而导出，
  *     实际调用点在 eq.js 内部 + node 测试）在别的渲染模块里一次都没出现 ⇒ 判成孤儿。
  *     可它不是死码：模块内部真在用，压缩器绝不会丢它。判据错在把"跨模块 import"

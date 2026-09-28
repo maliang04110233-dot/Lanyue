@@ -81,11 +81,11 @@ test('playlist.js: 歌单卡与"加入歌单"弹层条目挂桥属性（弹层�
   ], 2);
 });
 
-test('local.js: 列表行与网格单元挂桥属性（本地曲库两种视图都要键盘可播）', () => {
+test('local.js: 列表行、网格单元与封面墙卡片挂桥属性（三种视图都要键盘可点）', () => {
   const src = read('js', 'views', 'local.js');
   assertCardPinned('local.js', src, [
     '<div class="${rowClass}"', '<div class="grid-cell"',
-  ], 2);
+  ], 3);
 });
 
 test('第二批（163 收尾）: 播放队列行 / 下载队列详情 / 下载模板卡各挂 1 处', () => {

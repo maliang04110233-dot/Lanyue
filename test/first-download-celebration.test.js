@@ -157,7 +157,11 @@ test('接线：app.js 队列推送里调用 window.firstDownloadCelebrateObserve
 
 test('庆祝条的动作走既有 api.openFolder（回答"文件在哪"），零新 IPC；播放引向队列行既有 ▶', async () => {
   const src = read('src', 'renderer', 'js', 'firstDownloadCelebration.js');
-  assert.match(src, /api\.openFolder/, '打开文件夹要用既有 openFolder 通道');
+  // 必须走 openFolderSafe（utils.js 的唯一出口）：裸调 api.openFolder 在主进程
+  // 沙箱拒绝时是静默失败 —— 用户点了没反应也没有提示，而这里正是「打开文件夹」
+  // 的高频位置。
+  assert.match(src, /openFolderSafe\(/, '应走 openFolderSafe（被拒时有提示）');
+  assert.doesNotMatch(src, /api\.openFolder\(/, '裸调 api.openFolder 会静默失败');
   assert.match(src, /播放/, '文案要把"接下来听"引到队列行既有的播放入口');
   assert.ok(!/ipcRenderer\.|require\(['"]electron/.test(src), '渲染层不得直连 ipcRenderer');
 });

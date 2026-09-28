@@ -2,8 +2,9 @@
  * 通用右键上下文菜单（单例浮层）
  *
  * 与页面逻辑解耦：调用方只传 { x, y, items }，菜单项为纯对象
- * { icon?, label, onClick?, sep?, danger? }。文本一律走 textContent，
- * 歌曲标题等用户可控字段不会进 HTML。
+ * { icon?, iconHtml?, label, onClick?, sep?, danger? }。label 一律走
+ * textContent，歌曲标题等用户可控字段不会进 HTML；iconHtml 仅允许
+ * 调用方传入仓内静态 SVG（不拼用户可控字段）。
  */
 
 let _el = null;
@@ -65,7 +66,15 @@ export function showContextMenu(x, y, items) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'ctx-item' + (it.danger ? ' ctx-danger' : '');
-    b.textContent = (it.icon ? it.icon + '  ' : '') + it.label;
+    if (it.iconHtml) {
+      const span = document.createElement('span');
+      span.className = 'ctx-icon';
+      span.innerHTML = it.iconHtml;
+      b.appendChild(span);
+      b.appendChild(document.createTextNode('  ' + it.label));
+    } else {
+      b.textContent = (it.icon ? it.icon + '  ' : '') + it.label;
+    }
     b.addEventListener('click', () => {
       detach(); closeContextMenu();
       try { if (it.onClick) it.onClick(); } catch (_e) { /* 单项失败不影响菜单框架 */ }

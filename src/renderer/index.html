@@ -88,7 +88,7 @@
     </button>
 
     <div class="sidebar-title" data-i18n="nav.operations.title">操作</div>
-    <button class="nav-item" onclick="api.openFolder(getState('saveDir'))">
+    <button class="nav-item" onclick="openFolderSafe(getState('saveDir'))">
       <span class="icon">📥</span> 打开下载目录
     </button>
     <button class="nav-item" onclick="openSettings()">
@@ -297,8 +297,10 @@
             <div id="probeProgressBar" class="batch-progress-bar"></div>
             <button class="tab" onclick="cancelProbeScan()" style="flex-shrink:0;padding:3px 10px;font-size:11px">取消</button>
           </div>
+          <button class="tab" id="localAlbumFilterChip" style="display:none" onclick="clearAlbumFilter()" title="清除专辑过滤">💿 <span id="localAlbumFilterLabel"></span> ✕</button>
           <div class="local-list" id="localList"></div>
                     <div class="local-grid" id="localGrid" style="display:none"></div>
+                    <div class="local-grid local-album-wall" id="localAlbumWall" style="display:none"></div>
                   </div>
 
     <!-- 下载页面 -->
@@ -314,7 +316,7 @@
           <div class="download-header" style="display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;">
             <div style="font-size:16px;font-weight:600;" data-i18n="download.title">⬇ 下载队列</div>
             <span class="panel-badge" id="queueBadge">0</span>
-            <button class="tab" id="queuePauseBtn" title="暂停后不再启动新任务，在途任务继续完成" onclick="toggleQueuePause()">⏸ 暂停</button>
+            <button class="tab" id="queuePauseBtn" title="暂停后不再启动新任务，在途任务继续完成" onclick="toggleQueuePause()"><svg class="row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> 暂停</button>
             <button class="tab" id="afterQueueBtn" title="下载队列全部结束后自动执行的动作（关机/睡眠有 60 秒可取消倒计时）" aria-haspopup="true" onclick="openAfterQueueMenu()">🏁 完成后: <span id="afterQueueLabel">无</span></button>
             <!-- 状态筛选标签 -->
             <div class="filter-tabs" id="downloadFilterTabs">
@@ -590,7 +592,6 @@
         </div>
         <div class="pc-sub-row">
           <span class="pc-artist" id="playerArtist" data-i18n="player.artist">—</span>
-          <span class="player-src-badge" id="playerSrcBadge" style="display:none;"></span>
           <span class="player-src-badge" id="playerQualityBadge" style="display:none;" title="本次播放音质"></span>
           <span class="pc-clock"><span id="timeNow">0:00</span><span class="pc-clock-sep">/</span><span id="timeTotal">0:00</span></span>
         </div>

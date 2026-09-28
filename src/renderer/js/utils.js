@@ -1,8 +1,25 @@
 /**
  * MusicDL 通用工具函数
- * 
- * ES Module — export 供其他模块 import，同时保留 window 全局供 HTML onclick
+ *
+ * ES Module 导出供其他模块 import，同时保留 window 全局供 HTML onclick
+ *
+ * errBrief 走动态 import 而非静态：本模块被大量 view 与 node 测试直接 import，
+ * 静态 import 会把 errBrief 拉进模块图（i18n.js 头注记着同一条纪律的由来）。
+ * 失败反馈是异步路径上偶发的，动态 import 的那点开销不在热路径上。
  */
+
+/** 取人话错误文案；拿不到就退回一个不撒谎的定值（绝不让 undefined 上屏） */
+let _errBrief;
+async function _brief(e) {
+  try {
+    if (!_errBrief) {
+      ({ errBrief: _errBrief } = await import('./errBrief.js'));
+    }
+    return _errBrief(e) || '未知错误';
+  } catch (_e) {
+    return '未知错误';
+  }
+}
 
 // ── HTML 转义 ────────────────────────────────────────
 function esc(s) {
@@ -259,6 +276,42 @@ function showRedownloadToast(title, finishedAt, onConfirm) {
   });
 }
 
+/**
+ * 打开「文件所在文件夹」——全仓唯一入口。
+ *
+ * 为什么要有这一层：主进程 open-folder 从 2026-09-28 起接了 approvedDirs 沙箱
+ * （见 src/main/ipc/window.js 的 P1-9 注释），未批准的路径会返回
+ * `{ok:false, error}`。而当时 9 个调用点里有 8 个**完全忽略返回值**：
+ * 用户点了「打开文件夹」，资源管理器不弹、也不给任何提示 —— 静默失败，
+ * 比报错更难排查，也违反本仓「反馈必须跟着事实走」的纪律。
+ *
+ * 所以判据只写在这里一处，调用方一律走它。失败时如实说明，并**区分两类原因**
+ * （用户能采取的动作不一样）：被沙箱拒 vs 通道异常。
+ *
+ * @param {string} folder 目标目录或文件路径
+ * @returns {Promise<boolean>} 是否真的打开了
+ */
+async function openFolderSafe(folder) {
+  if (!folder) {
+    showToast(window.t('toast.folderNoPath'), 'warn');
+    return false;
+  }
+  try {
+    const r = await api.openFolder(folder);
+    if (r && r.ok === false) {
+      showToast(window.t('toast.folderBlocked', { error: r.error || '' }), 'warn');
+      return false;
+    }
+    return true;
+  } catch (e) {
+    // 通道本身炸了（不是被拒）—— 如实说「打不开」，不假装成路径问题。
+    // 文案走 errBrief：全仓规矩是用户可见的弹层不许直拼 .message（栈文本会漏到界面上），
+    // test/err-brief.test.js 有全局反向钉盯着。
+    showToast(window.t('toast.folderOpenFailed', { error: await _brief(e) }), 'warn');
+    return false;
+  }
+}
+
 // ── ES Module 导出 ──────────────────────────────────────
 export {
   esc,
@@ -280,6 +333,7 @@ export {
   fmtHistoryTime,
   showActionToast,
   showRedownloadToast,
+  openFolderSafe,
   playReferer,
 };
 
@@ -304,3 +358,4 @@ window.formatPlayCount = formatPlayCount;
 window.fmtHistoryTime = fmtHistoryTime;
 window.showActionToast = showActionToast;
 window.showRedownloadToast = showRedownloadToast;
+window.openFolderSafe = openFolderSafe;

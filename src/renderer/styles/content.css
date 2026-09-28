@@ -1739,4 +1739,6 @@
   cursor: pointer;
 }
 .ctx-item:hover { background: var(--bg-hover); }
+.ctx-icon { display: inline-flex; align-items: center; vertical-align: -3px; }
+.ctx-icon svg { width: 14px; height: 14px; display: block; }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }

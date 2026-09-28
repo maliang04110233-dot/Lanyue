@@ -2,7 +2,9 @@
  * MusicDL 播放器 — 频谱可视化（增量82）
  *
  * 数据源是 player/eq.js 音频图上的 AnalyserNode 只读抽头
- * （filters → analyser → destination，对声音零影响）。
+ * （source → preamp → filters → analyser → destination，对声音零影响。
+ *   preamp 是 eq.js 的输出级 trim，刻意排在滤波之前：trim 与滤波串联时
+ *   增益可交换，挪位置只改频谱抽到的是什么，不改听感。增量223）
  * createMediaElementSource 一个元素只能建一次，建图必须统一走
  * ensureAudioGraph()——本模块严禁自造 AudioContext 节点。
  */

@@ -119,7 +119,31 @@ test('缺 message / 传字符串 / 传 null 都不抛异常', () => {
 test('mirrorTried=true 时说明直连与镜像都试过', () => {
   const out = say('net::ERR_CONNECTION_RESET', { mirrorTried: true });
   assert.match(out, /镜像/);
-  assert.doesNotMatch(out, /已自动重试多次/);
+  assert.doesNotMatch(out, /自动重试多次/);
+});
+
+test('mirrorBlocked 时不得声称试过镜像（压根没试，说了就是假话）', () => {
+  // 镜像是被信任闸门拦下的（产物无 publisherName ⇒ 签名校验空转 ⇒ 镜像不可信），
+  // 那种情况下 tryMirrorFeeds 一次都没真去请求镜像。若沿用「GitHub 直连与镜像源
+  // 均已试过」，用户会以为镜像也排除过了 —— 事实并非如此，这是本文案纪律最在意的一类错。
+  const out = say('net::ERR_CONNECTION_RESET', { mirrorTried: false, mirrorBlocked: true });
+  assert.doesNotMatch(out, /均已试过/, '镜像是被闸门拦下的，不能说「均已试过」');
+  assert.doesNotMatch(out, /镜像源均/, '同上');
+  assert.match(out, /未做代码签名/, '应说明镜像是因未做代码签名而未启用');
+  assert.match(out, /未启用/);
+});
+
+test('mirrorBlocked 优先于 mirrorTried（两个都传时以 blocked 为准）', () => {
+  const out = say('net::ERR_CONNECTION_RESET', { mirrorTried: true, mirrorBlocked: true });
+  assert.doesNotMatch(out, /均已试过/, 'blocked 与 tried 语义互斥，blocked 优先');
+  assert.match(out, /未启用/);
+});
+
+test('mirrorBlocked 时手动下载入口照给（那是唯一走得通的路）', () => {
+  const withBtn = say('net::ERR_CONNECTION_RESET', { mirrorBlocked: true, manualAvailable: true });
+  assert.match(withBtn, /打开下载页/, '镜像不可用时手动下载更重要，不该省掉按钮');
+  const noBtn = say('net::ERR_CONNECTION_RESET', { mirrorBlocked: true, manualAvailable: false });
+  assert.match(noBtn, /GitHub Releases 页面手动下载/, '无按钮时退回页面指引，不得指向不存在的按钮');
 });
 
 test('未走镜像时不提镜像（不提发生过的事，也不漏说重试过）', () => {

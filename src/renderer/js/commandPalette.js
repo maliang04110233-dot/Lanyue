@@ -131,6 +131,9 @@ const COMMANDS = [
   { id: 'pl-fade', icon: '🌊', group: '播放', label: '播放淡入档位：关 / 0.5s / 1s / 2s', keywords: ['fade', '淡入', '音量', '渐变'], run: () => _call('cycleFadeIn') },
   { id: 'pl-fadeout', icon: '🌊', group: '播放', label: '播放淡出档位：暂停/定时到点缓停（关 / 0.5s / 1s / 2s）', keywords: ['fade out', 'fadeOut', '淡出', '缓停', '音量', '渐变'], run: () => _call('cycleFadeOut') },
   { id: 'viz-toggle', icon: '📊', group: '播放', label: '频谱可视化开关（进度条下方实时频谱）', keywords: ['visualizer', 'spectrum', '频谱', '可视化'], run: () => _call('toggleVisualizer') },
+  { id: 'eq-cycle', icon: '🎚️', group: '播放', label: 'EQ 预设循环：平坦 → 流行 → 摇滚 → …', keywords: ['eq', 'equalizer', '均衡器', '预设', '曲线'], run: () => _call('cycleEqPreset') },
+  { id: 'eq-bypass', icon: '🔇', group: '播放', label: 'EQ 旁路开关（关闭/打开均衡器，曲线保留）', keywords: ['eq', 'bypass', '均衡器', '旁路', '关闭'], run: () => _call('toggleEqBypass') },
+  { id: 'eq-reset', icon: '↩', group: '播放', label: 'EQ 重置为平坦（清掉手调与预设抬升）', keywords: ['eq', 'reset', '均衡器', '重置', '平坦', 'flat'], run: () => _call('resetEq') },
 
   { id: 'dl-batch', icon: '📥', group: '下载', label: '批量导入链接', keywords: ['batch', '粘贴'], run: () => _call('openBatchImport') },
   { id: 'dl-namebatch', icon: '🎤', group: '下载', label: '按歌名批量导入（歌手 - 歌名清单）', keywords: ['name batch', '歌名', '文本清单'], run: () => _call('openNameBatch') },

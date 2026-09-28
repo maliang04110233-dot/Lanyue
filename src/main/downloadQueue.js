@@ -372,6 +372,20 @@ function createDownloadQueueEngine({
         if (!dirPlan.applied && dirPlan.reason && dirPlan.reason !== 'no-template') {
           logger.warn('[processOneSong] 路径模板未生效，落回根目录:', dirPlan.reason);
         }
+        // 落盘前的最后一道沙箱复核（审计 P1-7）。上面 359 行只判了**根目录**，
+        // 模板渲染出来的子目录此前一次都没判过就 mkdir recursive —— 根目录里的
+        // 一个链接就能把写入甩到沙箱外。判据与根目录同源（isSaveDirAllowed 就是
+        // approvedDirs.isApprovedDir，内含词法快筛 + realpath 复核）。
+        // 复核不过就退回根目录：根目录已经过了 359 行，下载照常进行 ——
+        // 「目录不安全」不能变成「下载失败」。
+        // 在同一个对象上改写而不是另起 finalDir：savePath / mkdir / statfs
+        // 三处都读 dirPlan.dir，同一个名字才保证「三处同源」，改名会让人漏改一处。
+        if (typeof isSaveDirAllowed === 'function' && !isSaveDirAllowed(dirPlan.dir)) {
+          logger.warn('[processOneSong] 落盘目录未过沙箱复核，退回根目录:', dirPlan.dir);
+          dirPlan.dir = saveDir;
+          dirPlan.applied = false;
+          dirPlan.reason = 'outside-save-dir';
+        }
         const savePath = path.join(dirPlan.dir, sanitizeFilename(renderFileName(namingTemplate, song, ext)));
 
         await fs.promises.mkdir(dirPlan.dir, { recursive: true }).catch(e => {

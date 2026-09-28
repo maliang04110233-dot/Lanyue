@@ -14,6 +14,12 @@
  *   正确做法是把它作为独立特性单独立项（见本轮报告）。
  *
  * 用本地 http server 模拟，无外网依赖（与既有 request.test.js 同风格）。
+ *
+ * 所有 request() 调用都带 skipSsrf: true：P1-6 补上首跳闸口之后，环回地址
+ * 一律被 urlGuard 拒掉，而这些用例真正在测的是 429/5xx 的退避节奏与状态码
+ * 透传，必须真的连上本机 server，故按仓库既有约定（downloader 的
+ * skipSsrfCheck 同名同义）走测试通道。闸口自身的行为见
+ * test/request-ssrf-firsthop.test.js，两处合计覆盖面只增不减。
  */
 
 const test = require('node:test');
@@ -65,7 +71,7 @@ test('429: 持续 429 时按 retries 重试，最终抛出且带 statusCode=429'
   });
   try {
     const err = await catchError(
-      () => request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 5, timeout: 5000 })
+      () => request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 5, timeout: 5000, skipSsrf: true })
     );
     // 429 属 isRetriableStatus → 重试到上限（1 次首发 + 2 次重试 = 3）
     assert.strictEqual(count, 3, `429 应重试到上限，实际请求 ${count} 次`);
@@ -87,7 +93,7 @@ test('429: 前两次限流后恢复 → 最终 resolve 出业务数据（重试�
     res.end(JSON.stringify({ ok: true, attempts: count }));
   });
   try {
-    const result = await request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 5, timeout: 5000 });
+    const result = await request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 5, timeout: 5000, skipSsrf: true });
     assert.deepStrictEqual(result, { ok: true, attempts: 3 });
   } finally { server.close(); }
 });
@@ -101,7 +107,7 @@ test('429: retries=0 时不重试，只发一次请求', async () => {
   });
   try {
     await assert.rejects(
-      () => request(`http://127.0.0.1:${port}/`, { retries: 0, retryDelay: 5, timeout: 5000 })
+      () => request(`http://127.0.0.1:${port}/`, { retries: 0, retryDelay: 5, timeout: 5000, skipSsrf: true })
     );
     assert.strictEqual(count, 1, 'retries=0 必须只请求一次');
   } finally { server.close(); }
@@ -114,7 +120,7 @@ test('429: 抛出的错误携带 responseBody，便于上层记录限流响应�
   });
   try {
     const err = await catchError(
-      () => request(`http://127.0.0.1:${port}/`, { retries: 0, timeout: 5000 })
+      () => request(`http://127.0.0.1:${port}/`, { retries: 0, timeout: 5000, skipSsrf: true })
     );
     assert.strictEqual(err.responseBody, 'quota exceeded: retry later');
   } finally { server.close(); }
@@ -130,7 +136,7 @@ test('退避时序: 退避延迟按 baseDelay × 3^attempt 增长（用真实耗
   try {
     // baseDelay=60 → 退避 60ms + 180ms = 240ms（另有两次请求往返的极小开销）
     const { ms } = await withTiming(() =>
-      request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 60, timeout: 5000 })
+      request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 60, timeout: 5000, skipSsrf: true })
         .catch(() => null)
     );
     assert.strictEqual(count, 3);
@@ -153,7 +159,7 @@ test('退避时序: 退避随 attempt 递增（第二次等待明显长于第一
     res.end('busy');
   });
   try {
-    await request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 50, timeout: 5000 }).catch(() => null);
+    await request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 50, timeout: 5000, skipSsrf: true }).catch(() => null);
     assert.strictEqual(gaps.length, 2, '应有两次重试间隔（3 次请求）');
     // 期望 gap1≈50ms、gap2≈150ms；断言「第二个 gap 至少是第一个的 1.5 倍」
     assert.ok(
@@ -174,7 +180,7 @@ test('429: 与 5xx 共用同一重试通道（isRetriableStatus 判据一致）'
     res.end(JSON.stringify({ ok: true }));
   });
   try {
-    const result = await request(`http://127.0.0.1:${port}/`, { retries: 3, retryDelay: 5, timeout: 5000 });
+    const result = await request(`http://127.0.0.1:${port}/`, { retries: 3, retryDelay: 5, timeout: 5000, skipSsrf: true });
     assert.deepStrictEqual(result, { ok: true });
     assert.strictEqual(count, 3);
   } finally { server.close(); }
@@ -188,7 +194,7 @@ test('429: 4xx 中非 429 者不重试（401 应立即返回，不浪费退避�
     res.end('unauthorized');
   });
   try {
-    const result = await request(`http://127.0.0.1:${port}/`, { retries: 3, retryDelay: 5, timeout: 5000 });
+    const result = await request(`http://127.0.0.1:${port}/`, { retries: 3, retryDelay: 5, timeout: 5000, skipSsrf: true });
     assert.strictEqual(result, 'unauthorized', '4xx 走 resolve 透传 body');
     assert.strictEqual(count, 1, '401 不应重试');
   } finally { server.close(); }
@@ -209,7 +215,7 @@ test('429 后成功：返回的是成功响应的 body，而非限流响应体',
     res.end(JSON.stringify({ real: 'data' }));
   });
   try {
-    const result = await request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 5, timeout: 5000 });
+    const result = await request(`http://127.0.0.1:${port}/`, { retries: 2, retryDelay: 5, timeout: 5000, skipSsrf: true });
     assert.deepStrictEqual(result, { real: 'data' });
     assert.ok(!JSON.stringify(result).includes('RATE LIMITED'), '限流 body 不得泄漏进成功结果');
   } finally { server.close(); }

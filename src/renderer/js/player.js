@@ -32,12 +32,12 @@ let audioCtx = null;
 // 实现、已知状态说明与守卫测试见 player/eq.js 头部注释。
 import {
   applyEqPreset, toggleEqBypass, setEqBand, resetEq,
-  saveEqSettings, restoreEqPresetSetting,
+  saveEqSettings, restoreEqPresetSetting, cycleEqPreset,
 } from './player/eq.js';
 
 export {
   applyEqPreset, toggleEqBypass, setEqBand, resetEq,
-  saveEqSettings, restoreEqPresetSetting,
+  saveEqSettings, restoreEqPresetSetting, cycleEqPreset,
 };
 
 // ── 更新播放器卡片信息（不播放） ─────────────────────
@@ -120,7 +120,6 @@ export function updatePlayerCard(song) {
     document.getElementById('playerArtist').textContent = '—';
     document.getElementById('playerDiscImg').style.display = 'none';
     document.getElementById('playerDiscPh').style.display = 'flex';
-    _updateSrcBadge(null);
     _updateQualityBadge(null);
     _applyTitleMarquee();
     return;
@@ -130,7 +129,6 @@ export function updatePlayerCard(song) {
   // 「不修改播放状态」矛盾，也会在恢复播放队列（未自动播放）时显示错文案。
   document.getElementById('playerTitle').textContent = song.title || '未知歌曲';
   document.getElementById('playerArtist').textContent = song.artist || '未知艺术家';
-  _updateSrcBadge(song);
   _updateQualityBadge(song);
   _applyTitleMarquee();
   const discPh = document.getElementById('playerDiscPh');
@@ -144,24 +142,6 @@ export function updatePlayerCard(song) {
     discPh.style.display = 'flex';
   }
   // 不修改进度条、频谱等播放状态
-}
-
-// 平台名统一走 utils.js 的 platformName()（裸标识符用法同 esc()/fmtTime()，
-// 由 utils.js 挂 window）。原先此处手写 SOURCE_NAMES，与 settings.js / utils.js
-// 各存一份 —— 三份拷贝会漂移，且新增平台必漏改。
-/** 换源徽标：实际取流源(song._altSource.source)与原源不同时显示，
-    让"换源成功"从一次性 toast 变为持续可见状态 */
-function _updateSrcBadge(song) {
-  const badge = document.getElementById('playerSrcBadge');
-  if (!badge) return;
-  const alt = song && song._altSource;
-  if (alt && alt.source && alt.source !== song.source) {
-    badge.textContent = `↻ ${platformName(alt.source)}源`;
-    badge.title = `原源 ${platformName(song.source)} 不可用，已自动切换`;
-    badge.style.display = '';
-  } else {
-    badge.style.display = 'none';
-  }
 }
 
 /** 播放音质徽标：显示本次实际取流档位（song._playedQuality，由取流成功处回写） */
@@ -469,7 +449,7 @@ async function playSongByIdx(idx, song) {
     if (notice) showToast(notice, 'info', 3000);
     if (result.matchedSong) {
       song._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
-      updatePlayerCard(song); // 换源徽标立即显示（不等下一次切歌）
+      updatePlayerCard(song); // 音质等徽标随实际取流结果刷新
     }
     const referer = playReferer(result.source || song.source, result);
     const proxied = await api.proxyPlay(result.url, referer);
@@ -1029,6 +1009,7 @@ window.saveEqSettings = saveEqSettings;
 window.applyEqPreset = applyEqPreset;
 window.toggleEqBypass = toggleEqBypass;
 window.restoreEqPresetSetting = restoreEqPresetSetting;
+window.cycleEqPreset = cycleEqPreset;
 window.setVolume = setVolume;
 window.toggleMute = toggleMute;
 window.cyclePlaybackRate = cyclePlaybackRate;

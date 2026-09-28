@@ -320,12 +320,22 @@ test('主进程挂点：启动清过期 / 删除走 trashRemove / 保存分支�
 
 test('渲染层：确认框点名歌单与歌数，删除后走带「撤销」按钮的 toast，撤销复用 save-user-playlist', () => {
   const src = read('src/renderer/js/views/playlist.js');
+  const dict = require('../src/renderer/js/lang/zh.json');
   const fn = src.match(/async function deletePlaylist[\s\S]*?\n}\n/);
   assert.ok(fn, 'deletePlaylist 找不到了（改名/挪走时同步本测试）');
-  assert.match(fn[0], /确认删除歌单「\$\{pl\.name\}」/, '确认框没点名歌单');
-  assert.match(fn[0], /\$\{n\} 首歌/, '确认框没亮出影响范围（歌数）');
+  // 文案已收进词典（增量210 一批）：断言从「源码里有中文模板串」改成
+  // 「源码把 name / count 传进去了，且词典那一格真的点得着名与数」。
+  // 只钉 t('toast.plConfirmDelete' 是不够的 —— 那只证明接了词典，
+  // 不证明这条文案还守着 F2 纪律。两侧都要钉。
+  assert.match(fn[0], /askConfirm\(t\(\s*'toast\.plConfirmDelete',\s*\{[^}]*name:\s*pl\.name[^}]*count:\s*n[^}]*\}\s*\)\)/,
+    '确认框必须走词典且带上歌名与歌数');
+  assert.match(dict['toast.plConfirmDelete'] || '', /\{name\}/,
+    '词典 toast.plConfirmDelete 丢了 {name} —— 确认框点不出是哪张歌单（F2 纪律）');
+  assert.match(dict['toast.plConfirmDelete'] || '', /\{count\}/,
+    '词典 toast.plConfirmDelete 丢了 {count} —— 确认框亮不出影响范围（歌数）');
   assert.match(fn[0], /showActionToast\(\{/, '没走带按钮的 toast');
-  assert.match(fn[0], /btnLabel: '撤销'/);
+  assert.match(fn[0], /btnLabel: t\('toast\.undo'\)/, '撤销按钮文案要走词典');
+  assert.match(dict['toast.undo'] || '', /撤销/, '词典 toast.undo 应是「撤销」');
   assert.match(fn[0], /ttl: 5000/, '撤销窗口必须是 5 秒（审计 F2）');
   const undo = src.match(/async function undoDeletePlaylist[\s\S]*?\n}\n/);
   assert.ok(undo, 'undoDeletePlaylist 没了');
@@ -347,9 +357,13 @@ test('渲染层（增量157）：回收站入口/弹窗/四个函数接线齐全
   const restore = src.match(/async function restoreTrashedPlaylist[\s\S]*?\n}\n/);
   assert.match(restore[0], /api\.saveUserPlaylist\(e\.playlist\)/, '恢复必须把视图里嵌套的原货交给既有保存通道');
   const purge = src.match(/async function purgeTrashedPlaylist[\s\S]*?\n}\n/);
-  assert.match(purge[0], /askConfirm\(`彻底删除歌单「\$\{pl\.name\}」/, '彻底删除确认框必须点名歌单（F2 纪律）');
-  assert.match(purge[0], /\$\{n\} 首歌/, '彻底删除确认框必须亮出歌数');
-  assert.match(purge[0], /无法再找回/, '彻底删除必须说清这是不可逆的一层');
+  assert.match(purge[0], /askConfirm\(t\(\s*'toast\.plConfirmPurge',\s*\{[^}]*name:\s*pl\.name[^}]*count:\s*n[^}]*\}\s*\)\)/,
+    '彻底删除确认框必须走词典且带上歌名与歌数（F2 纪律）');
+  const dict = require('../src/renderer/js/lang/zh.json');
+  assert.match(dict['toast.plConfirmPurge'] || '', /\{name\}/, '词典 toast.plConfirmPurge 丢了 {name}');
+  assert.match(dict['toast.plConfirmPurge'] || '', /\{count\}/, '词典 toast.plConfirmPurge 丢了 {count}');
+  assert.match(dict['toast.plConfirmPurge'] || '', /无法再找回|不可恢复|不可逆/,
+    '彻底删除的确认文案必须说清这是不可逆的一层（词典侧丢了这句 = F2 纪律失守）');
   assert.match(purge[0], /api\.deleteUserPlaylist\(playlistId\)/, '彻底删除必须走 delete 频道的再删一次分支，不许新开通道');
   // daysLeft 由主进程算好（TTL 默认值只有一家），渲染层不许自己拿 30 去减
   assert.ok(!/30 \* 24|TRASH_TTL/.test(src), '渲染层私自重算了 TTL');

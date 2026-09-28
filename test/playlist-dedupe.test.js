@@ -61,7 +61,11 @@ test('playlist.js 接线：去重走 mergeSongLists(pl.songs,[])，有 busy 守�
   assert.match(PL_JS, /const merged = mergeSongLists\(pl\.songs \|\| \[\], \[\]\);/);
   assert.match(PL_JS, /let _plDedupeBusy = false;/);
   assert.match(PL_JS, /if \(!_currentPlaylistId \|\| _plDedupeBusy\) return;/);
-  assert.match(PL_JS, /if \(!removed\) \{ showToast\('本歌单没有重复歌曲', 'info'\); return; \}/);
+  assert.match(PL_JS, /if \(!removed\) \{ showToast\(t\('toast\.plNoDupSongs'\), 'info'\); return; \}/);
+  // 键值对账：源码只留键，词典值必须还是「本歌单没有重复歌曲」（防止接错线）
+  const zh = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '../src/renderer/js/lang/zh.json'), 'utf8'));
+  assert.strictEqual(zh['toast.plNoDupSongs'], '本歌单没有重复歌曲');
   assert.match(PL_JS, /api\.saveUserPlaylist\(\{ id: pl\.id, name: pl\.name, songs: merged\.songs \}\)/);
   assert.match(PL_JS, /window\.dedupeCurrentPlaylist = dedupeCurrentPlaylist;/);
 });

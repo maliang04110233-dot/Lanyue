@@ -36,12 +36,37 @@ function setHistoryPath(userDataPath) {
 }
 
 /**
+ * 取消错误：与公共 transport（src/api/request.js）同码同辞，
+ * 上层的取消判定不必为本模块单开一套口径。
+ */
+function _abortError() {
+  return Object.assign(new Error('已取消'), { code: 'ABORT_ERR' });
+}
+
+/**
  * 通用 HTTP 请求
+ *
+ * ── 2026-09 审计 P1-10：signal 曾经是装饰性的 ──────────────
+ *
+ * 本模块自带 transport（不经过 src/api/request.js：计费接口要禁自动重试，
+ * 且公共层返回值口径也不同）。而这个本地 request 从第一版起就没有读过
+ * options.signal —— 于是 generateMusic 传下来的 signal 一路被丢弃，
+ * 主进程侧的 AbortController 触发与否对在途的 MiniMax 计费请求毫无影响：
+ * 用户点了取消，界面回到可点，token 照烧。
+ *
+ * 现在 signal 真的接进传输层，三处都要：
+ *   1. 入口短路：传进来时已取消 → 连第一跳都不发（少一次计费）；
+ *   2. destroy 在途 socket —— 只把 signal 往下传不算取消，socket 得断；
+ *   3. 结果闩（settled）：取消后既不 resolve，也不让重试通道把它复活成
+ *      新的一跳（否则取消一次反而多烧几次钱）。
  */
 function request(url, options = {}) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
     const lib = parsedUrl.protocol === 'https:' ? https : http;
+
+    const signal = options.signal || null;
+    if (signal && signal.aborted) return reject(_abortError());
 
     const reqOptions = {
       hostname: parsedUrl.hostname,
@@ -59,42 +84,84 @@ function request(url, options = {}) {
     const maxRetries = options.retries ?? 3;
     const baseDelay = options.retryDelay ?? 1000;
 
+    // 结果闩：定死之后 resolve/reject 都不再动，杜绝"取消后仍 resolve"
+    let settled = false;
+    let retryTimer = null;
+    // 在途那一跳的 destroy 监听（同时只可能有一个）
+    let destroyInFlight = null;
+    const settle = (fn, v) => {
+      if (settled) return;
+      settled = true;
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+      fn(v);
+    };
+    const done = (v) => settle(resolve, v);
+    const fail = (e) => settle(reject, e);
+    /** 取消语义优先于一切重试：用户已经不要这个结果了 */
+    const cancelled = () => !!(signal && signal.aborted);
+    const scheduleRetry = (retryCount) => {
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        doRequest(retryCount + 1);
+      }, baseDelay * Math.pow(2, retryCount));
+    };
+
     function doRequest(retryCount = 0) {
+      // 退避等待期间被取消：这一跳根本不该发出去
+      if (cancelled()) return fail(_abortError());
+
       const req = lib.request(reqOptions, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
+          if (cancelled()) return fail(_abortError());
           try {
-            resolve({ status: res.statusCode, data: JSON.parse(data) });
+            done({ status: res.statusCode, data: JSON.parse(data) });
           } catch (e) {
-            resolve({ status: res.statusCode, data });
+            done({ status: res.statusCode, data });
           }
         });
       });
 
       req.on('error', (e) => {
+        if (cancelled()) return fail(e);
         if (retryCount < maxRetries) {
-          const delay = baseDelay * Math.pow(2, retryCount);
-          setTimeout(() => doRequest(retryCount + 1), delay);
+          scheduleRetry(retryCount);
         } else {
-          reject(e);
+          fail(e);
         }
       });
       req.on('timeout', () => {
         req.destroy();
+        if (cancelled()) return fail(_abortError());
         if (retryCount < maxRetries) {
-          const delay = baseDelay * Math.pow(2, retryCount);
-          setTimeout(() => doRequest(retryCount + 1), delay);
+          scheduleRetry(retryCount);
         } else {
-          reject(new Error('请求超时'));
+          fail(new Error('请求超时'));
         }
       });
+
+      // 中止要 destroy **在途的 socket** —— 只把 signal 传下去不算取消。
+      // 换跳时摘掉上一跳的监听：signal 上只留"当前在途"那一个，
+      // 既不越堆越多，也不去 destroy 一个早就结束的请求。
+      //
+      // 注意这个监听**不能**挂在 settle 里清理：abort 是一次性事件，
+      // settle 会在同一次 dispatch 里把后面的监听摘掉，destroy 就会被吞掉
+      // （取消只改了 promise，socket 还在烧 token —— 正是 P1-10 的原症状）。
+      if (signal) {
+        if (destroyInFlight) signal.removeEventListener('abort', destroyInFlight);
+        destroyInFlight = () => { req.destroy(_abortError()); };
+        signal.addEventListener('abort', destroyInFlight, { once: true });
+      }
 
       if (options.body) {
         req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
       }
       req.end();
     }
+
+    // 兜底：不管此刻是在途、退避还是收尾，abort 一律立刻定死 reject
+    if (signal) signal.addEventListener('abort', () => fail(_abortError()), { once: true });
 
     doRequest(0);
   });
@@ -464,6 +531,7 @@ async function generateMusic(params, callOptions = {}) {
       body,
       timeout: 300000, // 5 分钟超时
       signal: callOptions.signal, // M11：取消链路，主进程侧 AbortController 触发
+                                 // （P1-10 前这条是死链：本模块 transport 不读 signal）
     });
 
     if (result.status !== 200) {

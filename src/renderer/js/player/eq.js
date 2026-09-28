@@ -5,7 +5,8 @@
  *
  * 增量77 起 EQ 真实接入音频链路：首次播放后恢复偏好并懒建
  * AudioContext → MediaElementSource → 5 × BiquadFilter（lowshelf/peaking×3/
- * highshelf）→ destination。_gains 数组是增益的唯一真身（图未建时也能
+ * highshelf）→ destination（增量223 在滤波链首与链尾各插一枚节点，见下两段）。
+ * _gains 数组是增益的唯一真身（图未建时也能
  * 记录手调值），BiquadFilter 只是它的镜像。图只在「有用户手势上下文」或
  * 首次 playing 事件时创建，AudioContext 挂了就整场生效——绝不静默劫持
  * 原生输出后又不 resume（那会导致无声）。
@@ -23,6 +24,12 @@
  * 且谎话能活过重启）。现在高亮与 eqPreset 一律由 matchPresetName(_gains) 现推，
  * 推不出就是 PRESET_CUSTOM（面板上显式标「自定义」），影子变量删除。
  * test/eq-preset-highlight.test.js 守这条路。
+ *
+ * 增量223（原注释自称「增量213」，而 213 已被 7c0ed3f 用掉，是撞号）：EQ 输出级
+ * trim + 命令面板入口。preampTrimDb 现推固定 trim dB（有效增益里最大正抬升取反），
+ * 镜像到链首的 preamp GainNode；不写第四把 pref。cycleEqPreset 委派 applyEqPreset
+ * （三键/高亮/bypass 的唯一家），供 Ctrl+K 的 eq-cycle 调用。
+ * test/eq-clip-guard.test.js 守这两条。
  */
 
 // ── EQ 5 段均衡器 ────────────────────────────────────
@@ -36,6 +43,11 @@ const EQ_BANDS = [
 const eqFilters = []; // BiquadFilterNode[]，ensureEqGraph() 填充
 let audioCtx = null;
 let analyserNode = null; // 频谱可视化只读抽头（增量82），随 ensureEqGraph 建立
+// 链首 preamp（增量223）。放链首不是随手摆的：trim 必须与滤波串联才等效于输出衰减，
+// 而插在 filters 之后会让 analyser（频谱的唯一抽头）读到被自己抵消后的信号 ——
+// bass 预设 +6dB 低架配 trim −6dB，图上低频比 flat 还低，EQ 效果在图里看不见。
+// 挪到链首后 analyser 落在滤波链尾，量到的是「EQ 干了什么」而不是「trim 拿走了多少」。
+let preampNode = null;
 const _gains = [0, 0, 0, 0, 0]; // 唯一真身：用户想要的每段 dB（-12..12）
 let eqBypassed = false; // EQ bypass state
 
@@ -60,6 +72,28 @@ const _effective = () => (eqBypassed ? _gains.map(() => 0) : _gains);
 const _hasProfile = () => !eqBypassed && _gains.some((g) => g !== 0);
 
 /**
+ * 输出级固定 trim（增量223）：有效增益里的**最大单段正抬升**取反（dB）。
+ * 平坦/全负 → 0（不额外衰减）；脏输入安全。preamp GainNode 只是它的镜像。
+ *
+ * 名字为什么从 clipGuardDb 改成 preampTrimDb（增量223 记账）：它**不是**削波保护。
+ * 削波保护要看真实峰值，而这里的输入只有一条静态增益曲线：多段同时抬升会因相位
+ * 叠加把峰值推到远超「最大单段 dB」的地方（bass 预设实测 6+3 段可同相），所以这个
+ * 数字挡不住任何真实的过载；反过来它对**每一条带正增益的曲线都无条件生效**，于是
+ * vocal −4dB ≈ 明显听感变轻。叫 clipGuardDb 是「名字承诺的比它能做的多」——
+ * 本仓的取名规矩是宁可名字难看也不许骗人，故降级为「听感取向的固定 trim」：
+ * 要的是「抬了 bass 就别让整首歌跟着变响」，不是「保证不削波」。
+ */
+export function preampTrimDb(gains) {
+  if (!Array.isArray(gains) || !gains.length) return 0;
+  let maxBoost = 0;
+  for (const g of gains) {
+    const n = Number(g);
+    if (Number.isFinite(n) && n > maxBoost) maxBoost = n;
+  }
+  return maxBoost > 0 ? -maxBoost : 0;
+}
+
+/**
  * 曲线 → 预设名的唯一一只手（增量187）。
  * 认不出返回 null，由调用方决定怎么交代——绝不"挑一条最接近的"糊上去。
  * 段数不符直接 null：半条曲线不是任何预设。
@@ -81,10 +115,14 @@ function _syncPresetHighlight() {
   if (hint) hint.style.display = name ? 'none' : '';
 }
 
-/** 把 _gains（含 bypass 语义）镜像到已存在的滤波器节点 */
+/** 把 _gains（含 bypass 语义）镜像到已存在的滤波器节点 + 链首 preamp 的固定 trim */
 function _mirrorToGraph() {
   const eff = _effective();
   eqFilters.forEach((f, i) => { f.gain.value = eff[i]; });
+  if (preampNode) {
+    // dB → 线性：10^(dB/20)；trim 为 0 时 gain=1（直通）
+    preampNode.gain.value = Math.pow(10, preampTrimDb(eff) / 20);
+  }
 }
 
 /** 把 bypass 状态镜像到那枚按钮（文案 + 类名）：预设/开关/恢复三条路都得同步它 */
@@ -111,6 +149,11 @@ function ensureEqGraph() {
   try {
     audioCtx = new AC();
     let node = audioCtx.createMediaElementSource(audio);
+    // 链首 preamp：source → preamp → filters → analyser → destination（增量223）
+    preampNode = audioCtx.createGain();
+    preampNode.gain.value = 1;
+    node.connect(preampNode);
+    node = preampNode;
     eqFilters.length = 0;
     for (const band of EQ_BANDS) {
       const f = audioCtx.createBiquadFilter();
@@ -121,6 +164,8 @@ function ensureEqGraph() {
       node = f;
       eqFilters.push(f);
     }
+    // analyser 落在滤波链尾（增量223）：频谱量到的是 EQ 曲线本身，不含 preamp trim ——
+    // 取舍写在文件头与 preampNode 声明处，不是「顺手接在最后一个节点上」。
     analyserNode = audioCtx.createAnalyser();
     analyserNode.fftSize = 256;
     analyserNode.smoothingTimeConstant = 0.8;
@@ -132,6 +177,7 @@ function ensureEqGraph() {
   } catch (e) {
     audioCtx = null;
     analyserNode = null;
+    preampNode = null;
     eqFilters.length = 0;
     return false;
   }
@@ -173,6 +219,18 @@ export function toggleEqBypass() {
   // bypass 时不改滑块显示，只改按钮状态
   _syncBypassBtn();
   saveEqSettings(); // 三键的唯一持久化家；bypass 不改曲线，高亮自然也不改
+}
+
+/** 预设循环（命令面板/更多菜单）：当前曲线 → 下一内置预设；自定义从表首起 */
+export function cycleEqPreset() {
+  const order = Object.keys(EQ_PRESETS); // flat, pop, rock, classic, vocal, dance, jazz, bass
+  const cur = matchPresetName(_gains);
+  const idx = order.indexOf(cur);
+  const next = order[(idx + 1) % order.length]; // idx=-1 → order[0]=flat
+  applyEqPreset(next);
+  try {
+    if (typeof showToast === 'function') showToast('EQ：' + next, 'info', 1800);
+  } catch (_e) { /* 无 toast 环境 */ }
 }
 
 // ── 启动恢复 ─────────────────────────────────────────
@@ -254,6 +312,8 @@ if (typeof document !== 'undefined' && typeof window !== 'undefined') {
       audioCtx.close().catch(() => {});
       audioCtx = null;
       eqFilters.length = 0;
+      preampNode = null;
+      analyserNode = null;
     }
   });
 }

@@ -9,6 +9,10 @@
  *
  * 打桩方式：替换 http.request（捕获 reqOptions + 假响应脚本）与
  * dns.promises.lookup（虚拟域 → TEST-NET 假公网 IP），全程无真实网络。
+ *
+ * 2026-09 审计 P1-6：首跳也过 guard 了（此前只有 3xx 分支调 assertPublicHttpUrl），
+ * 所以下面 request.js 那条用例的入口域名也必须在桩表里，否则解析失败会被闸口
+ * 挡在第一跳 —— 断言从「入口不钉」升级成「入口也钉」，覆盖面只增不减。
  */
 
 const test = require('node:test');
@@ -87,10 +91,10 @@ function resolveVia(lookup, hostname) {
 }
 
 // 这些桩模块在测试内被全局替换，必须串行且用完即还原
-test('request.js：过了 guard 的重定向跳，连接固定用校验时的 IP', async () => {
+test('request.js：过了 guard 的每一跳（含首跳）连接都固定用校验时的 IP', async () => {
   const request = require('../src/api/request');
   const s = installStubs(
-    { 'rebind.example.test': [FAKE_CDN] },
+    { 'api.example.test': [FAKE_PUBLIC], 'rebind.example.test': [FAKE_CDN] },
     [
       { statusCode: 302, headers: { location: 'http://rebind.example.test/x' } },
       { statusCode: 200, headers: { 'content-type': 'application/json' }, body: '{"ok":1}' },
@@ -99,9 +103,12 @@ test('request.js：过了 guard 的重定向跳，连接固定用校验时的 IP
   try {
     const out = await request('http://api.example.test/s');
     assert.deepStrictEqual(out, { ok: 1 }); // request 向后兼容直接返回 data
-    // 第一跳：入口从未过 guard（信任平台域），不钉
-    assert.strictEqual(s.calls[0].lookup, undefined);
-    // 重定向跳：assertPublicHttpUrl 校验过 rebind.example.test → 必须钉住校验结果
+    // 首跳同样过了 guard（审计 P1-6 补上的缺口）→ 也要钉住校验结果。
+    // 修复前这里断言的是 lookup === undefined，注释写着「入口从未过 guard」。
+    assert.strictEqual(typeof s.calls[0].lookup, 'function', '首跳过了 guard 就必须钉');
+    const entryAddrs = await resolveVia(s.calls[0].lookup, 'api.example.test');
+    assert.deepStrictEqual(entryAddrs.map((a) => a.address), [FAKE_PUBLIC]);
+    // 重定向跳：assertPublicHttpUrl 校验过 rebind.example.test → 钉住校验结果
     assert.strictEqual(typeof s.calls[1].lookup, 'function', '重定向跳应携带 pinned lookup');
     const addrs = await resolveVia(s.calls[1].lookup, 'rebind.example.test');
     assert.deepStrictEqual(addrs.map((a) => a.address), [FAKE_CDN]);

@@ -127,22 +127,31 @@ function register() {
   // 生成音乐（同步返回 hex 数据）
   // M11：生成期间持有 AbortController，渲染层经 ai-cancel-generation 真取消
   // （此前取消只改 UI 状态，底层计费请求照跑）
-  const _aiGenControllers = new Map();
+  //
+  // 一个 requestId 可能对应**多个并发版本**（一句话直出默认出 2 版，渲染层
+  // 一次 Promise.allSettled 打两发），共用一个 controller：点一次取消 = 整批
+  // 都停。所以登记里带在途计数 —— 谁先跑完谁就 delete 的话，剩下那一版
+  // 就再也取消不掉，计费请求继续烧（取消链路又断在同一个地方）。
+  const _aiGenControllers = new Map(); // requestId → { ctrl, pending }
 
   handle('ai-cancel-generation', (_, requestId) => {
-    const ctrl = _aiGenControllers.get(String(requestId));
-    if (!ctrl) return { cancelled: false };
-    ctrl.abort();
+    const entry = _aiGenControllers.get(String(requestId));
+    if (!entry) return { cancelled: false };
+    entry.ctrl.abort();
     _aiGenControllers.delete(String(requestId));
     return { cancelled: true };
   });
 
   handle('ai-generate-music', async (_, params) => {
     const requestId = params && params.requestId ? String(params.requestId) : '';
-    const ctrl = requestId ? new AbortController() : null;
-    if (ctrl) _aiGenControllers.set(requestId, ctrl);
+    let entry = requestId ? _aiGenControllers.get(requestId) : null;
+    if (requestId && !entry) {
+      entry = { ctrl: new AbortController(), pending: 0 };
+      _aiGenControllers.set(requestId, entry);
+    }
+    if (entry) entry.pending++;
     try {
-      const result = await aiMusic.generateMusic(params, { signal: ctrl ? ctrl.signal : undefined });
+      const result = await aiMusic.generateMusic(params, { signal: entry ? entry.ctrl.signal : undefined });
 
       // 如果生成成功，保存为文件
       if (result.audioHex) {
@@ -185,7 +194,11 @@ function register() {
     } catch (e) {
       return { error: e.message };
     } finally {
-      if (requestId) _aiGenControllers.delete(requestId);
+      // 最后一个在途版本走完才摘登记：摘早了会让仍在计费的那一版取消不掉
+      if (entry) {
+        entry.pending--;
+        if (entry.pending <= 0) _aiGenControllers.delete(requestId);
+      }
     }
   });
 

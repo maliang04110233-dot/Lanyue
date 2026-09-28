@@ -513,7 +513,9 @@ test('侧边栏条目：七个 data-tab 且「搜歌」是唯一发现/搜索入
   assert.deepStrictEqual([...seg['曲库'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['local', 'playlist', 'subscription']);
   assert.deepStrictEqual([...seg['工具'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['ai-music', 'converter']);
   assert.ok(!seg['操作'].includes('data-tab'), '「操作」两项是动作按钮不是页面，挂上 data-tab 会被 switchTab 兜底误高亮');
-  assert.ok(seg['操作'].includes('api.openFolder(') && seg['操作'].includes('openSettings()'));
+  // 「操作」段的打开目录按钮走 openFolderSafe（utils.js 的唯一出口）——
+  // 裸调 api.openFolder 在主进程沙箱拒绝时是静默失败，用户点了没反应也没提示。
+  assert.ok(seg['操作'].includes('openFolderSafe(') && seg['操作'].includes('openSettings()'));
   assert.ok(seg['曲库'].includes('id="subBadge"'), '订阅未读徽标必须仍长在订阅条目上，挪丢=红点静默消失');
 });
 

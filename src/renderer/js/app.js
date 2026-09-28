@@ -265,26 +265,30 @@ async function init() {
 
   // 调试：定位 init 哪一步抛错
   try {
-    const savedSaveDir = await api.getPref('saveDir');
+    // 无相互依赖的启动 IPC 并发拉取：弱机上首屏不再被十几次
+    // 串行 round-trip 拖慢。下面的消费顺序保持不变。
+    const [savedSaveDir, savedQuality, savedTheme, savedTemplate, savedLocalDir] =
+      await Promise.all([
+        api.getPref('saveDir'),
+        api.getPref('quality').catch(() => null),
+        api.getPref('theme').catch(() => null),
+        api.getPref('namingTemplate'),
+        api.getPref('localDirPath'),
+      ]);
+
     if (savedSaveDir) setState('saveDir', savedSaveDir);
     // 未设置过下载目录时显示主进程默认目录（音乐\MusicDownloader），
     // 避免首页路径栏空白让用户误以为必须手动选目录
     document.getElementById('saveDirText').textContent = getState('saveDir') || (await api.getDefaultDir()) || '';
 
     // 恢复音质选择（此前仅设置页变更时同步，启动时从未恢复）
-    try {
-      const savedQuality = await api.getPref('quality');
-      if (savedQuality) {
-        const qs = document.getElementById('qualitySelect');
-        if (qs) qs.value = savedQuality;
-      }
-    } catch (_e) { /* 音质恢复失败使用默认 */ }
+    if (savedQuality) {
+      const qs = document.getElementById('qualitySelect');
+      if (qs) qs.value = savedQuality;
+    }
 
     // 恢复主题（尽早应用，避免闪烁）
-    try {
-      const savedTheme = await api.getPref('theme');
-      if (savedTheme && typeof applyTheme === 'function') applyTheme(savedTheme);
-    } catch (_e) { /* 主题恢复失败使用默认 */ }
+    if (savedTheme && typeof applyTheme === 'function') applyTheme(savedTheme);
 
     // 平台清单（v3）：源下拉 / 平台名 / 徽标配色的唯一来源，来自主进程 registry。
     // ⚠️ 必须在 applyTranslations() **之前** —— 本步会重建源下拉 DOM，
@@ -303,7 +307,7 @@ async function init() {
       if (window.i18n) await window.i18n.applyTranslations();
     } catch (_e) { /* 忽略 */ }
 
-    // 显示版本号 + commit
+    // 显示版本号 + commit（与上面 prefs 已并发，此处只消费结果）
     try {
       const versionEl = document.getElementById('appVersion');
       const commitEl = document.getElementById('appCommit');
@@ -315,12 +319,10 @@ async function init() {
     } catch (_e) { /* 忽略 */ }
 
     // 恢复命名模板（编辑入口在设置页，这里只同步 state）
-    const savedTemplate = await api.getPref('namingTemplate');
     if (savedTemplate) {
       setState('namingTemplate', savedTemplate);
     }
 
-    const savedLocalDir = await api.getPref('localDirPath');
     if (savedLocalDir) setState('localDirPath', savedLocalDir);
 
     api.onQueueUpdated((queue) => {

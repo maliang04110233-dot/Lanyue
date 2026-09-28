@@ -8,6 +8,7 @@
  * （5 个 handler，prefs 持久化）完整接通。
  */
 
+import { t } from '../i18n.js';
 import { errBrief } from '../errBrief.js';
 import { askConfirm } from '../confirmDialog.js';
 import { logger } from '../logger.js';
@@ -55,7 +56,7 @@ async function loadUserPlaylists() {
     renderPlaylistList(playlists || []);
   } catch (e) {
     logger.error('加载歌单失败:', e);
-    showToast('加载歌单失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plLoadFailed', { msg: errBrief(e) }), 'error');
   }
   // 回收站徽标跟着列表一起刷新（删除/撤销/恢复都经过这里；自身带 try/catch，不打扰主流程）
   refreshPlTrash();
@@ -149,27 +150,115 @@ function _plVisiblePairs(songs) {
   return sortPlaylistPairs(dlFiltered, _plSortMode);
 }
 
+// 大库分片渲染：首屏同步出结果，其余按片 rAF 追加；token 防快速重筛竞态。
+//
+// 为什么渲染函数要**返回一个 Promise**：分片期间 DOM 里只有前几片，而
+// locatePlayingInDetail（定位正在播放）与 _plRowUnder（拖拽落点）都要求
+// 「全部行已在 DOM」。旧实现在首屏那一瞬就同步查一次，查不到就把"还没渲染完"
+// 误报成 toast.plRowNotVisible（"该行当前不在可见列表（检查排序/过滤）"）——
+// 一句完全错误的诊断，把用户往排序/过滤上带，而真正的原因只是分片没跑完。
+// 所以"分片全部落地"的时刻必须交出去，让调用方 await 它再查。
+//
+// 三个视图（playlist 详情 / local 网格 / converter 列表）统一这一套约定。
+// 不抽公共模块是因为抽出去就得新增一个 src 模块，超出本次改动面；这段只有
+// 十来行、且三家形状完全一致，抄一份比新增跨视图依赖便宜。
+const PL_RENDER_CHUNK = 100;
+let _plRenderToken = 0;
+// 在跑的分片各挂一个结算句柄。被作废时**必须**结算：否则 await 它的调用方
+// 会永久挂起 —— 那比误报更糟（"点定位没反应"会升级成"界面卡住"）。
+let _plRenderPending = [];
+
+/**
+ * 开一次新渲染：作废旧分片并立即结算它们（旧 await 方不该被新渲染拖住）。
+ *
+ * 顺序有讲究：先把 _plRenderPending 换成新名单**再**结算旧的。settle() 会把自己从
+ * 名单里摘掉，若顺序反过来，旧的 d.settle() 去 splice 的就是刚登记进来的新分片。
+ */
+function _plInvalidateRender() {
+  _plRenderToken++;
+  const old = _plRenderPending;
+  _plRenderPending = [];
+  for (const d of old) d.settle();
+}
+
+/**
+ * 登记一次分片渲染。settle 幂等 ——「跑完」与「被作废」两条路径都会调它。
+ *
+ * ⚠️ settle() 必须**把自己从 _plRenderPending 里摘掉**，不只是 resolve promise。
+ * 这份名单有两个消费者，摘不摘的后果各有一条（2026-09 实测，两条都踩过）：
+ *   · _plRenderBusy()（拖拽守卫）读它的 length —— 只结算不摘的话，渲染正常跑完
+ *     之后名单依然非空，起拖被**永久**拒绝，歌单拖拽排序整个瘫掉（且症状是
+ *     "把手按下去没反应"，极难归因到一行分片记账）；
+ *   · _plRenderIdle()（等排空）按它 while —— 同样只结算不摘的话，循环永远转下去，
+ *     "点定位"变成一次永不返回的 await。
+ * 名单的语义因此是"**在跑**的分片"，不是"曾经跑过的分片"。
+ */
+function _plDeferRender() {
+  let done = false;
+  let settle;
+  const promise = new Promise((res) => { settle = res; });
+  const d = {
+    promise,
+    settle() {
+      if (done) return;
+      done = true;
+      const i = _plRenderPending.indexOf(d);
+      if (i >= 0) _plRenderPending.splice(i, 1);
+      settle();
+    },
+  };
+  _plRenderPending.push(d);
+  return d;
+}
+
+/**
+ * 等当前在跑的分片全部落地（被作废的那轮早已结算，不会永久挂起）。
+ *
+ * 为什么是循环而不是一次 Promise.all —— 这正是首版修法的漏网处（实测）：
+ * 等待期间完全可能又来一次渲染（别的动作保存了歌单、收藏同步触发重画）。那一轮
+ * 会把本轮的句柄**结算掉**并把自己登记进 _plRenderPending，于是"只等一次"的 await
+ * 在**新那一轮才画完第一片**的时刻就返回；调用方紧接着 querySelector，第 150 行
+ * 仍然不在 DOM 里，缺陷 1 原样复发，只是窗口比修之前窄得多（窄到更难复现）。
+ * 循环把不变量说成"返回时没有分片在跑"，而不是"我等的那些跑完了"。
+ *
+ * 终止性：每一轮渲染都在有限帧内结算（rows.length/CHUNK + 1 帧），所以只要没有
+ * 无限自我重绘的视图，循环必然收敛。而无限自我重绘的视图本来就是坏的（rAF 永远
+ * 排满、CPU 满载），多转一圈不比它更糟 —— 不加人为上限正是这个取舍。
+ */
+async function _plRenderIdle() {
+  while (_plRenderPending.length) {
+    await Promise.all(_plRenderPending.map((d) => d.promise));
+  }
+}
+
+/** 分片是否还在跑。拖拽起手守卫用：半个列表算出来的落点会写错序 */
+function _plRenderBusy() {
+  return _plRenderPending.length > 0;
+}
+
 function renderPlaylistDetailSongs(songs) {
   const list = document.getElementById('playlistDetailSongs');
-  if (!list) return;
+  if (!list) return Promise.resolve();
   _currentDetailSongs = songs || [];
   _syncPlSelBtns(); // 计数/显隐跟渲染走，早退分支也不留脏按钮
   dlEnsureHistoryLoaded(); // 跨会话"已下载"懒回填，完成后经监听器重渲染徽标
 
   if (!songs || songs.length === 0) {
+    _plInvalidateRender(); // 作废进行中的分片追加
     list.innerHTML = '<div class="empty-hint" style="text-align:center;padding:30px 0;">歌单为空，去搜索页添加喜欢的歌曲吧</div>';
-    return;
+    return Promise.resolve();
   }
 
   const pairs = _plVisiblePairs(songs);
   const reorderable = songs.length > 1 && !_plSortMode; // 排序时展示序≠存储序，禁用拖把手防误持久化
   if (!pairs.length) {
+    _plInvalidateRender();
     const kwPart = _plSongKw.trim() ? `「${esc(_plSongKw.trim())}」` : '';
     const dlPart = _plDlMode !== 'all' ? (kwPart ? '且符合所选下载状态' : '所选下载状态') : '';
     list.innerHTML = `<div class="empty-hint" style="text-align:center;padding:30px 0;">没有匹配${kwPart}${dlPart}的歌曲</div>`;
-    return;
+    return Promise.resolve();
   }
-  list.innerHTML = pairs.map(({ song, i: idx }) => `
+  const rows = pairs.map(({ song, i: idx }) => `
     <div class="song-row" data-pidx="${idx}" ondblclick="playPlaylistSong(${idx})">
       ${_plSelMode ? `<input type="checkbox" class="pl-sel-chk" ${_plSelKeys.has(plSongKey(song)) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="togglePlSongSel(${idx})" title="勾选后可一键移出歌单" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;margin-right:6px;">` : ''}
       ${reorderable ? '<span class="pl-drag-handle" draggable="true" title="按住拖动排序">⠿</span>' : ''}
@@ -188,7 +277,26 @@ function renderPlaylistDetailSongs(songs) {
         <button class="action-btn" onclick="removeSongFromPlaylist('${escQ(String(song.id))}','${escQ(String(song.source || ''))}')" title="从歌单移除">✕</button>
       </div>
     </div>
-  `).join('');
+  `);
+  _plInvalidateRender();
+  const d = _plDeferRender();
+  const token = _plRenderToken;
+  let cursor = 0;
+  const appendSlice = () => {
+    // 被作废（新一轮渲染，或外部 ++_plRenderToken）时先结算 await 方再走人：
+    // 不结算就是永久 pending，比误报更难排查。
+    if (token !== _plRenderToken) return d.settle();
+    const end = Math.min(cursor + PL_RENDER_CHUNK, rows.length);
+    let html = '';
+    for (let i = cursor; i < end; i++) html += rows[i];
+    if (cursor === 0) list.innerHTML = html;
+    else list.insertAdjacentHTML('beforeend', html);
+    cursor = end;
+    if (cursor < rows.length) requestAnimationFrame(appendSlice);
+    else d.settle();
+  };
+  appendSlice();
+  return d.promise;
 }
 
 // ── 行右键菜单（业务项在 ../songMenu.js 共享）──────────
@@ -231,6 +339,10 @@ function _plClearDragMarks() {
 
 document.addEventListener('dragstart', (e) => {
   if (!(e.target && e.target.closest && e.target.closest('.pl-drag-handle'))) return;
+  // 分片还在跑 ⇒ 列表正在往下长。此时起拖，用户能瞄到的只有"已经画出来的那几片"，
+  // 落点索引会按半个列表解释，persistPlaylistOrder 于是把歌挪到用户没瞄准的位置。
+  // 宁可这一下不起拖（分片通常一两帧就完，窗口极短），也不写错序。
+  if (_plRenderBusy()) { e.preventDefault(); return; }
   const hit = _plRowUnder(e);
   if (!hit) return;
   _plDragFrom = hit.idx;
@@ -256,6 +368,10 @@ document.addEventListener('drop', (e) => {
   _plDragFrom = -1;
   _plClearDragMarks();
   if (from < 0) return;
+  // dragstart 拦过一次还不够：拖拽途中可能来了一次重渲染（别的动作保存了歌单、
+  // 收藏同步触发了重画），那时 from 是**旧**列表的下标，落到新列表上就是错歌错位。
+  // 这是 persistPlaylistOrder 的唯一入口，守住它就等于守住排序通道。
+  if (_plRenderBusy()) return;
   const hit = _plRowUnder(e);
   if (!hit || hit.idx === from) return;
   e.preventDefault();
@@ -282,7 +398,7 @@ async function persistPlaylistOrder(from, to) {
     setState('userPlaylists', playlists);
     renderPlaylistList(playlists);
   } catch (err) {
-    showToast('排序保存失败: ' + errBrief(err), 'error');
+    showToast(t('toast.plSortSaveFailed', { msg: errBrief(err) }), 'error');
     renderPlaylistDetailSongs(pl.songs || []);
   }
 }
@@ -296,18 +412,18 @@ async function playPlaylistSong(idx) {
 async function _playFrom(list, idx) {
   const songs = Array.isArray(list) ? list : [];
   const song = songs[idx];
-  if (!song) { showToast('未找到歌曲', 'warn'); return; }
+  if (!song) { showToast(t('toast.songNotFound'), 'warn'); return; }
   const quality = resolveQuality(song.source);
-  showToast(`正在准备音源：${song.title}`, 'info');
+  showToast(t('toast.preparingSource', { title: song.title }), 'info');
   const reqId = ++_playlistPlayRequestId;
   try {
     const result = await api.getDownloadUrlSmart(song, quality);
     if (reqId !== _playlistPlayRequestId) return; // 已点别的歌，丢弃过期结果
     if (!result || !result.url) {
       if (result && result.code === 'VIP_REQUIRED') {
-        showToast('⚠️ 该歌曲为 VIP 专享，请登录后重试', 'warn', 5000);
+        showToast(t('toast.vipRequired'), 'warn', 5000);
       } else {
-        showToast('⚠️ 暂无法获取音源，请稍后重试', 'warn', 5000);
+        showToast(t('toast.noSource'), 'warn', 5000);
       }
       return;
     }
@@ -322,7 +438,7 @@ async function _playFrom(list, idx) {
     const proxied = await api.proxyPlay(result.url, referer);
     if (reqId !== _playlistPlayRequestId) return;
     if (!proxied || !proxied.fileUrl) {
-      showToast('⚠️ 音源获取失败', 'error', 5000);
+      showToast(t('toast.sourceFailed'), 'error', 5000);
       return;
     }
     // 整个歌单作为播放队列，从点击的歌开始
@@ -331,11 +447,11 @@ async function _playFrom(list, idx) {
     // currentPlaying 驱动托盘/迷你播放器/播放器卡片，也是 audio error 守卫的前置条件
     setState('currentPlaying', song);
     await loadAndPlay(song, proxied.fileUrl, true);
-    showToast('▶ 正在播放：' + song.title, 'success', 2500);
+    showToast(t('toast.nowPlaying', { title: song.title }), 'success', 2500);
   } catch (e) {
     if (reqId === _playlistPlayRequestId) {
       logger.warn('播放失败:', e);
-      showToast('⚠️ 播放失败：' + errBrief(e), 'error', 4000);
+      showToast(t('toast.playFailed', { msg: errBrief(e) }), 'error', 4000);
     }
   }
 }
@@ -347,7 +463,7 @@ function addPlaylistSongToQueue(idx) {
   const q = (getState('playQueue') || []).slice();
   q.push(song);
   setState('playQueue', q);
-  showToast('✅ 已加入播放队列', 'success');
+  showToast(t('toast.addedToPlayQueue'), 'success');
 }
 
 // ── 下载：单曲入队 / 整单入队（语义与搜索页 addDownload 一致）──
@@ -356,36 +472,36 @@ async function downloadPlaylistSong(idx, qualityOverride) {
   if (!song) return;
   const existing = (getState('queueSnapshot') || []).find(q =>
     q.id === song.id && q.source === song.source && q.status !== 'done');
-  if (existing) { showToast(`「${song.title}」已在队列中`, 'warn', 2500); return; }
+  if (existing) { showToast(t('toast.alreadyInQueue', { title: song.title }), 'warn', 2500); return; }
   const saveDir = getState('saveDir');
   const quality = qualityOverride || resolveQuality(song.source);
   try {
     const r = await api.addToQueue({ ...song, saveDir, quality });
-    if (r && r.duplicated) { showToast(`「${song.title}」已在下载队列中`, 'warn', 2500); return; }
+    if (r && r.duplicated) { showToast(t('toast.queueDup', { title: song.title }), 'warn', 2500); return; }
     if (r && r.alreadyDownloaded) {
       showRedownloadToast(song.title, r.finishedAt, () => {
         api.addToQueue({ ...song, saveDir, quality, forceRedownload: true })
-          .then(() => showToast(`「${song.title}」已加入下载队列`, 'success'))
-          .catch(e => showToast('加入失败: ' + errBrief(e), 'error'));
+          .then(() => showToast(t('toast.queueAdded', { title: song.title }), 'success'))
+          .catch(e => showToast(t('toast.addFailed', { msg: errBrief(e) }), 'error'));
       });
       return;
     }
-    if (r && r.queued) showToast(`「${song.title}」已加入下载队列`, 'success');
-    else showToast((r && r.error) || '加入下载队列失败', 'error');
+    if (r && r.queued) showToast(t('toast.queueAdded', { title: song.title }), 'success');
+    else showToast((r && r.error) || t('toast.enqueueFailed'), 'error');
   } catch (e) {
-    showToast('加入下载队列失败: ' + errBrief(e), 'error');
+    showToast(t('toast.enqueueFailedMsg', { msg: errBrief(e) }), 'error');
   }
 }
 
 /** 「▶ 播放全部」：整单进播放队列从第一首起连播（复用 playPlaylistSong 全语义） */
 async function playAllPlaylist() {
-  if (!_currentDetailSongs.length) { showToast('歌单为空', 'warn'); return; }
+  if (!_currentDetailSongs.length) { showToast(t('toast.playlistEmpty'), 'warn'); return; }
   await playPlaylistSong(0);
 }
 
 async function downloadAllPlaylist() {
   const songs = _currentDetailSongs.slice();
-  if (!songs.length) { showToast('歌单为空', 'warn'); return; }
+  if (!songs.length) { showToast(t('toast.playlistEmpty'), 'warn'); return; }
   const saveDir = getState('saveDir');
   const { toEnqueue, skipped: inQueue } = planSelEnqueue(songs, getState('queueSnapshot') || []);
   let queued = 0, dlSkipped = 0;
@@ -431,7 +547,7 @@ async function removeSongFromPlaylist(songId, source) {
       }
     }
   } catch (e) {
-    showToast('移除失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plRemoveFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -483,7 +599,7 @@ function togglePlSongSel(idx) {
 function plSelectAllVisible() {
   const pairs = _plVisiblePairs(_currentDetailSongs);
   const vis = keysOf(pairs.map(p => p.song));
-  if (!vis.size) { showToast('当前视图没有歌曲', 'info'); return; }
+  if (!vis.size) { showToast(t('toast.plNoVisibleSongs'), 'info'); return; }
   const allOn = [...vis].every(k => _plSelKeys.has(k));
   for (const k of vis) {
     if (allOn) _plSelKeys.delete(k);
@@ -493,14 +609,14 @@ function plSelectAllVisible() {
 }
 
 async function removeCheckedFromPlaylist() {
-  if (!_plSelKeys.size) { showToast('先勾选要移除的歌曲', 'warn'); return; }
+  if (!_plSelKeys.size) { showToast(t('toast.plPickRemoveFirst'), 'warn'); return; }
   if (!_currentPlaylistId) return;
   const playlists = getState('userPlaylists') || [];
   const pl = playlists.find(p => p.id === _currentPlaylistId);
   if (!pl) return;
   const { keep, removed } = splitBySelection(pl.songs || [], _plSelKeys);
   if (!removed.length) { _plSelKeys = new Set(); _syncPlSelBtns(); return; }
-  if (!await askConfirm(`确认把 ${removed.length} 首歌移出歌单「${pl.name}」？（不会删除已下载的文件）`)) return;
+  if (!await askConfirm(t('toast.plConfirmRemove', { count: removed.length, name: pl.name }))) return;
   try {
     const r = await api.saveUserPlaylist({
       id: pl.id, name: pl.name, desc: pl.desc || '', cover: pl.cover || '', songs: keep,
@@ -514,13 +630,13 @@ async function removeCheckedFromPlaylist() {
       _plSelKeys = new Set();
       renderPlaylistDetailSongs(r.playlist.songs || []);
       renderPlaylistList(playlists);
-      showToast(`🗑 已移出 ${removed.length} 首`, 'success');
+      showToast(t('toast.plRemoved', { count: removed.length }), 'success');
     } else {
-      showToast((r && r.error) || '移除失败', 'error');
+      showToast((r && r.error) || t('toast.plRemoveFailedShort'), 'error');
     }
   } catch (e) {
     logger.error('[removeCheckedFromPlaylist] 失败:', e);
-    showToast('移除失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plRemoveFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -532,7 +648,7 @@ function _plSelPicked() {
 
 async function plSelDownload() {
   const picked = _plSelPicked();
-  if (!picked.length) { showToast('先勾选要下载的歌曲', 'warn'); return; }
+  if (!picked.length) { showToast(t('toast.plPickDownloadFirst'), 'warn'); return; }
   const saveDir = getState('saveDir');
   const { toEnqueue, skipped } = planSelEnqueue(picked, getState('queueSnapshot') || []);
   let queued = 0, dlSkipped = 0;
@@ -544,13 +660,13 @@ async function plSelDownload() {
       else if (r && r.alreadyDownloaded) dlSkipped++;
     } catch (e) { logger.warn('歌单多选入队失败:', song.title, e.message); }
   }
-  showToast(`⬇ 已加入 ${queued} 首${enqueueSkipSuffix(skipped, dlSkipped)}`,
+  showToast(t('toast.plBatchQueued', { count: queued, extra: enqueueSkipSuffix(skipped, dlSkipped) }),
     queued || dlSkipped ? 'success' : 'info', 3200);
 }
 
 async function plSelPlay() {
   const picked = _plSelPicked();
-  if (!picked.length) { showToast('先勾选要播放的歌曲', 'warn'); return; }
+  if (!picked.length) { showToast(t('toast.plPickPlayFirst'), 'warn'); return; }
   // 勾选的歌单独组成播放队列，从第一首起连播（整单 playQueue 被替换是刻意语义）
   await _playFrom(picked, 0);
 }
@@ -596,7 +712,7 @@ function useFirstSongCover() {
   const coverInput = document.getElementById('playlistEditorCover');
   const pl = (getState('userPlaylists') || []).find(p => p.id === modal.dataset.editId);
   const c = pickFirstSongCover(pl && pl.songs);
-  if (!c) { showToast('歌内没有可用的封面链接', 'warn'); return; }
+  if (!c) { showToast(t('toast.plNoCoverInSongs'), 'warn'); return; }
   coverInput.value = c;
 }
 
@@ -613,7 +729,7 @@ async function savePlaylist() {
 
   const name = nameInput.value.trim();
   if (!name) {
-    showToast('请输入歌单名称', 'warn');
+    showToast(t('toast.plNameRequired'), 'warn');
     nameInput.focus();
     return;
   }
@@ -621,7 +737,7 @@ async function savePlaylist() {
   // 封面留空=清除（''），非法协议直接拦下（normalizeCoverUrl 非 http(s) → null）
   const cover = coverInput ? normalizeCoverUrl(coverInput.value) : '';
   if (cover === null) {
-    showToast('封面链接需以 http:// 或 https:// 开头', 'warn');
+    showToast(t('toast.plCoverHttpRequired'), 'warn');
     if (coverInput) coverInput.focus();
     return;
   }
@@ -643,12 +759,12 @@ async function savePlaylist() {
     if (result.success) {
       await loadUserPlaylists();
       closePlaylistEditor();
-      showToast(editId ? '✅ 歌单已更新' : '✅ 歌单已创建', 'success');
+      showToast(editId ? t('toast.plUpdated') : t('toast.plCreated'), 'success');
     } else {
-      showToast(result.error || '保存失败', 'error');
+      showToast(result.error || t('toast.saveFailed'), 'error');
     }
   } catch (e) {
-    showToast('保存失败: ' + errBrief(e), 'error');
+    showToast(t('toast.saveFailedDetail', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -661,24 +777,24 @@ async function deletePlaylist(playlistId) {
   // 增量156（审计 F2）：删除必见影响 —— 确认框点名歌单与歌数，
   // 删后 5 秒撤销窗口（走 utils.showActionToast，回收站兜底见 main/ipc/playlist.js）
   const pl = (getState('userPlaylists') || []).find(p => p && p.id === playlistId);
-  if (!pl) { showToast('歌单不存在或已刷新，请重试', 'warn'); return; }
+  if (!pl) { showToast(t('toast.plNotFound'), 'warn'); return; }
   const n = Array.isArray(pl.songs) ? pl.songs.length : 0;
-  if (!await askConfirm(`确认删除歌单「${pl.name}」？\n\n• 歌单里有 ${n} 首歌 —— 删的只是这份清单，歌曲文件与红心收藏都不受影响\n• 删除后 5 秒内可点「撤销」原样找回`)) return;
+  if (!await askConfirm(t('toast.plConfirmDelete', { name: pl.name, count: n }))) return;
   try {
     const result = await api.deleteUserPlaylist(playlistId);
     if (result.success) {
       await loadUserPlaylists();
       showActionToast({
-        text: `歌单「${pl.name}」已删除`,
-        btnLabel: '撤销',
+        text: t('toast.plDeleted', { name: pl.name }),
+        btnLabel: t('toast.undo'),
         ttl: 5000,
         onConfirm: () => undoDeletePlaylist(pl),
       });
     } else {
-      showToast(result.error || '删除失败', 'error');
+      showToast(result.error || t('toast.deleteFailedShort'), 'error');
     }
   } catch (e) {
-    showToast('删除失败: ' + errBrief(e), 'error');
+    showToast(t('toast.deleteFailedMsg', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -689,12 +805,12 @@ async function undoDeletePlaylist(pl) {
     const back = await api.saveUserPlaylist(pl);
     if (back && back.success) {
       await loadUserPlaylists();
-      showToast(`✅ 已撤销，歌单「${pl.name}」已找回`, 'success');
+      showToast(t('toast.plUndoDeleted', { name: pl.name }), 'success');
     } else {
-      showToast((back && back.error) || '撤销失败', 'error');
+      showToast((back && back.error) || t('toast.plUndoFailedShort'), 'error');
     }
   } catch (e) {
-    showToast('撤销失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plUndoFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -759,37 +875,37 @@ function closePlaylistTrash() {
 
 async function restoreTrashedPlaylist(playlistId) {
   const e = _plTrash.find(t => t.playlist && t.playlist.id === playlistId);
-  if (!e) { showToast('该歌单已不在回收站，请刷新重试', 'warn'); return; }
+  if (!e) { showToast(t('toast.plNotInTrash'), 'warn'); return; }
   try {
     const r = await api.saveUserPlaylist(e.playlist);
     if (r && r.success) {
       await loadUserPlaylists();
-      showToast(`✅ 歌单「${e.playlist.name}」已恢复`, 'success');
+      showToast(t('toast.plRestored', { name: e.playlist.name }), 'success');
     } else {
-      showToast((r && r.error) || '恢复失败', 'error');
+      showToast((r && r.error) || t('toast.plRestoreFailedShort'), 'error');
     }
   } catch (err) {
-    showToast('恢复失败: ' + errBrief(err), 'error');
+    showToast(t('toast.plRestoreFailed', { msg: errBrief(err) }), 'error');
   }
 }
 
 async function purgeTrashedPlaylist(playlistId) {
   // 增量157：彻底删除是真正不可逆的一层，确认框照 F2 纪律点名歌单与歌数
   const e = _plTrash.find(t => t.playlist && t.playlist.id === playlistId);
-  if (!e) { showToast('该歌单已不在回收站，请刷新重试', 'warn'); return; }
+  if (!e) { showToast(t('toast.plNotInTrash'), 'warn'); return; }
   const pl = e.playlist;
   const n = Array.isArray(pl.songs) ? pl.songs.length : 0;
-  if (!await askConfirm(`彻底删除歌单「${pl.name}」？\n\n• 歌单里有 ${n} 首歌，彻底删除后无法再找回（仍在 30 天期限内的其他歌单不受影响）\n• 歌曲文件与红心收藏不受影响`)) return;
+  if (!await askConfirm(t('toast.plConfirmPurge', { name: pl.name, count: n }))) return;
   try {
     const r = await api.deleteUserPlaylist(playlistId);
     if (r && r.success) {
       await refreshPlTrash();
-      showToast(`歌单「${pl.name}」已彻底删除`, 'success');
+      showToast(t('toast.plPurged', { name: pl.name }), 'success');
     } else {
-      showToast((r && r.error) || '删除失败', 'error');
+      showToast((r && r.error) || t('toast.deleteFailedShort'), 'error');
     }
   } catch (err) {
-    showToast('删除失败: ' + errBrief(err), 'error');
+    showToast(t('toast.deleteFailedMsg', { msg: errBrief(err) }), 'error');
   }
 }
 
@@ -801,7 +917,7 @@ async function quickAddToPlaylist(songOrList) {
     if (!list.length) return;
     const playlists = getState('userPlaylists') || [];
     if (playlists.length === 0) {
-      showToast('请先创建一个歌单', 'warn');
+      showToast(t('toast.plCreateFirst'), 'warn');
       openPlaylistEditor(null);
       return;
     }
@@ -879,11 +995,14 @@ async function _addListToPlaylist(playlistId, list) {
       if (_currentPlaylistId === playlistId) renderPlaylistDetailSongs(lastPl.songs || []);
     }
   }
+  // 汇总串三段都是词条，段间分隔用语言中立的间隔号（同 app.js:1057 的批量入队汇总）：
+  // 分句硬编码中文时 LEDGER 判据失明（首实参是 parts.join(...) 表达式，扫不到字面量），
+  // 台账归零而英文界面照旧整句中文 —— 只把分隔符接进词典是"假进度"里最隐蔽的一种。
   const parts = [];
-  if (added) parts.push(`已加入 ${added} 首`);
-  if (skipped) parts.push(`跳过已在歌单 ${skipped} 首`);
-  if (failed) parts.push(`失败 ${failed} 首`);
-  showToast(parts.length ? parts.join('，') : '没有歌曲被加入', added ? 'success' : 'warn');
+  if (added) parts.push(t('toast.batchQueued', { count: added, extra: '' }));
+  if (skipped) parts.push(t('toast.plBatchSkipped', { count: skipped }));
+  if (failed) parts.push(t('toast.plBatchAddFailed', { count: failed }));
+  showToast(parts.length ? parts.join(t('toast.listSeparator')) : t('toast.plNothingAdded'), added ? 'success' : 'warn');
 }
 
 async function addToPlaylistAndNotify(playlistId, song) {
@@ -891,9 +1010,9 @@ async function addToPlaylistAndNotify(playlistId, song) {
     const result = await api.addToUserPlaylist(playlistId, song);
     if (result.success) {
       if (result.skipped) {
-        showToast('⚠️ 歌曲已在歌单中', 'warn');
+        showToast(t('toast.plSongAlreadyIn'), 'warn');
       } else {
-        showToast('✅ 已添加到歌单', 'success');
+        showToast(t('toast.plSongAdded'), 'success');
         const playlists = getState('userPlaylists') || [];
         const idx = playlists.findIndex(p => p.id === playlistId);
         if (idx >= 0) {
@@ -905,7 +1024,7 @@ async function addToPlaylistAndNotify(playlistId, song) {
       }
     }
   } catch (e) {
-    showToast('添加失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plAddFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -992,7 +1111,7 @@ function _ensurePlAddModal() {
 }
 
 function openPlaylistAddSongs() {
-  if (!_currentPlaylistId) { showToast('请先打开一个歌单', 'warn'); return; }
+  if (!_currentPlaylistId) { showToast(t('toast.plOpenFirst'), 'warn'); return; }
   const m = _ensurePlAddModal();
   m.classList.remove('hidden');
   const input = document.getElementById('plAddInput');
@@ -1010,7 +1129,7 @@ function closePlaylistAddSongs() {
 async function doPlAddSearch() {
   const kw = (document.getElementById('plAddInput').value || '').trim();
   const box = document.getElementById('plAddResults');
-  if (!kw) { showToast('请输入搜索关键词', 'warn'); return; }
+  if (!kw) { showToast(t('toast.plKeywordRequired'), 'warn'); return; }
   const reqId = ++_plAddReqId;
   box.innerHTML = '<div class="empty-hint" style="text-align:center;padding:20px;">搜索中…</div>';
   try {
@@ -1058,10 +1177,10 @@ async function plAddPick(i) {
   if (!song || !_currentPlaylistId) return;
   try {
     const r = await api.addToUserPlaylist(_currentPlaylistId, song);
-    if (!r || !r.success) { showToast((r && r.error) || '添加失败', 'error'); return; }
-    if (r.skipped) showToast('⚠️ 歌曲已在歌单中', 'warn');
+    if (!r || !r.success) { showToast((r && r.error) || t('toast.plAddFailedShort'), 'error'); return; }
+    if (r.skipped) showToast(t('toast.plSongAlreadyIn'), 'warn');
     else {
-      showToast('✅ 已添加：' + (song.title || ''), 'success');
+      showToast(t('toast.plSongAddedTitle', { title: song.title || '' }), 'success');
       const playlists = getState('userPlaylists') || [];
       const idx = playlists.findIndex(p => p.id === _currentPlaylistId);
       if (idx >= 0 && r.playlist) {
@@ -1072,7 +1191,7 @@ async function plAddPick(i) {
     }
     _renderPlAddList(); // 该行刷成 ✓，可继续加下一首
   } catch (e) {
-    showToast('添加失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plAddFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -1082,7 +1201,7 @@ let _plExportBusy = false;
 
 async function exportCurrentPlaylistM3u() {
   const songs = _currentDetailSongs || [];
-  if (!songs.length) { showToast('当前歌单没有歌曲可导出', 'warn', 2500); return; }
+  if (!songs.length) { showToast(t('toast.plNothingToExport'), 'warn', 2500); return; }
   if (_plExportBusy) return;
   _plExportBusy = true;
   try {
@@ -1099,10 +1218,10 @@ async function exportCurrentPlaylistM3u() {
       name: 'MusicDL-' + sanitizeFileBase(name),
     });
     if (r && r.canceled) return;
-    if (r && r.success) showToast(`⤴ 已导出 ${songs.length} 首：${r.path}`, 'success', 3500);
-    else showToast((r && r.error) || '导出失败', 'error');
+    if (r && r.success) showToast(t('toast.plExported', { count: songs.length, path: r.path }), 'success', 3500);
+    else showToast((r && r.error) || t('toast.exportFailedShort'), 'error');
   } catch (e) {
-    showToast('导出失败: ' + errBrief(e), 'error');
+    showToast(t('toast.exportFailed', { msg: errBrief(e) }), 'error');
   } finally {
     _plExportBusy = false;
   }
@@ -1135,7 +1254,7 @@ function _ensurePlMergeModal() {
 }
 
 async function openPlaylistMergePicker() {
-  if (!_currentPlaylistId) { showToast('请先打开一个歌单', 'warn'); return; }
+  if (!_currentPlaylistId) { showToast(t('toast.plOpenFirst'), 'warn'); return; }
   const m = _ensurePlMergeModal();
   m.classList.remove('hidden');
   const box = document.getElementById('plMergeList');
@@ -1168,27 +1287,27 @@ function closePlaylistMergePicker() {
 
 async function mergePlaylistIntoCurrent(srcId) {
   if (!_currentPlaylistId || _plMerging) return;
-  if (srcId === _currentPlaylistId) { showToast('不能合并到自己', 'warn'); return; }
+  if (srcId === _currentPlaylistId) { showToast(t('toast.plMergeSelf'), 'warn'); return; }
   _plMerging = true;
   try {
     // 实时重拉两侧：卡片列表 state 可能已被其他入口改脏
     const all = (await api.getUserPlaylists()) || [];
     const target = all.find(p => p && p.id === _currentPlaylistId);
     const src = all.find(p => p && p.id === srcId);
-    if (!target || !src) { showToast('歌单已不存在，请刷新重试', 'warn'); return; }
+    if (!target || !src) { showToast(t('toast.plGone'), 'warn'); return; }
     const merged = mergeSongLists(target.songs || [], src.songs || []);
     if (!merged.added) {
-      showToast(`「${src.name}」没有新歌可合入（重复 ${merged.dup} 首）`, 'info');
+      showToast(t('toast.plMergeNothing', { name: src.name, dup: merged.dup }), 'info');
       return;
     }
     const r = await api.saveUserPlaylist({ id: target.id, name: target.name, songs: merged.songs });
-    if (!r || !r.success) { showToast('合并失败：' + ((r && r.error) || '未知错误'), 'error'); return; }
+    if (!r || !r.success) { showToast(t('toast.plMergeFailedMsg', { msg: (r && r.error) || t('toast.unknownError') }), 'error'); return; }
     renderPlaylistDetailSongs((r.playlist && r.playlist.songs) || merged.songs);
     loadUserPlaylists(); // 卡片曲数/排序随合并后数据刷新
     closePlaylistMergePicker();
-    showToast(`📥 已把「${src.name}」的 ${merged.added} 首合入本歌单（跳过重复 ${merged.dup} 首）`, 'success', 3500);
+    showToast(t('toast.plMergeDone', { name: src.name, added: merged.added, dup: merged.dup }), 'success', 3500);
   } catch (e) {
-    showToast('合并失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plMergeFailed', { msg: errBrief(e) }), 'error');
   } finally {
     _plMerging = false;
   }
@@ -1203,18 +1322,18 @@ async function dedupeCurrentPlaylist() {
   try {
     const all = (await api.getUserPlaylists()) || [];
     const pl = all.find(p => p && p.id === _currentPlaylistId);
-    if (!pl) { showToast('歌单已不存在，请刷新重试', 'warn'); return; }
+    if (!pl) { showToast(t('toast.plGone'), 'warn'); return; }
     const before = (pl.songs || []).length;
     const merged = mergeSongLists(pl.songs || [], []);
     const removed = before - merged.songs.length;
-    if (!removed) { showToast('本歌单没有重复歌曲', 'info'); return; }
+    if (!removed) { showToast(t('toast.plNoDupSongs'), 'info'); return; }
     const r = await api.saveUserPlaylist({ id: pl.id, name: pl.name, songs: merged.songs });
-    if (!r || !r.success) { showToast('清理失败：' + ((r && r.error) || '未知错误'), 'error'); return; }
+    if (!r || !r.success) { showToast(t('toast.plCleanFailedMsg', { msg: (r && r.error) || t('toast.unknownError') }), 'error'); return; }
     renderPlaylistDetailSongs((r.playlist && r.playlist.songs) || merged.songs);
     loadUserPlaylists(); // 卡片曲数同步
-    showToast(`🧹 已移除 ${removed} 首重复歌曲，保留 ${merged.songs.length} 首`, 'success', 3000);
+    showToast(t('toast.plDeduped', { removed, kept: merged.songs.length }), 'success', 3000);
   } catch (e) {
-    showToast('清理失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plCleanFailed', { msg: errBrief(e) }), 'error');
   } finally {
     _plDedupeBusy = false;
   }
@@ -1230,14 +1349,14 @@ async function duplicateCurrentPlaylist() {
   try {
     const all = (await api.getUserPlaylists()) || [];
     const pl = all.find(p => p && p.id === _currentPlaylistId);
-    if (!pl) { showToast('歌单已不存在，请刷新重试', 'warn'); return; }
+    if (!pl) { showToast(t('toast.plGone'), 'warn'); return; }
     const newName = dupPlaylistName(pl.name, all.map(p => p && p.name).filter(Boolean));
     const r = await api.saveUserPlaylist(dupPlaylistPayload(pl, newName));
-    if (!r || !r.success) { showToast('复制失败：' + ((r && r.error) || '未知错误'), 'error'); return; }
+    if (!r || !r.success) { showToast(t('toast.plCopyFailedMsg', { msg: (r && r.error) || t('toast.unknownError') }), 'error'); return; }
     loadUserPlaylists(); // 卡片列表随新副本刷新
-    showToast(`📋 已另存副本「${newName}」（${(pl.songs || []).length} 首）`, 'success', 3000);
+    showToast(t('toast.plCopied', { name: newName, count: (pl.songs || []).length }), 'success', 3000);
   } catch (e) {
-    showToast('复制失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plCopyFailed', { msg: errBrief(e) }), 'error');
   } finally {
     _plDupBusy = false;
   }
@@ -1247,9 +1366,9 @@ async function duplicateCurrentPlaylist() {
 // 发群聊直接贴清单；增量58 是行级分享文案（带链接），这里是清单级，零新通道
 async function copyPlaylistListText() {
   const lines = toTrackLines(_plVisiblePairs(_currentDetailSongs).map(p => p.song));
-  if (!lines.length) { showToast('当前视图没有可复制的歌曲', 'info'); return; }
+  if (!lines.length) { showToast(t('toast.plNothingToCopy'), 'info'); return; }
   const ok = await copyText(lines.join('\n'));
-  showToast(ok ? `📋 已复制 ${lines.length} 首歌名清单` : '复制失败：剪贴板被占用或无权限', ok ? 'success' : 'error', 2500);
+  showToast(ok ? t('toast.plCopiedTitles', { count: lines.length }) : t('toast.copyFailed'), ok ? 'success' : 'error', 2500);
 }
 
 // ── 🧮 跨歌单重复检测（增量117）：纯函数扫描 + 报告弹层 + 复制，零新通道 ──
@@ -1291,9 +1410,9 @@ function showDedupeModal(groups) {
 
 function scanCrossPlaylistDupes() {
   const pls = (getState('userPlaylists') || []).filter(p => p && Array.isArray(p.songs));
-  if (pls.length < 2) { showToast('至少要有两个歌单才谈得上「跨单重复」', 'info'); return; }
+  if (pls.length < 2) { showToast(t('toast.plNeedTwoForDup'), 'info'); return; }
   const groups = findCrossPlaylistDupes(pls);
-  if (!groups.length) { showToast(`🧮 ${pls.length} 个歌单互不重复，很干净`, 'success', 2500); return; }
+  if (!groups.length) { showToast(t('toast.plNoCrossDup', { count: pls.length }), 'success', 2500); return; }
   showDedupeModal(groups);
 }
 
@@ -1304,32 +1423,32 @@ function closeDedupeScanModal() {
 
 async function copyDedupeScanReport() {
   const body = dedupeScanText(_dedupeGroups);
-  if (!body) { showToast('没有可复制的内容', 'info'); return; }
+  if (!body) { showToast(t('toast.plNothingToCopyContent'), 'info'); return; }
   const ok = await copyText(`🧮 MusicDL 跨歌单重复报告（${_dedupeGroups.length} 首）\n${body}`);
-  showToast(ok ? '📋 重复报告已复制' : '复制失败：剪贴板被占用或无权限', ok ? 'success' : 'error', 2500);
+  showToast(ok ? t('toast.plDupReportCopied') : t('toast.copyFailed'), ok ? 'success' : 'error', 2500);
 }
 
 /** 🧲 收拢一组重复（增量118）：留首见单、其余整单更新，写完重扫刷新弹层 */
 async function consolidateDup(i) {
   const g = _dedupeGroups[i];
-  if (!g || !g.key) { showToast('该行缺身份键，收拢不了，重新扫描试试', 'warn'); return; }
+  if (!g || !g.key) { showToast(t('toast.plNoKeyToConsolidate'), 'warn'); return; }
   const plan = planConsolidate(getState('userPlaylists') || [], g.key);
-  if (!plan) { showToast('这些歌单里该歌已变化，重新扫描看看', 'info'); closeDedupeScanModal(); return; }
-  if (!await askConfirm(`「${g.title}」保留在「${plan.keepPlName}」，从其他 ${plan.updates.length} 个歌单移出 ${plan.removed} 份？（不删文件）`)) return;
+  if (!plan) { showToast(t('toast.plSongChanged'), 'info'); closeDedupeScanModal(); return; }
+  if (!await askConfirm(t('toast.plConfirmConsolidate', { title: g.title, keep: plan.keepPlName, others: plan.updates.length, removed: plan.removed }))) return;
   try {
     let done = 0;
     for (const u of plan.updates) {
       const r = await api.saveUserPlaylist(u);
       if (r && r.success) done++;
     }
-    if (!done) { showToast('收拢失败：一个歌单都没写成', 'error'); return; }
+    if (!done) { showToast(t('toast.plConsolidateNone'), 'error'); return; }
     if (typeof window.loadUserPlaylists === 'function') await window.loadUserPlaylists();
-    showToast(`🧲 「${g.title}」已收拢到「${plan.keepPlName}」（移出 ${plan.removed} 份）`, 'success', 3000);
+    showToast(t('toast.plConsolidated', { title: g.title, keep: plan.keepPlName, removed: plan.removed }), 'success', 3000);
     const rest = findCrossPlaylistDupes((getState('userPlaylists') || []).filter(p => p && Array.isArray(p.songs)));
     if (rest.length) showDedupeModal(rest); else closeDedupeScanModal();
   } catch (e) {
     logger.error('[consolidateDup] 失败:', e);
-    showToast('收拢失败: ' + errBrief(e), 'error');
+    showToast(t('toast.plConsolidateFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -1355,18 +1474,24 @@ function initPlaylistView() {
 }
 
 // 🎯 定位正在播放的歌：行选择器 data-pidx 存的是存储序下标，排序视图也能命中
-function locatePlayingInDetail() {
-  if (!_currentPlaylistId) { showToast('先打开一个歌单', 'info'); return; }
+//
+// 为什么必须 async：data-pidx 落在第 150 行的那种歌，只有等分片全部追加完
+// 才在 DOM 里。旧版同步查一次就下结论，于是大歌单里"点定位"恒弹
+// toast.plRowNotVisible —— 那句诊断把用户往排序/过滤上带，而真实原因只是
+// 渲染还没跑完。改成先 await 分片落地，再判断可见性。
+async function locatePlayingInDetail() {
+  if (!_currentPlaylistId) { showToast(t('toast.plOpenOneFirst'), 'info'); return; }
   const cur = typeof getState === 'function' ? getState('currentPlaying') : null;
   const idx = indexOfPlaying(_currentDetailSongs, cur);
-  if (idx < 0) { showToast('正在播放的歌不在本歌单', 'info'); return; }
+  if (idx < 0) { showToast(t('toast.plNotInThisPlaylist'), 'info'); return; }
+  await _plRenderIdle();
   let row = document.querySelector(`#playlistDetailSongs .song-row[data-pidx="${idx}"]`);
-  if (!row && _plSongKw) { // 被关键词过滤藏了：清过滤重渲染后再找
+  if (!row && _plSongKw) { // 被关键词过滤藏了：清过滤重渲染后再找（这一轮也要等）
     _plSongKw = '';
-    renderPlaylistDetailSongs(_currentDetailSongs);
+    await renderPlaylistDetailSongs(_currentDetailSongs);
     row = document.querySelector(`#playlistDetailSongs .song-row[data-pidx="${idx}"]`);
   }
-  if (!row) { showToast('该行当前不在可见列表（检查排序/过滤）', 'info'); return; }
+  if (!row) { showToast(t('toast.plRowNotVisible'), 'info'); return; }
   flashRow(row);
 }
 
@@ -1385,6 +1510,11 @@ window.mergePlaylistIntoCurrent = mergePlaylistIntoCurrent;
 window.dedupeCurrentPlaylist = dedupeCurrentPlaylist;
 window.copyPlaylistListText = copyPlaylistListText;
 window.locatePlayingInDetail = locatePlayingInDetail;
+// 分片排空句柄也桥出去：local.js（localGridRenderIdle）与 converter.js
+// （converterRenderIdle）都这么做，本文件是三家里唯一没有的。桥出去有两个用处 ——
+// 别的视图/命令面板可以"等列表画完"再做按下标的操作，测试也不必再靠
+// setTimeout 猜帧数（那正是首版测试假红/挂死的来源）。
+window.playlistRenderIdle = _plRenderIdle;
 window.playAllPlaylist = playAllPlaylist;
 window.removeSongFromPlaylist = removeSongFromPlaylist;
 window.openPlaylistEditor = openPlaylistEditor;

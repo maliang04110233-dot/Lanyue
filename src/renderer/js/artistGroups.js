@@ -51,6 +51,36 @@ export function groupAlbums(songs) {
   return _groupField(songs, 'album', UNKNOWN_ALBUM);
 }
 
+/**
+ * 封面墙卡片分组（增量212）：按专辑聚合，取组内第一张非空封面，
+ * 收集去重后的歌手名。纯函数，node 直测。
+ * @param {Array} songs 本地曲库歌曲（{album, artist, cover} 宽松取数）
+ * @returns {Array<{album:string,count:number,artists:string,cover:string|null}>}
+ *   数量降序、同数按专辑 zh 拼音序
+ */
+export function groupSongsForAlbumWall(songs) {
+  if (!Array.isArray(songs)) return [];
+  const map = new Map();
+  for (const s of songs) {
+    if (!s) continue;
+    const name = normalizeGroupKey(s.album, UNKNOWN_ALBUM);
+    let g = map.get(name);
+    if (!g) { g = { album: name, count: 0, cover: null, artistSet: new Set() }; map.set(name, g); }
+    g.count++;
+    if (!g.cover && typeof s.cover === 'string' && s.cover) g.cover = s.cover;
+    const artist = normalizeGroupKey(s.artist, UNKNOWN_ARTIST);
+    g.artistSet.add(artist);
+  }
+  const out = Array.from(map.values()).map(g => ({
+    album: g.album,
+    count: g.count,
+    artists: Array.from(g.artistSet).join(' / '),
+    cover: g.cover,
+  }));
+  out.sort((a, b) => b.count - a.count || a.album.localeCompare(b.album, 'zh'));
+  return out;
+}
+
 /** 柱宽百分比：非零最少 8%（与趋势面板 barPct 同手感） */
 export function groupBarPct(count, max) {
   if (!count || !max || max <= 0) return 0;

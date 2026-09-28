@@ -111,6 +111,10 @@ let _userInitiated = false;
 let _flowInFlight = false;
 // 本轮是否真的试过镜像源：措辞要跟着事实走，否则「已自动重试多次」变成假话
 let _mirrorTried = false;
+// 本轮镜像是否被信任闸门拦下（产物未签名 ⇒ 签名校验空转 ⇒ 镜像不可信）。
+// 与 _mirrorTried 分开记，因为两者的用户文案不同：前者是「试过但都不通」，
+// 后者是「压根没试，因为装了它也不可信」。
+let _mirrorBlocked = false;
 
 /**
  * 失败出口的唯一派生点：文案 + 手动下载入口。
@@ -126,6 +130,7 @@ function manualFailureInfo(err) {
     manualUrl,
     message: describeUpdateError(err, {
       mirrorTried: _mirrorTried,
+      mirrorBlocked: _mirrorBlocked,
       manualAvailable: !!manualUrl,
     }),
   };
@@ -145,16 +150,30 @@ autoUpdater.on('error', (err) => {
 // GitHub 直连在部分网络下间歇性全灭（实测检查更新 3 连败）。
 // 直连耗尽重试后，逐个尝试镜像 feed（派生自 app-update.yml，见 updateMirror.js）。
 // 镜像路径每次只做一次尝试：镜像本身是兜底，多试只会让用户等更久。
+//
+// 但镜像不是无条件可用的：产物无 publisherName ⇒ 更新签名校验空转 ⇒
+// 镜像提供的安装包无从验证。此时 useMirrorFeed 抛 UntrustedMirrorError，
+// 镜像**不参与**本轮兜底，措辞也必须跟着改成「镜像因未签名而停用」，
+// 不能说「镜像源均已试过」——那句话在这种情况下是假话。
 async function tryMirrorFeeds(label) {
   const feeds = getMirrorFeeds();
-  if (feeds.length) _mirrorTried = true;
+  if (!feeds.length) return false;
   for (let i = 0; i < feeds.length; i++) {
     try {
       logger.warn(`[Updater] ${label}：直连失败，尝试镜像源 ${i + 1}/${feeds.length}`);
       useMirrorFeed(autoUpdater, feeds[i]);
+      _mirrorTried = true;
       await autoUpdater.checkForUpdates();
       return true;
     } catch (err) {
+      if (err && err.code === 'ERR_UPDATE_MIRROR_UNTRUSTED') {
+        // 信任闸门拦下 —— 这是配置事实，不是「某个镜像挂了」。整轮都不再试：
+        // 换另一个镜像源同样无 publisherName 可用，试下去只是让用户多等。
+        _mirrorBlocked = true;
+        logger.warn(`[Updater] 镜像兜底已停用: ${err.message}`);
+        return false;
+      }
+      _mirrorTried = true;
       logger.warn(`[Updater] 镜像源 ${i + 1} 失败: ${err.message}`);
     }
   }
@@ -166,6 +185,7 @@ handle('check-for-update', async () => {
   _userInitiated = true;
   _flowInFlight = true;
   _mirrorTried = false;
+  _mirrorBlocked = false;
   try {
     try {
       await checkForUpdatesWithRetry();

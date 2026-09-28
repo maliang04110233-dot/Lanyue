@@ -50,20 +50,30 @@ function manualDownloadHint(opts) {
  * 把裸的网络错误翻译成用户能行动的一句话。
  *
  * @param {Error|string|null} err
- * @param {{mirrorTried?:boolean}} [opts] 镜像兜底是否已经跑过 —— 措辞必须跟着事实走，
+ * @param {{mirrorTried?:boolean, mirrorBlocked?:boolean}} [opts]
+ *        mirrorTried —— 镜像兜底是否真的跑过；措辞必须跟着事实走，
  *        否则「已自动重试多次」会在用户面前变成假话（实际还试了镜像）。
+ *        mirrorBlocked —— 镜像是被信任闸门拦下的（产物未签名，签名校验空转），
+ *        这时**不能**说「镜像源均已试过」：压根没试过，说了就是假话。
+ *        这种情况给手动下载入口反而更重要 —— 那是唯一走得通的路。
  * @returns {string} 非网络错误原样返回（无 message 时返回空串）
  */
 function describeUpdateError(err, opts = {}) {
   const msg = messageOf(err);
   if (isTlsFailure(err)) {
-    return '更新连接被证书校验挡住（常见于代理、VPN 或安全软件拦截），' +
-      '请检查这类网络中间件后再试' + manualDownloadHint(opts);
+    return '更新连接被证书校验挡住（常见于代理、VPN 或安全软件拦截），'
+      + '请检查这类网络中间件后再试' + manualDownloadHint(opts);
   }
   if (isTransportFailure(err)) {
-    const scope = opts.mirrorTried
-      ? 'GitHub 直连与镜像源均已试过'
-      : '已自动重试多次';
+    let scope;
+    if (opts.mirrorBlocked) {
+      scope = '已自动重试多次；镜像源因当前版本未做代码签名、'
+        + '无法验证安装包来源而未启用';
+    } else if (opts.mirrorTried) {
+      scope = 'GitHub 直连与镜像源均已试过';
+    } else {
+      scope = '已自动重试多次';
+    }
     return `网络连不上更新服务器（${scope}），请稍后再试` + manualDownloadHint(opts);
   }
   return msg;

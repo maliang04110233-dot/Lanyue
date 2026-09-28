@@ -59,7 +59,12 @@ test('接线钉：徽标渲染/逐首入队/防抖重渲染/palette/CSS 全部�
   assert.match(SUB_JS, /import \{ subDlPayload, subDlPayloadList, subNewSongById, subActiveQueueDup \} from '\.\.\/subNewDl\.js';/);
   assert.match(SUB_JS, /const queue = getState\('queueSnapshot'\) \|\| \[\];/, '渲染期取队列快照');
   assert.match(SUB_JS, /\$\{dlBadgeHtml\(s, queue\)\}<button class="btn-sm sub-new-dl"/, '行内徽标+下载按钮');
-  assert.match(SUB_JS, /onclick="subscriptionDownloadNew\('\$\{escAttr\(e\.key\)\}', '\$\{escAttr\(String\(s\.id\)\)\}'\)"/, 'onclick 键控传参全转义');
+  // ⚠️ 2026-09-28 修正：这里原先把 escAttr 当作「onclick 键控传参」的正确写法钉住，
+  // 但那一版写法本身是**可注入的**（escAttr 把 ' 转成 &#39;，浏览器取出内联事件
+  // 属性时会先把实体解码再当 JS 执行，' 于是又变回裸单引号、逃出字符串字面量）。
+  // e.key 含平台返回的 targetId、s.id 来自平台数据，均为外部不可信输入。
+  // 必须用 escQ（先转义反斜杠、再把 ' 转义成 \'）。详见 renderer-audit 的对照用例。
+  assert.match(SUB_JS, /onclick="subscriptionDownloadNew\('\$\{escQ\(e\.key\)\}', '\$\{escQ\(String\(s\.id\)\)\}'\)"/, 'onclick 键控传参必须走 escQ');
   assert.match(SUB_JS, /subDlPayloadList\(songs, getState\('saveDir'\), resolveQuality\)/, '全部入队复用纯函数');
   assert.doesNotMatch(SUB_JS, /songs\.map\(s => \(\{ \.\.\.s, saveDir/, '旧内联 payload 已移除');
   assert.match(SUB_JS, /async function subscriptionDownloadNew\(key, songId\) \{/);

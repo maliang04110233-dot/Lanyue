@@ -46,6 +46,9 @@ function stripCredentials(headers) {
 /** 网络层错误 / 超时 → 值得重试 */
 function isRetriableError(err) {
   if (!err) return false;
+  // SSRF 拦截不是网络故障：重试只会把同一个内网地址再打一遍，还正好给
+  // DNS rebinding 送出时间窗。唯一正确的处置是让调用方看见并改 URL。
+  if (err.ssrfBlocked) return false;
   if (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET' || err.code === 'EAI_AGAIN' || err.code === 'ECONNREFUSED') return true;
   if (err.message && /timeout|ECONNREFUSED|ECONNRESET|socket hang up|aborted/i.test(err.message)) return true;
   return false;
@@ -61,13 +64,45 @@ const MAX_REDIRECTS = 5;
 /** 请求超时默认值（ms）：普通 API 请求 / 音频链路探测 */
 const DEFAULT_TIMEOUT_MS = 15000;
 const PROBE_TIMEOUT_MS = 8000;
-function _followRedirects(url, options, redirectCount = 0, pinnedIps = null) {
+
+/**
+ * SSRF 拦截的唯一错误出口。
+ *
+ * 为什么单独造一个：这条错误绝不能落进重试通道（见 isRetriableError）。
+ * 消息前缀沿用既有的 `ssrf-blocked`，日志正则与上层判定不用跟着改。
+ * 只放 origin 不放完整 URL —— 平台 API 常把鉴权态（data/sign/key）塞查询串里。
+ */
+function _ssrfBlocked(stage, origin, reason) {
+  return Object.assign(
+    new Error(`ssrf-blocked ${stage}: ${origin} (${reason})`),
+    { ssrfBlocked: true },
+  );
+}
+
+/**
+ * 每一跳的 SSRF 闸口 —— 首跳与重定向跳共用这一处，判据同 _probeAudio。
+ *
+ * 过去只有 3xx 分支调它：第 0 跳（redirectCount === 0）整个裸奔，
+ * 「每一跳都过 urlGuard」那句注释对首跳是假的。当时没出事，只因为全仓
+ * 13 个调用点的 URL 都是硬编码平台域名；任何新增适配器（拼 HLS 分片 URL、
+ * 封面代理 URL）都会原样继承这个缺口，所以把闸口下沉到每一跳的必经之路。
+ *
+ * @param {string} stage 'entry' | 'redirect'，只用于让日志一眼看出是哪一跳被拦
+ * @returns {Promise<{ips: string[]|null}>} ips 交给 makePinnedLookup 固定连接，
+ *   闭合「校验 → 连接」之间的 rebinding 窗口；skipSsrf 时为 null（不钉）。
+ */
+function _guardHop(url, options, stage, origin) {
+  // skipSsrf 仅供本机测试服务器（与 downloader 的 skipSsrfCheck 同约定）
+  if (options.skipSsrf) return Promise.resolve({ ips: null });
+  return assertPublicHttpUrl(url).then((g) => {
+    if (!g.ok) throw _ssrfBlocked(stage, origin, g.reason);
+    return { ips: g.ips };
+  });
+}
+
+/** 真正发一跳（首跳与重定向跳共用）；pinnedIps 是本跳刚跑过闸口拿到的 IP */
+function _sendHop(url, options, redirectCount, parsedUrl, pinnedIps) {
   return new Promise((resolve, reject) => {
-    if (redirectCount > MAX_REDIRECTS) {
-      return reject(new Error(`重定向次数超过上限 ${MAX_REDIRECTS}`));
-    }
-    let parsedUrl;
-    try { parsedUrl = new URL(url); } catch (e) { return reject(new Error('invalid url: ' + url)); }
     const isHttps = parsedUrl.protocol === 'https:';
     const lib = isHttps ? https : http;
 
@@ -84,14 +119,14 @@ function _followRedirects(url, options, redirectCount = 0, pinnedIps = null) {
       },
       timeout: options.timeout || DEFAULT_TIMEOUT_MS,
     };
-    // DNS rebinding 闭合：上一跳 guard 校验过本跳域名时，连接固定用校验
-    // 时的 IP（Host/SNI 仍是原域名），杜绝"校验→连接"之间 DNS 调包
+    // DNS rebinding 闭合：本跳的 guard 校验过这个域名，连接就固定用校验时的
+    // IP（Host/SNI 仍是原域名），杜绝"校验→连接"之间 DNS 调包
     if (pinnedIps && pinnedIps.length) {
       reqOptions.lookup = makePinnedLookup(pinnedIps);
     }
 
     const req = lib.request(reqOptions, (res) => {
-      // 跟随重定向（递归时也走本函数，外层 retry 不重做这次内部重定向）
+      // 跟随重定向（递归时也走 _followRedirects，外层 retry 不重做这次内部重定向）
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         let nextUrl;
@@ -105,16 +140,12 @@ function _followRedirects(url, options, redirectCount = 0, pinnedIps = null) {
         if (nextUrl.hostname !== parsedUrl.hostname) {
           options = { ...options, headers: stripCredentials(options.headers || {}) };
         }
-        // M8: 每一跳都过 urlGuard（与 _probeAudio 同规则）—— 平台直链 302
-        // 即可把请求送进内网，入口校验拦不住后续跳；skipSsrf 仅供本机测试
-        const proceed = (ips) =>
-          _followRedirects(nextUrl.toString(), options, redirectCount + 1, ips).then(resolve).catch(reject);
-        if (options.skipSsrf) return proceed(null);
-        return assertPublicHttpUrl(nextUrl.toString())
-          .then(g => g.ok
-            ? proceed(g.ips)
-            : reject(new Error(`ssrf-blocked redirect: ${nextUrl.origin} (${g.reason})`)))
-          .catch(reject);
+        // M8: 下一跳从 _followRedirects 起步，闸口在那一跳的入口跑 ——
+        // 平台直链 302 即可把请求送进内网，入口校验拦不住后续跳。这里不
+        // 再单独校验一次：同一条链路上判据只有 _guardHop 一处，首跳/后续跳
+        // 不可能走出两套口径（这正是审计 P1-6 指出的缺口）。
+        return _followRedirects(nextUrl.toString(), options, redirectCount + 1)
+          .then(resolve).catch(reject);
       }
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -154,7 +185,26 @@ function _followRedirects(url, options, redirectCount = 0, pinnedIps = null) {
 }
 
 /**
+ * 发一跳：先过 SSRF 闸口，再连接。
+ *
+ * 校验与连接同源：拿闸口解析出的 IP 钉进 lookup，Host/SNI 仍用原域名。
+ */
+function _followRedirects(url, options, redirectCount = 0) {
+  if (redirectCount > MAX_REDIRECTS) {
+    return Promise.reject(new Error(`重定向次数超过上限 ${MAX_REDIRECTS}`));
+  }
+  let parsedUrl;
+  try { parsedUrl = new URL(url); } catch (e) { return Promise.reject(new Error('invalid url: ' + url)); }
+  return _guardHop(url, options, redirectCount === 0 ? 'entry' : 'redirect', parsedUrl.origin)
+    .then(({ ips }) => _sendHop(url, options, redirectCount, parsedUrl, ips));
+}
+
+/**
  * 公开 API：带重试的请求
+ *
+ * SSRF：入口 URL 与之后每一跳重定向都过 urlGuard（_guardHop 是唯一闸口），
+ * 被拦下时抛 ssrf-blocked 错误且**不进重试通道** —— 换个 URL 重试才有意义。
+ * options.skipSsrf 仅供本机测试服务器（与 downloader 的 skipSsrfCheck 同约定）。
  *
  * @param {string} url
  * @param {RequestOptions} options

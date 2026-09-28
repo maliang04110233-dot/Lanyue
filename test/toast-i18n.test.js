@@ -149,6 +149,56 @@ function feedbackSites(code) {
       out.push({ line: code.slice(0, m.index).split('\n').length, text: lits[0] });
     }
   }
+  return out.concat(accumulatorSites(code));
+}
+
+/** 反馈调用的首实参源码片段（判据⑥要靠它判断"这个数组攒的文案真的被展示了吗"） */
+function feedbackFirstArgs(code) {
+  const out = [];
+  for (const fn of FEEDBACK_FNS) {
+    const re = new RegExp('(^|[^A-Za-z0-9_$.])' + fn + '\\s*\\(', 'g');
+    let m;
+    while ((m = re.exec(code))) {
+      const arg = firstArg(code, m.index + m[0].length - 1);
+      if (arg !== null) out.push(arg);
+    }
+  }
+  return out;
+}
+
+/**
+ * 判据⑥（2026-09-28 新增）：**先 push 攒进数组、再 join 进出线**也算欠账。
+ *
+ * 来龙去脉（实测，不是推测）：views/playlist.js 的批量加歌汇总原先写作
+ *
+ *     parts.push(`已加入 ${added} 首`); …
+ *     showToast(parts.join(t('toast.listSeparator')) : …)
+ *
+ * 首实参是 `parts.join(…)` 表达式，里面**一个字面量都没有** ⇒ 判据只扫首实参时
+ * 整段失明。于是那次改动只把**分隔符**接进词典、三个分句留着硬编码中文，
+ * 而 LEDGER 里 views/playlist.js 的计数被从 98 改成"删项（归零）"——
+ * 台账宣告"该文件没有硬编码中文反馈"，英文界面上那一句照旧整句中文。
+ * 这正是 D4 段落里点名的"LEDGER 清零、界面照旧漏中文"的假进度。
+ *
+ * 为什么按 `.push(` 收口而不是把"函数体内任意字面量"都算进来：数组累加器是这类
+ * 失明唯一可静态识别、且误报率低的形状。要求数组**确实出现在某个反馈调用的首实参里**
+ * 才计数 —— 于是 `rows.push(html)` 这类"攒的是 DOM 片段、从不进 toast"的写法不受影响。
+ */
+function accumulatorSites(code) {
+  const shown = feedbackFirstArgs(code).join('\n');
+  const out = [];
+  const re = /(?:^|[^A-Za-z0-9_$.])([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*push\s*\(/g;
+  let m;
+  while ((m = re.exec(code))) {
+    const ident = m[1];
+    // 只认"这个数组的名字真的出现在反馈调用的首实参里"的累加器
+    if (!new RegExp('(^|[^A-Za-z0-9_$])' + ident + '(?![A-Za-z0-9_$])').test(shown)) continue;
+    const arg = firstArg(code, m.index + m[0].length - 1);
+    if (arg === null) continue;
+    const lits = hardcodedLiterals(arg);
+    if (!lits.length) continue;
+    out.push({ line: code.slice(0, m.index).split('\n').length, text: lits[0] });
+  }
   return out;
 }
 
@@ -259,6 +309,31 @@ test('自检：注释与函数名同形词不算欠账（stripComments 后扫）
 
 test('自检：非首实参里的中文不算欠账（判据只看被展示的那一段）', () => {
   assert.strictEqual(feedbackSites(`showToast(t('toast.k'), '提示')`).length, 0);
+});
+
+test('自检：判据⑥「先 push 攒进数组、再 join 进出线」抓得到（playlist.js 那枚假进度的原型）', () => {
+  const src = [
+    'const parts = [];',
+    "if (added) parts.push(`已加入 ${added} 首`);",
+    "showToast(parts.join(t('toast.listSeparator')));",
+  ].join('\n');
+  const hits = feedbackSites(src);
+  assert.strictEqual(hits.length, 1, '攒进数组的中文分句必须被抓住：' + JSON.stringify(hits));
+  assert.match(hits[0].text, /已加入/);
+  // 反向钉：这段攒的是 DOM 片段、从不进 toast ⇒ 不许被算成欠账（否则本判据会变成噪声源）
+  const domOnly = [
+    'const rows = [];',
+    "rows.push(`<div class=\"song-row\">${esc(song.title)}</div>`);",
+    "list.innerHTML = rows.join('');",
+  ].join('\n');
+  assert.strictEqual(feedbackSites(domOnly).length, 0, '不进反馈调用的数组不该算欠账');
+  // 走词典的分句也不该被算成欠账（同 app.js:1057 的正确写法）
+  const wired = [
+    'const parts = [];',
+    "if (added) parts.push(t('toast.batchQueued', { count: added, extra: '' }));",
+    "showToast(parts.join(t('toast.listSeparator')));",
+  ].join('\n');
+  assert.strictEqual(feedbackSites(wired).length, 0, '接了词典的汇总串不算欠账');
 });
 
 test('自检：actionToast 的对象实参里 btnLabel 也算欠账（它照样印在界面上）', () => {
@@ -538,7 +613,28 @@ test('增量217 的对账表与订阅页读到的键恰好一一对应（漏钉�
     '订阅页按键读的句子与 WIRING_217 不等。实读=' + JSON.stringify(used));
 });
 
-for (const [table, name] of [[WIRING_194, '194'], [WIRING_203, '203'], [WIRING_217, '217']]) {
+/**
+ * 增量220（批量加歌汇总三段）的接线对账，家法同 WIRING_194 / 203 / 217：值抄在这里当锚。
+ *
+ * 为什么不并进 WIRING_194 那张表、也不直接并进 CONQUERED：views/playlist.js 只是
+ * **局部**收编（只收了这一处汇总串的三段），整个文件还剩 47 处 CJK 字面量（见 PASSTHROUGH）。
+ * 把它塞进 CONQUERED 会让"已收编 = 全文件零中文"那枚钉立刻变红；不钉它的话，
+ * 键值配错（把「失败 N 首」挂到 plBatchSkipped 上）一路绿灯到用户屏幕上。
+ *
+ * 三条里的第一条是**复用**不是新建：toast.batchQueued 的家在 app.js 的批量入队出口
+ * （增量217 已记过这个复用），歌单页是第二个消费方 —— 同一事实只许一个家。
+ */
+const WIRING_220 = {
+  'toast.batchQueued': '已加入 {count} 首{extra}',
+  'toast.plBatchSkipped': '跳过已在歌单 {count} 首',
+  'toast.plBatchAddFailed': '失败 {count} 首',
+  'toast.plNothingAdded': '没有歌曲被加入',
+  // 分隔符不是句子（en 值就是 ", "），但它是这次收编的一半：首版只接了它，
+  // 三个分句留着硬编码中文 ⇒ 英文界面上是"纯中文句子 + 英文逗号"，也钉住。
+  'toast.listSeparator': '，',
+};
+
+for (const [table, name] of [[WIRING_194, '194'], [WIRING_203, '203'], [WIRING_217, '217'], [WIRING_220, '220']]) {
   test(`增量${name} 接线的词条值逐字对账（键与值的配对不许只靠写代码那一次的手感）`, () => {
     const bad = [];
     for (const k of Object.keys(table)) {
@@ -586,6 +682,15 @@ test('toast.* 词条不许是半句话（值不得以冒号收尾 —— 拼接�
  * 但改大的那一枪会同时红在 reviewer 面前，这就是棘轮。
  * app.js 不在表里：它是本轮归零的那一面（见上方 D1 钉）。
  *
+ * ⚠️ 2026-09-28 判据加严（不是代码倒退，别照着"变多"去改源码）：新增判据⑥
+ *    「先 push 攒进数组、再 join 进出线」（见 accumulatorSites）。加严的结果是
+ *    **四个文件的计数同时上调**，而其中只有 views/playlist.js 是本轮真去改的那个：
+ *      scheduledDownload.js 2→4、views/batchImport.js 2→6、views/nameBatch.js 5→8
+ *    三处都是同一形状的存量失明（它们早就在攒中文字面量，只是判据看不见），
+ *    本轮不碰它们的代码，只让台账说实话。views/playlist.js 靠判据⑥ + 把三个分句
+ *    接进词典，它自己的计数落回 0 —— 但那**不代表该文件没有中文了**：它还剩
+ *    整文件字面量（弹窗按钮、剪贴板报告…），已由下面的 PASSTHROUGH 单独立账。
+ *
  * 落地本轮时的规模（43 个文件 / 494 处，本轮前的 app.js 一个文件就占 55 处）：
  * 大头在 views/playlist.js(98)、local.js(48)、search.js(40)、settings.js(43)、
  * ai-music.js(38)、download.js(30) —— 按"一个文件一次收编"的节奏还，
@@ -614,20 +719,22 @@ const LEDGER = {
   'src/renderer/js/player/fade.js': 2,
   'src/renderer/js/player/lyrics.js': 2,
   'src/renderer/js/player/stats.js': 3,
-  'src/renderer/js/scheduledDownload.js': 2,
+  'src/renderer/js/scheduledDownload.js': 4,
   'src/renderer/js/sleepTimer.js': 7,
   'src/renderer/js/songGroups.js': 1,
   'src/renderer/js/songMenu.js': 3,
-  'src/renderer/js/views/batchImport.js': 2,
+  'src/renderer/js/views/batchImport.js': 6,
   'src/renderer/js/views/clipboard.js': 1,
   'src/renderer/js/views/converter.js': 10,
   'src/renderer/js/views/dragdrop.js': 10,
   'src/renderer/js/views/history.js': 24,
   'src/renderer/js/views/home.js': 15,
   'src/renderer/js/views/local-stats.js': 11,
-  'src/renderer/js/views/local.js': 48,
-  'src/renderer/js/views/nameBatch.js': 5,
-  'src/renderer/js/views/playlist.js': 98,
+  // 48 → 46：revealLocalFile 里的两处硬编码中文（「无法打开文件夹：」/「打开文件夹失败:」）
+  // 改走 openFolderSafe 的统一反馈（toast.folderBlocked / toast.folderOpenFailed），
+  // 顺带修掉「主进程已加沙箱、8 个调用点却静默失败」的缺陷。
+  'src/renderer/js/views/local.js': 46,
+  'src/renderer/js/views/nameBatch.js': 8,
   'src/renderer/js/views/search.js': 36,
 };
 
@@ -655,19 +762,31 @@ function cjkLiterals(code) {
 }
 
 /**
- * app.js 里 7 个"首实参是变量"的 toast 点，本轮逐个追了出处：
- *   queueCopyToastText() → queueCopy.js、playFailureRetryText()/describePlayError() → playError.js、
- *   buildFallbackNotice() → fallbackNotice.js。
- * 这三个文件里没有一处 showToast 调用，所以 LEDGER 的"看实参"判据对它们**完全失明**，
- * 而它们 return 的句子就是用户在英文界面里看到的那一句 —— 不另立一张表，就会出现
- * "LEDGER 清零、界面照旧漏中文"的假进度。
+ * 透传/旁路文案台账：LEDGER 看不见的那些中文字面量，按**整文件**计（去注释后）。
  *
- * （listAccess.js 不在这张表里：它已经走 say(tr, key, 中文兜底)，句子有键可查，兜底才是中文。）
+ * 两种成员，失效方式不同但结局一样 —— 都是"台账清零、界面照旧漏中文"：
+ *   ① 跨文件 return 透传：app.js 里 7 个"首实参是变量"的 toast 点，本轮逐个追了出处 ——
+ *      queueCopyToastText() → queueCopy.js、playFailureRetryText()/describePlayError()
+ *      → playError.js、buildFallbackNotice() → fallbackNotice.js。这三个文件里没有一处
+ *      showToast 调用，LEDGER 的"看实参"判据对它们**完全失明**。
+ *   ② 同文件内、但不落在反馈调用上的字面量（弹窗标题/按钮 title/剪贴板报告…）：
+ *      views/playlist.js 归零 LEDGER 之后，整文件仍有 47 处 CJK 字面量 ——
+ *      其中 `🧮 MusicDL 跨歌单重复报告（${n} 首）`（copyDedupeScanReport）直接进剪贴板，
+ *      英文界面上照样是中文。
+ *
+ * 入表规则（写死，别再出现"LEDGER 说 0 就当这个文件干净了"）：
+ *   **某文件在 LEDGER 里归零、而整文件还有 CJK 字面量 ⇒ 它必须同时进这张表。**
+ *   已经在 LEDGER 里有非零计数的文件不必重复进表（同一事实一个家，避免两份数字各自腐烂）。
+ *
+ * （listAccess.js 不在表里：它已经走 say(tr, key, 中文兜底)，句子有键可查，兜底才是中文。）
  */
 const PASSTHROUGH = {
   'src/renderer/js/fallbackNotice.js': 2,
   'src/renderer/js/playError.js': 6,
   'src/renderer/js/queueCopy.js': 2,
+  // LEDGER 归零但整文件仍有 47 处 CJK 字面量（弹窗文案 + 剪贴板报告 + title 提示…）。
+  // 本轮只把批量加歌的三个分句接进词典（-3），剩下的**不假装已还清**，如实记账。
+  'src/renderer/js/views/playlist.js': 47,
 };
 
 function scanPassthrough() {
@@ -691,7 +810,107 @@ test('透传文案台账与实际逐字相等（还掉一处改小，新写一�
   const actual = scanPassthrough();
   assert.deepStrictEqual(actual, PASSTHROUGH,
     '透传台账与实际不符。实跑=' + JSON.stringify(actual)
-    + '\n这三个文件 return 的句子直接进 toast：新增中文要改表（并补词条接线），还清也要改表。');
+    + '\n这些文件里的中文不进反馈调用的实参（跨文件 return 透传 / 弹窗与剪贴板文案）：'
+    + '新增中文要改表（并补词条接线），还清也要改表。');
+});
+
+/**
+ * 两张表不许互相盖住：PASSTHROUGH 的成员必须是"LEDGER 判它零欠账"的文件。
+ *
+ * 为什么需要这一枚：入表规则是"LEDGER 归零、整文件还有中文 ⇒ 进 PASSTHROUGH"，
+ * 但规则本身没有机器执行 —— 表是手写的，于是**反向**的漏洞一直敞着：把一个
+ * LEDGER 里还欠着 20 处的文件也塞进 PASSTHROUGH，两张表各记一份数，
+ * 改一处只改一张 ⇒ 两张表的差额就是新的、未被记账的中文。
+ * （顺手也钉住"表项不许写成 0"：计数归零就该删项，而不是留一条恒真的记录。）
+ */
+test('两张表不许互相盖住：PASSTHROUGH 每一项的 LEDGER 计数都必须是 0，且整文件确有中文', () => {
+  const actual = scanLedger();
+  const bad = [];
+  for (const [rel, n] of Object.entries(PASSTHROUGH)) {
+    if (actual[rel]) bad.push(`${rel}: LEDGER 还有 ${actual[rel]} 处，不该同时进 PASSTHROUGH（两份数会各自腐烂）`);
+    const whole = cjkLiterals(stripComments(read(rel))).length;
+    if (whole !== n) bad.push(`${rel}: 表里写 ${n}，整文件实跑 ${whole}`);
+    if (whole === 0) bad.push(`${rel}: 整文件已无中文字面量，表项该删掉（恒真记录是负资产）`);
+  }
+  assert.deepStrictEqual(bad, [], '两张台账互相盖住了：\n  ' + bad.join('\n  '));
+});
+
+/**
+ * 定点回归：views/playlist.js 这一枚假进度不许复发。
+ *
+ * 实测过的失效方式（三样同时发生，界面上一个字都没变）：
+ *   ① 三个分句的 `parts.push(\`已加入 ${added} 首\`)` 留着硬编码中文；
+ *   ② 只有分隔符接了词典，于是英文界面上是"纯中文句子 + 英文逗号"；
+ *   ③ LEDGER 里把该文件的 98 直接删项（归零），判据却因为首实参是
+ *      `parts.join(…)` 表达式而一个字面量都扫不到 ⇒ 台账与实跑"逐字相等"。
+ * 三样都被本文件（判据⑥ + PASSTHROUGH 表 + 下面三段断言）钉住。
+ */
+test('views/playlist.js 批量加歌的三段汇总走词典（不是"只接分隔符"那种假进度）', () => {
+  const code = stripComments(read('src/renderer/js/views/playlist.js'));
+  const fn = /async function _addListToPlaylist\([^)]*\)\s*\{[\s\S]*?\n\}/.exec(code);
+  assert.ok(fn, '没找到 _addListToPlaylist');
+  const body = fn[0];
+
+  for (const k of ['toast.batchQueued', 'toast.plBatchSkipped', 'toast.plBatchAddFailed']) {
+    assert.match(body, new RegExp(`t\\(\\s*'${k}'\\s*,`), `${body.includes(k) ? '' : '该段仍没按键读：'}${k}`);
+  }
+  // 三段都带 {count}（把首数说实，不是"加入了一些"含糊带过）
+  assert.match(body, /t\('toast\.batchQueued',\s*\{\s*count:\s*added,\s*extra:\s*''\s*\}\)/,
+    '已加入段应读 toast.batchQueued（app.js:1057 同一个事实的家）并把 extra 传空串');
+  assert.match(body, /t\('toast\.plBatchSkipped',\s*\{\s*count:\s*skipped\s*\}\)/);
+  assert.match(body, /t\('toast\.plBatchAddFailed',\s*\{\s*count:\s*failed\s*\}\)/);
+
+  // 旧的三句字面量不得残留（含只留分隔符的中文分句：判据⑥ 抓的就是它）
+  for (const s of ['已加入 ${added} 首', '跳过已在歌单 ${skipped} 首', '失败 ${failed} 首']) {
+    assert.ok(!body.includes(s), `汇总串里还留着硬编码中文分句：${s}`);
+  }
+  // 判据⑥ 独立复核：这个函数里一处含 CJK 的字面量都不许有
+  assert.deepStrictEqual(accumulatorSites(code), [],
+    '_addListToPlaylist 仍在往数组里攒中文字面量（判据⑥ 报到的是全文件，不止这一个函数）');
+  assert.ok(!new RegExp('已加入|跳过已在歌单').test(body), '汇总串里还有中文分句字面量');
+});
+
+test('views/playlist.js 归零 LEDGER 后仍如实进 PASSTHROUGH（"还剩多少"是真实数字）', () => {
+  // 本轮只还了 3 处，剩下 47 处（弹窗文案、剪贴板报告、title 提示…）不许装作已清零
+  assert.ok(!('src/renderer/js/views/playlist.js' in LEDGER),
+    'views/playlist.js 的反馈文案已接词典，LEDGER 里应当是删项而不是留一条 0');
+  const n = cjkLiterals(stripComments(read('src/renderer/js/views/playlist.js'))).length;
+  assert.ok(n > 0, '整文件已无中文字面量 ⇒ PASSTHROUGH 的表项该删掉');
+  assert.strictEqual(PASSTHROUGH['src/renderer/js/views/playlist.js'], n,
+    `PASSTHROUGH 与实跑不符：表里写 ${PASSTHROUGH['src/renderer/js/views/playlist.js']}，实跑 ${n}`);
+});
+
+/**
+ * 批量加歌汇总的五个键，必须**在 zh 与 en 两边都在**，且都带齐占位符。
+ *
+ * 为什么这条不能靠现成的钉兜住：`用到的每个键都中英齐备` 与 `每条 toast.* 的中英占位符
+ * 同集合` 两枚遍历的都是 keysUsedInApp()，而那是**已收编文件**（CONQUERED）的并集 ——
+ * views/playlist.js 只做了局部收编，刻意没进那张表（进了就会因整文件还剩 47 处中文而红）。
+ * 于是这五个键一度谁都不管：新写一个 zh 键忘了 en，英文界面上就印出键名 `toast.plBatchSkipped`。
+ * 局部收编必须自带一枚"这几个键两边齐"的钉，否则就是覆盖盲区。
+ */
+test('增量220 批量加歌汇总的五个键中英齐备、占位符对齐、译文是真英文', () => {
+  const bad = [];
+  for (const k of Object.keys(WIRING_220)) {
+    if (!(k in zh)) { bad.push(`${k}: zh 缺键（英文界面会印出键名）`); continue; }
+    if (!(k in en)) { bad.push(`${k}: en 缺键（英文界面会印出键名）`); continue; }
+    const a = placeholdersOf(zh[k]).join(',');
+    const b = placeholdersOf(en[k]).join(',');
+    if (a !== b) bad.push(`${k}: 占位符 zh[${a}] vs en[${b}]（少一个 {x} 就是把变量名印给用户）`);
+    if (CJK.test(en[k])) bad.push(`${k}: en 里混着中文（等于没译）`);
+  }
+  assert.deepStrictEqual(bad, [], '这批词条不合格：\n  ' + bad.join('\n  '));
+
+  // 三个计数段必须真的把首数说实 —— "已加入一些"在批量操作里是不合格的反馈
+  for (const k of ['toast.batchQueued', 'toast.plBatchSkipped', 'toast.plBatchAddFailed']) {
+    assert.match(zh[k], /\{count\}/, `${k} 缺 {count}：批量加歌不报数等于让用户自己数`);
+    assert.match(en[k], /\{count\}/, `${k}(en) 缺 {count}`);
+  }
+  // 复核接线：这五个键是 _addListToPlaylist 一个不落地按键读的
+  const used = new Set(keysUsedIn('src/renderer/js/views/playlist.js'));
+  const missing = Object.keys(WIRING_220).filter((k) => !used.has(k));
+  assert.deepStrictEqual(missing, [],
+    '表里有键没人读（表已脱钩）／或函数改用了别的键：' + missing.join(', '));
 });
 
 // ── D3：词典侧双向对账 ──
@@ -792,7 +1011,10 @@ test('每条 toast.* 译文都是真英文（不得照抄中文）', () => {
  * 是复制进语言包时留下的脏值 —— 一旦接线就会在英文界面上印出歪斜文案）。
  */
 test('toast.* 两边值都是干净文案（无首尾空白、en 不含中文、zh 必须含中文）', () => {
-  const keys = Object.keys(zh).filter((k) => k.startsWith('toast.'));
+  // toast.listSeparator 是 join 用的分隔符不是句子：en 值 ", " 的尾随空格是分隔符本体
+  // （拼进列表要 ", "），zh 值 "，" 是全角逗号不在 CJK 判据的汉字区间 —— 按句子口径会误伤它。
+  const SEPARATOR_KEYS = new Set(['toast.listSeparator']);
+  const keys = Object.keys(zh).filter((k) => k.startsWith('toast.') && !SEPARATOR_KEYS.has(k));
   assert.ok(keys.length >= 20, '词典里 toast.* 词条数异常：' + keys.length);
   const bad = [];
   for (const k of keys) {

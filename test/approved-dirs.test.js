@@ -132,7 +132,6 @@ test('未批准路径不做任何系统调用（词法快筛在前，保住热�
   // 把 realpathDeep 换成计数器：未批准路径不应走到它
   const orig = ad.realpathDeep;
   let calls = 0;
-  // eslint-disable-next-line no-import-assign
   require.cache[require.resolve(path.join(ROOT, 'src/main/approvedDirs'))].exports.realpathDeep = (p) => {
     calls++;
     return orig(p);

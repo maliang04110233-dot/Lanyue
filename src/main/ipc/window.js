@@ -207,8 +207,20 @@ function register() {
     if (/^[a-zA-Z][a-zA-Z0-9+.-]+:/.test(folder) && !/^[a-zA-Z]:[\\/]/.test(folder)) {
       return { ok: false, error: '非法路径' };
     }
+    // P1-9：协议前缀只挡"伪路径"，挡不住"合法盘符路径"——渲染层可以拿
+    // `D:\` 这类任意路径做存在性探测（返回 ok 差异）并把资源管理器拉到任意
+    // 目录。同一仓库 library.js 的 15 处路径通道都过了沙箱，只有这条漏网。
+    //
+    // 复用 approvedDirs 的既有判据（词法快筛 + 真实路径复核），不另起一套：
+    // 渲染层真会送进来的目录 —— saveDir / localDirPath / aiMusicSaveDir /
+    // convertOutputDir 这几个目录型偏好，以及原生选器选过的目录 —— 启动时
+    // 都被 index.js seed 进了注册表（见 DIR_PREF_KEYS），所以收窄到注册表
+    // 内不会误伤任何一条真实调用点。
+    const resolved = path.resolve(folder);
+    if (!approvedDirs.isApprovedDir(resolved)) {
+      return { ok: false, error: '路径不可访问' };
+    }
     try {
-      const resolved = path.resolve(folder);
       if (await fsa.exists(resolved)) {
         shell.showItemInFolder(resolved);
       }

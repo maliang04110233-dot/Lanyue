@@ -105,3 +105,44 @@ test('sanitizeFileBase 保留中文/数字/连字符（常见专辑名无需替�
   const { sanitizeFileBase } = await mod();
   assert.equal(sanitizeFileBase('七里香-2004'), '七里香-2004');
 });
+
+test('groupSongsForAlbumWall 按专辑聚合，取第一张非空封面，歌手去重拼接', async () => {
+  const { groupSongsForAlbumWall } = await mod();
+  const r = groupSongsForAlbumWall([
+    { album: ' 范特西 ', artist: '周杰伦', cover: null },
+    { album: '范特西', artist: '周杰伦', cover: 'data:image/jpeg;base64,AAA' },
+    { album: '范特西', artist: '温岚', cover: 'data:image/jpeg;base64,BBB' },
+    { album: '', artist: '', cover: 'data:image/jpeg;base64,CCC' },
+    null,
+    undefined,
+  ]);
+  assert.equal(r.length, 2);
+  assert.deepEqual(r[0], {
+    album: '范特西',
+    count: 3,
+    artists: '周杰伦 / 温岚',
+    cover: 'data:image/jpeg;base64,AAA',
+  });
+  assert.deepEqual(r[1], {
+    album: '未知专辑',
+    count: 1,
+    artists: '未知歌手',
+    cover: 'data:image/jpeg;base64,CCC',
+  });
+  assert.deepEqual(groupSongsForAlbumWall(null), []);
+  assert.deepEqual(groupSongsForAlbumWall([]), []);
+  assert.deepEqual(groupSongsForAlbumWall('x'), []);
+});
+
+test('groupSongsForAlbumWall 数量降序，同数按专辑 zh 拼音序，全无封面 cover 为 null', async () => {
+  const { groupSongsForAlbumWall } = await mod();
+  const r = groupSongsForAlbumWall([
+    { album: '蓝' }, { album: '蓝' },
+    { album: '白' }, { album: '白' },
+    { album: '红' }, { album: '红' },
+    { album: '无封面', cover: undefined },
+  ]);
+  assert.deepEqual(r.map(g => g.album), ['白', '红', '蓝', '无封面']);
+  assert.equal(r[0].cover, null);
+  assert.equal(r[0].count, 2);
+});

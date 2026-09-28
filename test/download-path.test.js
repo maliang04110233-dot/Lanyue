@@ -233,14 +233,19 @@ test('设置页: 展示相对片段并说明它是「相对下载目录」', () 
 
 test('下载队列行: 📂 定位真实文件所在目录，不再打开全局下载目录', () => {
   const src = read('src/renderer/js/views/download.js');
-  const openSites = src.match(/api\.openFolder\(/g) || [];
-  assert.equal(openSites.length, 3, 'openFolder 调用点数量变了，复核一遍归属');
+  // 三个入口统一走 openFolderSafe（utils.js 的唯一出口）而不是裸调 api.openFolder：
+  // 主进程 open-folder 有 approvedDirs 沙箱，裸调会让「被拒」变成静默失败 ——
+  // 用户点了没反应也没有提示。判据见 test/open-folder-entry.test.js。
+  const openSites = src.match(/\bopenFolderSafe\(/g) || [];
+  assert.equal(openSites.length, 3, 'openFolderSafe 调用点数量变了，复核一遍归属');
+  assert.doesNotMatch(src, /api\.openFolder\(/, '裸调 api.openFolder 会静默失败');
   // 行内按钮与右键菜单：都按该行的 savePath 定位（和历史页同一口径 —— 显示的就是那首歌）
-  assert.equal(countOf(src, "api.openFolder('${escQ(s.savePath)}')"), 1);
-  assert.equal(countOf(src, 'api.openFolder(s.savePath)'), 1);
+  assert.equal(countOf(src, "openFolderSafe('${escQ(s.savePath)}')"), 1);
+  assert.equal(countOf(src, 'openFolderSafe(s.savePath)'), 1);
   // 工具栏那个「打开下载目录」按钮仍指向全局目录，属另一个语义，不许被顺手改掉
-  assert.equal(countOf(src, 'api.openFolder(saveDir)'), 1);
-  assert.equal(countOf(src, "openFolder('${escQ(getState('saveDir')"), 0);
+  assert.equal(countOf(src, 'openFolderSafe(saveDir)'), 1);
+  // 也不许把全局目录按钮改成「按当前行的 savePath 定位」——那是本条要防的回归
+  assert.equal(countOf(src, "openFolderSafe('${escQ(getState('saveDir')"), 0);
 });
 
 test('零新 IPC 通道：本增量只用既有方法', () => {

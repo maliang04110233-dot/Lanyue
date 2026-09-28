@@ -732,7 +732,10 @@ async function generateAiMusic() {
         mood: document.getElementById('aiMoodValue')?.value || '',
         audioPath: res.filePath,
       });
-      const escapedPath = escAttr(res.filePath);
+      // 与上方 393/394/945 行保持一致：onclick 的 JS 字符串字面量内必须用 escQ。
+      // 原为 escAttr —— 它把 ' 转成 &#39;，而内联事件属性会先把实体解码再当 JS 执行，
+      // 于是 ' 又变回裸单引号、逃出字符串（AI 生成的音频文件名可含任意字符）。
+      const escapedPath = escQ(res.filePath);
       return `<div class="ai-result-card${succeeded.length > 1 ? ' ai-result-card-sm' : ''}">
         <div class="ai-result-icon">🎵</div>
         <div class="ai-result-info">
@@ -850,7 +853,7 @@ function playAiSong(filePath) {
   loadAndPlay(song);
 }
 
-function openAiFolder() { if (aiState.saveDir) api.openFolder(aiState.saveDir); }
+function openAiFolder() { if (aiState.saveDir) openFolderSafe(aiState.saveDir); }
 
 function showAiLyricsDetail(json) {
   try {

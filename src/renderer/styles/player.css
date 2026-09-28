@@ -36,6 +36,7 @@
   background: transparent; color: var(--neon-dim); cursor: pointer;
   font-size: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
 }
+.queue-cancel svg { width: 14px; height: 14px; display: block; }
 .queue-cancel:hover { color: var(--neon-pink); }
 .queue-empty {
   padding: 16px; text-align: center; color: var(--neon-dim); font-size: 12px;
@@ -45,10 +46,18 @@
   padding: 42px 16px; display: flex; flex-direction: column;
   align-items: center; gap: 8px;
 }
-.queue-empty-guide .queue-empty-icon { font-size: 34px; opacity: .55; }
+.queue-empty-guide .queue-empty-icon { width: 34px; height: 34px; opacity: .55; }
+.queue-empty-guide .queue-empty-icon svg { width: 100%; height: 100%; display: block; }
+.queue-cover-ph svg { width: 18px; height: 18px; display: block; }
+.queue-detail-toggle svg { width: 14px; height: 14px; display: block; }
 .queue-empty-guide .queue-empty-text { font-size: 13.5px; color: var(--neon-text); }
 .queue-empty-guide .queue-empty-hint { font-size: 11.5px; }
 .queue-empty-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+.queue-group-fold svg, .queue-group-only svg { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; }
+.queue-empty-hint svg, .setting-btn svg { width: 14px; height: 14px; display: inline-block; vertical-align: -3px; }
+#queuePauseBtn svg { width: 14px; height: 14px; display: inline-block; vertical-align: -3px; }
+.dl-platform-chip svg { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; }
 
 /* ── 下载页筛选标签 ───────────────────────────────── */
 .filter-tabs { display: flex; gap: 4px; }
@@ -416,7 +425,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 换源徽标：JS 用 style.display='' 恢复显示 → 这里不能写死 display:none */
+/* 播放器徽标（音质等）：JS 用 style.display='' 恢复显示 → 这里不能写死 display:none */
 .player-src-badge {
   display: inline-flex;
   align-items: center;
@@ -850,6 +859,10 @@ audio { display: none; }
   font-size: 10.5px; color: var(--neon-dim); white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; margin-top: 2px;
 }
+
+/* ── 本地库封面墙（增量212）── 复用 .local-grid/.grid-* 布局 ── */
+.local-album-wall .grid-cover { aspect-ratio: 1; }
+.local-album-wall .grid-title { font-size: 12px; }
 
 /* ── 搜索类型 Tab ─────────────────────────── */
 .search-type-tabs {

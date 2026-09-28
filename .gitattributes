@@ -1,0 +1,57 @@
+# ── 换行符约定（治愈 CRLF 平台耦合）────────────────────────────
+#
+# 背景：本仓库此前没有换行约定，而 Windows 上 core.autocrlf=true 会把
+# checkout 出来的文本文件转成 CRLF、提交时再转回 LF。结果是：
+#   · git 索引里全是 LF（i/lf）；
+#   · 工作树里却有 97 个文件是 CRLF（w/crlf）；
+#   · 测试里凡是「读取源码文件 + 用带 \n 的正则匹配」的断言，
+#     在 Linux CI 上绿、在 Windows 本地红（例如
+#     test/subscription-new-dl.test.js 的「防抖重渲染订阅徽标」）。
+#
+# 这类假失败的真正代价不是「一条用例红」，而是让团队习惯性忽略测试结果，
+# 真实回归就混在里面被无视。
+#
+# 处置：统一按 LF 存库、按 LF 检出（Linux/macOS 原生、Windows 亦可用，
+# 现代编辑器与构建链均无问题）。text=auto 让 git 自行识别文本文件，
+# 避免把二进制误判；显式声明的几个类型同时锁住「库内是 LF」。
+
+* text=auto eol=lf
+
+# 源码与文档（显式声明，防止将来有人改回）
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.json  text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.py    text eol=lf
+*.txt   text eol=lf
+*.svg   text eol=lf
+
+# Windows 批处理：cmd.exe 对 LF-only 的 .bat 处理不稳（多行 goto/label
+# 会错位），故这一族必须保留 CRLF —— 这是有意为之的例外，不是遗漏。
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# PowerShell 在 Windows 上接受 LF，但保持与 .bat 一致更省心
+*.ps1   text eol=crlf
+
+# ── 二进制：禁止 git 做任何换行/编码转换 ─────────────────────
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.exe   binary
+*.dll   binary
+*.node  binary
+*.zip   binary
+*.7z    binary
+*.asar  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.db    binary

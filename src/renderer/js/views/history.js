@@ -114,7 +114,7 @@ function renderHistory(items, stats) {
           ? `<button class="action-btn" title="本地播放（下载完直接听）" onclick="playHistoryItem(${idx})">▶</button>`
           : ''}
         ${s.status === 'done' && s.savePath && !dead
-          ? `<button class="action-btn" title="打开文件夹" onclick="api.openFolder('${escQ(s.savePath)}')">📂</button>`
+          ? `<button class="action-btn" title="打开文件夹" onclick="openFolderSafe('${escQ(s.savePath)}')">📂</button>`
           : ''}
         ${s.status === 'error' || dead ? retryBtn : ''}${s.status === 'error' ? diagBtn : ''}
       </div>
@@ -370,7 +370,7 @@ function _initHistoryFilterBar() {
   const tabsEl = document.getElementById('historyStatusTabs');
   if (tabsEl && !tabsEl.childElementCount) {
     tabsEl.innerHTML = HISTORY_STATUS_TABS.map(t =>
-      `<button class="filter-tab ${t.v === '' ? 'active' : ''}" data-hst="${esc(t.v)}" onclick="setHistoryStatusFilter('${esc(t.v)}')">${esc(t.label)}</button>`,
+      `<button class="filter-tab ${t.v === '' ? 'active' : ''}" data-hst="${escAttr(t.v)}" onclick="setHistoryStatusFilter('${escQ(t.v)}')">${esc(t.label)}</button>`,
     ).join('')
       + `<button class="filter-tab" id="historySortBtn" onclick="cycleHistorySort()">${esc(sortLabel(_historySort))}</button>`;
   }
@@ -464,7 +464,7 @@ function historyRowContext(e) {
   if (s.status === 'done' && s.savePath && !s.missing) {
     items.push(
       { icon: '▶', label: '本地播放', onClick: () => playHistoryItem(idx) },
-      { icon: '📂', label: '打开文件夹', onClick: () => api.openFolder(s.savePath) },
+      { icon: '📂', label: '打开文件夹', onClick: () => openFolderSafe(s.savePath) },
     );
   }
   items.push({

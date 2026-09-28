@@ -39,6 +39,37 @@ const LOGIN_CONFIGS = {
 };
 
 /**
+ * 登录窗口的导航/弹窗域判据（抽到模块作用域：判据可离线断言，
+ * 不必为测一行 if 就拉起 BrowserWindow + 起一个真实 Electron）
+ *
+ * 协议：**只放行 https**（2026-09 审计 P1-12）。原实现把 http: 和 https:
+ * 一起放行，可这个窗口里握着**活的登录 Cookie** —— 明文一跳就够中间人把
+ * 整页内容换成钓鱼页，窗口却照常显示"登录成功"。三个平台当前的登录入口
+ * 本身全是 https（见 LOGIN_CONFIGS.loginUrl），放行 http: 在真实用途里
+ * 一次都用不上，只是把明文面白白挂着。
+ *
+ * 域：**范围宽于"实际登录页所需"**，这里保持原样，原因是真实登录流程本身
+ * 就要跳出起始 host：
+ *   · QQ 走 ptlogin2.qq.com（账号密码）/ open.weixin.qq.com（微信扫码）/
+ *     graph.qq.com（OAuth 回调）—— 收窄到 y.qq.com 会直接卡死扫码登录；
+ *   · B站 passport.bilibili.com 登录成功后要跳 www.bilibili.com；
+ *   · 网易云整条链路都在 music.163.com 内。
+ * 且这份 cookieDomains 同时是**抓 Cookie 的清单**（下面轮询按它取），
+ * 只收窄导航白名单会让"能导航的域"和"能读到 Cookie 的域"分成两套口径，
+ * 反而更难审。残余风险是"同域兄弟站可被导航"，但仍限于腾讯/网易/B站
+ * 自己的域，比"任意 http(s)"小两个量级。
+ *
+ * 注意后缀匹配用的是**带前导点**的 d（'.qq.com'）：'evilqq.com'.endsWith('.qq.com')
+ * 为 false，'evil-douyinvod.com' 这类前缀碰撞不成立，别把判据"优化"成 startsWith。
+ */
+function hostAllowed(u, config) {
+  if (u.protocol !== 'https:') return false;
+  const host = u.hostname;
+  return config.cookieDomains.some(d =>
+    host === d.replace(/^\./, '') || host.endsWith(d));
+}
+
+/**
  * 打开登录子窗口
  * @param {string} platform  平台标识 (qq / netease / bilibili)
  * @param {BrowserWindow} parentWindow  父窗口（主窗口）
@@ -70,15 +101,9 @@ async function openLoginWindow(platform, parentWindow) {
 
   // M3: 页面内跳转同样限域（原先只有弹窗守卫，will-navigate 不设防，
   // 被诱导导航到 file:///内网 即可在本窗口上下文里读其他域）
-  const hostAllowed = (u) => {
-    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
-    const host = u.hostname;
-    return config.cookieDomains.some(d =>
-      host === d.replace(/^\./, '') || host.endsWith(d));
-  };
   loginWin.webContents.on('will-navigate', (event, url) => {
     let ok = false;
-    try { ok = hostAllowed(new URL(url)); } catch (_e) { ok = false; }
+    try { ok = hostAllowed(new URL(url), config); } catch (_e) { ok = false; }
     if (!ok) {
       logger.warn('[loginWindow] 拒绝越域导航:', url);
       event.preventDefault();
@@ -90,7 +115,7 @@ async function openLoginWindow(platform, parentWindow) {
   // file://、内网地址或钓鱼页（登录窗口能读取这些域的 Cookie）。
   loginWin.webContents.setWindowOpenHandler(({ url }) => {
     try {
-      if (hostAllowed(new URL(url))) {
+      if (hostAllowed(new URL(url), config)) {
         loginWin.webContents.loadURL(url);
       } else {
         logger.warn('[loginWindow] 拒绝弹出导航:', url);
@@ -192,4 +217,4 @@ async function openLoginWindow(platform, parentWindow) {
   });
 }
 
-module.exports = { openLoginWindow, LOGIN_CONFIGS };
+module.exports = { openLoginWindow, LOGIN_CONFIGS, hostAllowed };

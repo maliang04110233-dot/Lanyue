@@ -489,6 +489,15 @@ app.whenReady().then(async () => {
   // 初始化 prefs（用户偏好持久化）
   prefs.init(app.getPath('userData'));
 
+  // 启用日志落盘（P3-1）：生产环境控制台只留 error，而 155 处 logger.warn
+  // 记录的正是所有降级路径（镜像兜底失败、队列丢脏记录、目录模板回落…）——
+  // 用户报障时现场需要这些上下文。落盘异步 + 定时合并，不冻结主进程。
+  try {
+    logger.initLogFile(path.join(app.getPath('userData'), 'logs', 'main.log'));
+  } catch (e) {
+    logger.warn('[main] 日志落盘初始化失败:', e.message);
+  }
+
   // C1: seed 目录授权注册表 —— prefs 里的目录键是历史会话经原生选器
   // 选定的结果，默认音乐子目录随应用始终可用
   for (const k of approvedDirs.DIR_PREF_KEYS) {
@@ -609,7 +618,7 @@ app.whenReady().then(async () => {
   // CORS 白名单：本地来源 + 各平台 manifest 声明的域名（派生）
   // ⚠️ 这是本工程唯一的安全边界 —— 它决定哪些源能拿到非 null 的
   //    Access-Control-Allow-Origin。改动后必须与历史枚举逐条相等，
-  //    由 .preview/verify-platform-v3.cjs 的集合相等断言守住（不允许新增项）。
+  //    由 test/platform-contract.test.js 的集合相等断言守住（不允许新增项）。
   const LOCAL_ORIGINS = ['http://localhost', 'http://127.0.0.1'];
   const { origins: platformOrigins, suffixes: platformSuffixes } =
     require('../api').registry.getAllowedOrigins();
@@ -665,6 +674,8 @@ app.on('window-all-closed', () => {
   unregisterGlobalShortcuts();
   try { prefs.flush(); } catch (e) { logger.warn('prefs.flush 失败:', e.message); }
   try { history.flush(); } catch (e) { logger.warn('history.flush 失败:', e.message); }
+  // 日志缓冲同步冲刷：异步写在 app.quit() 后可能来不及落盘（同上方的队列/偏好）
+  try { logger.flushSyncOnExit(); } catch (_e) { /* 退出路径不再抛 */ }
   if (process.platform !== 'darwin') app.quit();
 });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

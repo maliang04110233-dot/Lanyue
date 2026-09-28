@@ -70,7 +70,7 @@ function renderSubscriptionPage(entries) {
           <span class="sub-name" title="${escAttr(e.name || e.targetId)}">${esc(e.name || e.targetId)}</span>
         </div>
         <div class="sub-card-actions">
-          <button class="btn-sm" onclick="subscriptionRemove('${escAttr(e.key)}')">退订</button>
+          <button class="btn-sm" onclick="subscriptionRemove('${escQ(e.key)}')">退订</button>
         </div>
       </div>
       <div class="sub-card-meta">
@@ -80,7 +80,7 @@ function renderSubscriptionPage(entries) {
         ${!e.hasSeeded ? '<span class="sub-seeded">待首次检查</span>' : ''}
       </div>
       <label class="sub-auto">
-        <input type="checkbox" ${e.autoDownload ? 'checked' : ''} onchange="subscriptionToggleAuto('${escAttr(e.key)}', this.checked)">
+        <input type="checkbox" ${e.autoDownload ? 'checked' : ''} onchange="subscriptionToggleAuto('${escQ(e.key)}', this.checked)">
         新歌自动下载
       </label>
       ${unread > 0 ? `
@@ -88,12 +88,12 @@ function renderSubscriptionPage(entries) {
         <div class="sub-new-head">
           <span>🆕 ${unread} 首新歌</span>
           <div class="sub-new-actions">
-            <button class="btn-sm" onclick="subscriptionQueueNew('${escAttr(e.key)}')">全部入队</button>
-            <button class="btn-sm" onclick="subscriptionMarkSeen('${escAttr(e.key)}')">已看完</button>
+            <button class="btn-sm" onclick="subscriptionQueueNew('${escQ(e.key)}')">全部入队</button>
+            <button class="btn-sm" onclick="subscriptionMarkSeen('${escQ(e.key)}')">已看完</button>
           </div>
         </div>
         <div class="sub-new-list">${(e.newSongs || []).slice(0, 10).map(s =>
-          `<div class="sub-new-row"><span class="sub-new-title">${esc(s.title)}</span><span class="sub-new-artist">${esc(s.artist)}</span>${dlBadgeHtml(s, queue)}<button class="btn-sm sub-new-dl" title="加入下载队列" onclick="subscriptionDownloadNew('${escAttr(e.key)}', '${escAttr(String(s.id))}')">⬇</button></div>`
+          `<div class="sub-new-row"><span class="sub-new-title">${esc(s.title)}</span><span class="sub-new-artist">${esc(s.artist)}</span>${dlBadgeHtml(s, queue)}<button class="btn-sm sub-new-dl" title="加入下载队列" onclick="subscriptionDownloadNew('${escQ(e.key)}', '${escQ(String(s.id))}')">⬇</button></div>`
         ).join('')}${unread > 10 ? '<div class="sub-new-more">…另有 ' + (unread - 10) + ' 首</div>' : ''}</div>
       </div>` : ''}
     </div>`;

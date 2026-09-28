@@ -119,7 +119,7 @@ test('player.js 的 window 公开面覆盖 EQ 簇全部函数（EQ 拆出 player
   // onclick="resetEq()" / applyEqPreset() 等会直接失效。
   const eqFns = [
     'applyEqPreset', 'toggleEqBypass', 'setEqBand', 'resetEq',
-    'saveEqSettings', 'restoreEqPresetSetting',
+    'saveEqSettings', 'restoreEqPresetSetting', 'cycleEqPreset',
   ];
   const missing = eqFns.filter((f) => !playerExports.has(f));
   assert.deepStrictEqual(missing, [], `EQ 簇缺少 window 挂载: ${missing.join(', ')}`);

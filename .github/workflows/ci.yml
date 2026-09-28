@@ -50,6 +50,34 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      # 依赖漏洞：先只看 production 链路（--omit=dev）降噪；
+      # high 及以上直接红灯，避免静默积压。
+      #
+      # 但「有漏洞」和「查不到」在 npm audit 里是同一个退出码 1，必须分开：
+      # 不少 registry 镜像（含国内常用的 npmmirror）没实现 audit 端点，
+      # 会返回 404 NOT_IMPLEMENTED；registry 限流/临时故障同理。
+      # 若不区分，一次镜像抖动或限流就能让整个 job 变红，而它与代码质量无关 ——
+      # 训练出来的结果是「红了就重跑」，真正的 high 漏洞也就一起被重跑掉了。
+      # 所以这里按 stderr 特征把「基础设施失败」降级为 warning 并放行，
+      # 「真有漏洞」仍然红灯。
+      - name: npm audit (production)
+        run: |
+          set +e
+          out=$(npm audit --omit=dev --audit-level=high 2>&1)
+          status=$?
+          set -e
+          echo "$out"
+          if [ "$status" -ne 0 ] && echo "$out" | grep -qiE \
+            'audit endpoint returned an error|NOT_IMPLEMENTED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ETIMEOUT|socket hang up'; then
+            echo "::warning::npm audit 端点不可用（registry 未实现 audit 端点或网络故障），本次跳过；漏洞扫描需在官方 registry 下重跑"
+            exit 0
+          fi
+          exit "$status"
+
+      # asar 排除项是否仍安全（死依赖误排除只在打包后爆）
+      - name: Dead deps check
+        run: npm run check:dead-deps
+
       # 测试全部离线（不触网），故 Ubuntu runner 上可稳定跑通
       - name: Unit tests
         run: npm test

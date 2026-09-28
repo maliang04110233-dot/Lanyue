@@ -2,8 +2,13 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: http: https:; media-src 'self' data: blob: file: http: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: http: https:; media-src 'self' data: blob: http: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws:;">
   <title>迷你播放器</title>
+  <!-- CSP 说明（2026-09-28 复审收紧）：media-src 原先比其他两个页面多一个
+       `file:`，但本窗口**不含任何 <audio>/<video> 元素**（播放由主窗口负责，
+       这里只接收 mini-player-update 推送的标题/封面/进度），且封面走
+       img-src（网络歌 http(s)、本地歌 base64 → data:）。`file:` 从未被用到，
+       属于无谓的攻击面放宽，故移除。若将来这里要直放本地音频，请连同理由一起加回。 -->
   <!-- 复用主窗口的令牌与事件
        ⚠️ 本文件不再放行 base.css 里的 html,body 规则：body 里显式覆盖 -->
   <link rel="stylesheet" href="./styles/base.css">

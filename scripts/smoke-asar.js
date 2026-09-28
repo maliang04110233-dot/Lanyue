@@ -276,7 +276,7 @@ if (fs.existsSync(eqSrcPath)) {
   const orphans = unownedEsmExports({ selfSrc: eqSrc, otherSrc, names: esmOnly });
   const VIZ_ANCHORS = ['音频图初始化失败，频谱不可用'];
   const missingAnchor = VIZ_ANCHORS.filter((s) => !bundle.includes(s));
-  const ok = bridgeNames.length === 6
+  const ok = bridgeNames.length === 7 // 增量223: +cycleEqPreset（原写 213，与 7c0ed3f 撞号）
     && missingMount.length === 0
     && orphans.length === 0
     && missingAnchor.length === 0;

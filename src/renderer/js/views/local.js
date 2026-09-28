@@ -36,6 +36,8 @@ import { applyFolderToSongs } from '../folderGroups.js';
 import { toTrackLines } from '../songListText.js';
 import { copyText } from '../songShare.js';
 import { indexOfPlaying, flashRow } from '../locatePlaying.js';
+import { groupSongsForAlbumWall, normalizeGroupKey, UNKNOWN_ALBUM } from '../artistGroups.js';
+import { t } from '../i18n.js';
 
 // 统计/查重已拆到 local-stats.js（回调在文件末尾注入）
 import {
@@ -201,6 +203,10 @@ function filterLocalSongs() {
   if (_localFmtMode !== 'all') songs = filterByFmt(songs, _localFmtMode);
   if (_localQualMode !== 'all') songs = filterByQuality(songs, (fp) => _probeCache.get(fp), _localQualMode);
   if (_localMetaMode !== 'all') songs = filterByMeta(songs, _localMetaMode);
+  if (_localAlbumFilter) {
+    const target = normalizeGroupKey(_localAlbumFilter, UNKNOWN_ALBUM);
+    songs = songs.filter(s => normalizeGroupKey(s && s.album, UNKNOWN_ALBUM) === target);
+  }
   if (kw) {
     songs = songs.filter(s =>
       (s.title || '').toLowerCase().includes(kw) ||
@@ -209,7 +215,8 @@ function filterLocalSongs() {
     );
   }
   setState('localFiltered', _sortL([...songs]));
-  if (_localGridView) renderLocalGrid();
+  if (_localViewMode === 'album') renderLocalAlbumWall();
+  else if (_localViewMode === 'grid') renderLocalGrid();
   else renderLocalSongs();
 }
 
@@ -703,7 +710,7 @@ setupDragCover();
     if (!encoded) return;
     try {
       const filePath = decodeURIComponent(atob(encoded));
-      api.openFolder(filePath);
+      openFolderSafe(filePath);
     } catch (err) {
       logger.warn('[openFolder] 解码路径失败:', err.message);
     }
@@ -760,13 +767,10 @@ function showLocalRowMenu(e, idx) {
 }
 
 // 📂 定位文件：复用 open-folder 通道（主进程对文件路径走 showItemInFolder 高亮）
+// 失败反馈统一由 openFolderSafe 出（它区分「被沙箱拒」与「通道异常」两种原因），
+// 这里不再自己判 r.ok —— 那是改接线之前的写法，留着会双弹一次 toast。
 async function revealLocalFile(s) {
-  try {
-    const r = await api.openFolder(s.filePath);
-    if (r && r.ok === false) showToast('无法打开文件夹：' + (r.error || '路径非法'), 'warn');
-  } catch (e) {
-    showToast('打开文件夹失败: ' + errBrief(e), 'error');
-  }
+  await openFolderSafe(s.filePath);
 }
 
 // 📋 复制文件本地路径（排障/搬运常用）
@@ -920,38 +924,150 @@ async function refetchCover(idx) {
 // ── 工具 ──────────────────────────────────────────────
 // esc()、fmtDuration()、formatBytes() 已由 utils.js 全局导出，此处不再重复定义
 
-// ── 视图切换 ─────────────────────────────────────────
-let _localGridView = false;
+// ── 视图切换：list → grid → album → list ────────────
+let _localViewMode = 'list';
+let _localAlbumFilter = '';
 
-function toggleLocalView() {
-  _localGridView = !_localGridView;
+// 大库分片渲染：首屏同步出结果，其余按片 rAF 追加；token 防快速重筛竞态。
+//
+// 为什么渲染函数返回 Promise（与 views/playlist.js、views/converter.js 同一约定）：
+// 分片期间网格里只有前 LOCAL_GRID_CHUNK 格，依赖"全部格子已在 DOM"的路径
+// （滚动定位、批量按序号取格子）在那个窗口里会读到半个列表。返回 Promise 让调用方
+// 能 await 一次"分片已落地"，而不用自己猜还剩几片。
+// 在跑的分片各挂一个结算句柄：被作废时**必须**结算，否则 await 的调用方会永久挂起。
+const LOCAL_GRID_CHUNK = 100;
+let _localGridRenderToken = 0;
+let _localGridPending = [];
+
+/**
+ * 作废在跑的分片并立即结算它们。
+ * token 由外部 ++（toggleLocalView / openAlbumFromWall 切视图）也能作废：那条路径
+ * 不经过本函数，但**已经排进 rAF 队列的那一帧**照样会来，届时 appendSlice 发现
+ * token 变了会自己结算 —— 所以这里不必、也不该去改那两个函数。
+ *
+ * 顺序：先换新名单再结算旧的。settle() 会把自己从名单里摘掉，顺序反了就会去
+ * splice 刚登记进来的新分片。
+ */
+function _localGridInvalidate() {
+  _localGridRenderToken++;
+  const old = _localGridPending;
+  _localGridPending = [];
+  for (const d of old) d.settle();
+}
+
+/**
+ * 登记一次分片渲染。settle 幂等 ——「跑完」与「被作废」两条路径都会调它。
+ *
+ * ⚠️ settle() 必须把自己从 _localGridPending 里摘掉（playlist.js 的 _plDeferRender
+ * 那里记了为什么：只结算不摘会让"在跑"名单变成"跑过"名单，等排空的 while 永不停）。
+ * 这里的直接后果是 await localGridRenderIdle() 永不返回。
+ */
+function _localGridDefer() {
+  let done = false;
+  let settle;
+  const promise = new Promise((res) => { settle = res; });
+  const d = {
+    promise,
+    settle() {
+      if (done) return;
+      done = true;
+      const i = _localGridPending.indexOf(d);
+      if (i >= 0) _localGridPending.splice(i, 1);
+      settle();
+    },
+  };
+  _localGridPending.push(d);
+  return d;
+}
+
+/**
+ * 等网格分片全部落地（被作废的那轮早已结算，不会永久挂起）。
+ *
+ * 循环而不是一次 Promise.all，与 playlist.js 的 _plRenderIdle 同一理由（那里记了
+ * 实测过程）：等待期间又来一次渲染时，那一轮会结算掉本轮句柄并登记自己，
+ * "只等一次"就会在**新那一轮才画完第一片**的时刻返回 —— 而 100 格的分片下，
+ * 那一刻网格里恰好缺着调用方要按序号取的那一格。
+ */
+async function localGridRenderIdle() {
+  while (_localGridPending.length) {
+    await Promise.all(_localGridPending.map((d) => d.promise));
+  }
+}
+
+/** 按钮文案 = 下一次点击的目标视图；同步 data-i18n 供语言切换重刷 */
+function _updateViewToggleBtn(btn) {
+  if (!btn) return;
+  const next = _localViewMode === 'list' ? 'local.grid'
+    : _localViewMode === 'grid' ? 'local.viewAlbum'
+    : 'local.viewList';
+  btn.dataset.i18n = next;
+  btn.textContent = t(next);
+}
+
+function _setViewChrome() {
   const list = document.getElementById('localList');
   const grid = document.getElementById('localGrid');
-  const btn = document.getElementById('localViewToggleBtn');
-  if (_localGridView) {
-    list.style.display = 'none';
-    grid.style.display = 'grid';
-    btn.textContent = '☰ 列表';
-    renderLocalGrid();
-  } else {
-    grid.style.display = 'none';
-    list.style.display = 'flex';
-    btn.textContent = '▦ 网格';
+  const wall = document.getElementById('localAlbumWall');
+  const chip = document.getElementById('localAlbumFilterChip');
+  if (list) list.style.display = _localViewMode === 'list' ? 'flex' : 'none';
+  if (grid) grid.style.display = _localViewMode === 'grid' ? 'grid' : 'none';
+  if (wall) wall.style.display = _localViewMode === 'album' ? 'grid' : 'none';
+  if (chip) chip.style.display = _localAlbumFilter ? '' : 'none';
+}
+
+function toggleLocalView() {
+  _localViewMode = _localViewMode === 'list' ? 'grid'
+    : _localViewMode === 'grid' ? 'album' : 'list';
+  if (_localViewMode !== 'album') {
+    // 离开封面墙时清掉专辑过滤。必须接着**重算** localFiltered：
+    // renderLocalSongs/renderLocalGrid 都只读 getState('localFiltered')，
+    // 不会自己过滤。曾经在清完 _localAlbumFilter 之后直接调渲染函数，
+    // 于是列表/网格继续显示「只有那一张专辑」的上一轮结果，而代表该过滤的
+    // chip 已被 _setViewChrome() 藏掉 —— 用户看到的是「曲库丢歌了」，
+    // 而且没有任何入口能把过滤清回来。
+    _localAlbumFilter = '';
   }
+  _localGridRenderToken++; // 作废进行中的分片追加
+  _setViewChrome();
+  _updateViewToggleBtn(document.getElementById('localViewToggleBtn'));
+  // 走 filterLocalSongs() 而非直接渲染：它会重算全部筛选轴并按当前视图分发。
+  filterLocalSongs();
+}
+
+/** 点封面墙卡片：设专辑过滤并切到列表视图 */
+function openAlbumFromWall(album) {
+  _localAlbumFilter = album || '';
+  _localViewMode = 'list';
+  _localGridRenderToken++;
+  _setViewChrome();
+  _updateViewToggleBtn(document.getElementById('localViewToggleBtn'));
+  const label = document.getElementById('localAlbumFilterLabel');
+  if (label) label.textContent = _localAlbumFilter;
+  filterLocalSongs();
+}
+
+/** 清除专辑过滤 chip（回到全量列表） */
+function clearAlbumFilter() {
+  if (!_localAlbumFilter) return;
+  _localAlbumFilter = '';
+  const chip = document.getElementById('localAlbumFilterChip');
+  if (chip) chip.style.display = 'none';
+  filterLocalSongs();
 }
 
 function renderLocalGrid() {
   const grid = document.getElementById('localGrid');
   const localFiltered = getState('localFiltered');
   if (!localFiltered || !localFiltered.length) {
+    _localGridInvalidate(); // 空态时作废进行中的分片，避免被后续片覆盖
     grid.innerHTML = `<div class="empty-state" style="flex:1;width:100%">
       <div class="empty-icon">📂</div>
       <div class="empty-text">暂无本地歌曲</div>
       <div class="empty-hint">点击"扫描目录"选择音乐文件夹</div>
     </div>`;
-    return;
+    return Promise.resolve();
   }
-  grid.innerHTML = localFiltered.map((s, i) => `
+  const rows = localFiltered.map((s, i) => `
     <div class="grid-cell" tabindex="0" role="button" onclick="playLocalSong(${i})">
       <div class="grid-cover">
         ${s.cover
@@ -964,7 +1080,75 @@ function renderLocalGrid() {
         <div class="grid-title">${esc(s.title || '未知')}</div>
         <div class="grid-artist">${esc(s.artist || '未知艺术家')}</div>
       </div>
-    </div>`).join('');
+    </div>`);
+  _localGridInvalidate();
+  const d = _localGridDefer();
+  const token = _localGridRenderToken;
+  let cursor = 0;
+  const appendSlice = () => {
+    // 被作废（新一轮渲染，或 toggleLocalView/openAlbumFromWall 外部 ++token）时
+    // 先结算再走人：不结算就是永久 pending。
+    if (token !== _localGridRenderToken) return d.settle();
+    const end = Math.min(cursor + LOCAL_GRID_CHUNK, rows.length);
+    let html = '';
+    for (let i = cursor; i < end; i++) html += rows[i];
+    if (cursor === 0) grid.innerHTML = html;
+    else grid.insertAdjacentHTML('beforeend', html);
+    cursor = end;
+    if (cursor < rows.length) requestAnimationFrame(appendSlice);
+    else d.settle();
+  };
+  appendSlice();
+  return d.promise;
+}
+
+/** 封面墙：按专辑分组渲染（增量212），分片 rAF + token 防竞态 */
+function renderLocalAlbumWall() {
+  const wall = document.getElementById('localAlbumWall');
+  if (!wall) return;
+  // 必须取 localFiltered 而不是 localSongs：封面墙过去直接从未过滤的全量曲库
+  // 起算，于是搜索框、格式/音质/完整度/收藏/文件夹这些筛选轴在专辑视图下
+  // **全部无效**（界面毫无反应，看着像控件坏了）。
+  // 取 localFiltered 后卡片上的歌数也变成「当前筛选结果里该专辑有几首」，
+  // 与点进去之后看到的数量一致 —— 之前两者会对不上。
+  const songs = getState('localFiltered') || [];
+  const groups = groupSongsForAlbumWall(songs);
+  if (!groups.length) {
+    _localGridRenderToken++;
+    wall.innerHTML = `<div class="empty-state" style="flex:1;width:100%">
+      <div class="empty-icon">💿</div>
+      <div class="empty-text">暂无本地歌曲</div>
+      <div class="empty-hint">点击"扫描目录"选择音乐文件夹</div>
+    </div>`;
+    return;
+  }
+  const rows = groups.map(g => `
+    <div class="grid-cell" tabindex="0" role="button" data-album="${escAttr(g.album)}" onclick="openAlbumFromWall(this.dataset.album)">
+      <div class="grid-cover">
+        ${g.cover
+          ? `<img src="${escAttr(g.cover)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          : ''}
+        <div class="grid-cover-ph" ${g.cover ? 'style="display:none"' : ''}>💿</div>
+        <div class="grid-play-overlay">▶</div>
+      </div>
+      <div class="grid-info">
+        <div class="grid-title">${esc(g.album)}</div>
+        <div class="grid-artist">${esc(g.artists)} · ${esc(t('local.albumSongCount', { count: g.count }))}</div>
+      </div>
+    </div>`);
+  const token = ++_localGridRenderToken;
+  let cursor = 0;
+  const appendSlice = () => {
+    if (token !== _localGridRenderToken) return;
+    const end = Math.min(cursor + LOCAL_GRID_CHUNK, rows.length);
+    let html = '';
+    for (let i = cursor; i < end; i++) html += rows[i];
+    if (cursor === 0) wall.innerHTML = html;
+    else wall.insertAdjacentHTML('beforeend', html);
+    cursor = end;
+    if (cursor < rows.length) requestAnimationFrame(appendSlice);
+  };
+  appendSlice();
 }
 
 // ── 一键补全元数据（封面+歌词）────────────────────────
@@ -1332,7 +1516,11 @@ export {
   refreshLocalLibrary,
   renderLocalSongs,
   renderLocalGrid,
+  renderLocalAlbumWall,
+  localGridRenderIdle,
   toggleLocalView,
+  openAlbumFromWall,
+  clearAlbumFilter,
   playLocalSong,
   refetchCover,
   batchFetchCovers,
@@ -1378,7 +1566,11 @@ window.copyLocalListText = copyLocalListText;
 window.refreshLocalLibrary = refreshLocalLibrary;
 window.renderLocalSongs = renderLocalSongs;
 window.renderLocalGrid = renderLocalGrid;
+window.localGridRenderIdle = localGridRenderIdle;
+window.renderLocalAlbumWall = renderLocalAlbumWall;
 window.toggleLocalView = toggleLocalView;
+window.openAlbumFromWall = openAlbumFromWall;
+window.clearAlbumFilter = clearAlbumFilter;
 window.playLocalSong = playLocalSong;
 window.locatePlayingLocal = locatePlayingLocal;
 window.refetchCover = refetchCover;

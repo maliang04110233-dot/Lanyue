@@ -102,7 +102,7 @@ function _celebrate(doneRow) {
     ttl: 9000,
     onConfirm() {
       const p = doneRow.savePath || doneRow.filePath;
-      if (p) api.openFolder(p);
+      if (p) openFolderSafe(p);
     },
   });
 }

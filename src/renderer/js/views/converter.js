@@ -161,6 +161,66 @@ function filterConverterSongs() {
 }
 
 // ── 渲染歌曲列表 ────────────────────────────────────────
+// 大库分片渲染：首屏同步出结果，其余按片 rAF 追加；token 防快速重筛竞态。
+//
+// 为什么渲染函数返回 Promise（与 views/playlist.js、views/local.js 同一约定）：
+// 分片期间列表里只有前 CONV_RENDER_CHUNK 行，依赖"全部行已在 DOM"的路径
+// （滚动定位、按下标取行）会读到半个列表。返回 Promise 让调用方能 await
+// 一次"分片已落地"，而不用自己猜还剩几片。
+// 在跑的分片各挂一个结算句柄：被作废时**必须**结算，否则 await 的调用方会永久挂起。
+//
+// ⚠️ updateSelectAllState() 刻意留在分片循环**外面**：它读的是 _convSelected 这个
+//   Set，不扫 DOM，选中态与分片进度无关。别顺手把它挪进循环里。
+const CONV_RENDER_CHUNK = 100;
+let _convRenderToken = 0;
+let _convPending = [];
+
+/** 作废在跑的分片并立即结算它们（showConverterEmpty 与新一轮渲染都走这里） */
+function _convInvalidateRender() {
+  _convRenderToken++;
+  // 先换新名单再结算旧的：settle() 会把自己从名单里摘掉，顺序反了就会去 splice 新分片
+  const old = _convPending;
+  _convPending = [];
+  for (const d of old) d.settle();
+}
+
+/**
+ * 登记一次分片渲染。settle 幂等 ——「跑完」与「被作废」两条路径都会调它。
+ *
+ * ⚠️ settle() 必须把自己从 _convPending 里摘掉（playlist.js 的 _plDeferRender 那里
+ * 记了为什么：只结算不摘，"在跑"名单就变成"跑过"名单，等排空的 while 永不停）。
+ */
+function _convDeferRender() {
+  let done = false;
+  let settle;
+  const promise = new Promise((res) => { settle = res; });
+  const d = {
+    promise,
+    settle() {
+      if (done) return;
+      done = true;
+      const i = _convPending.indexOf(d);
+      if (i >= 0) _convPending.splice(i, 1);
+      settle();
+    },
+  };
+  _convPending.push(d);
+  return d;
+}
+
+/**
+ * 等列表分片全部落地（被作废的那轮早已结算，不会永久挂起）。
+ *
+ * 循环而不是一次 Promise.all，与 playlist.js 的 _plRenderIdle 同一理由（那里记了
+ * 实测过程）：等待期间又来一次渲染时，那一轮会结算掉本轮句柄并登记自己，
+ * "只等一次"就会在**新那一轮才画完第一片**的时刻返回 —— 那一刻"按下标取行"仍会取空。
+ */
+async function converterRenderIdle() {
+  while (_convPending.length) {
+    await Promise.all(_convPending.map((d) => d.promise));
+  }
+}
+
 function renderConverterSongs() {
   const container = document.getElementById('converterSongList');
   const info = document.getElementById('converterInfo');
@@ -168,7 +228,7 @@ function renderConverterSongs() {
 
   if (!_convLocalSongs.length) {
     showConverterEmpty('暂无本地歌曲，请先扫描本地音乐文件夹');
-    return;
+    return Promise.resolve();
   }
 
   if (info) {
@@ -176,13 +236,17 @@ function renderConverterSongs() {
       (_convQueue.length ? `，已选择 ${_convQueue.length} 首待转换` : '');
   }
 
-  if (container) {
-    // M14: 每行 some() 线性扫队列 → 一次建 Set
-    const queuePaths = new Set(_convQueue.map(q => q.path));
-    container.innerHTML = filtered.map(song => {
-      const fp = song.filePath;
-      const inQueue = queuePaths.has(fp);
-      return `
+  if (!container) {
+    updateSelectAllState();
+    return Promise.resolve();
+  }
+
+  // M14: 每行 some() 线性扫队列 → 一次建 Set
+  const queuePaths = new Set(_convQueue.map(q => q.path));
+  const rows = filtered.map(song => {
+    const fp = song.filePath;
+    const inQueue = queuePaths.has(fp);
+    return `
         <div class="converter-song-item ${inQueue ? 'in-queue' : ''}">
           <input type="checkbox" class="converter-song-check" ${_convSelected.has(fp) ? 'checked' : ''}
                  onchange="_convSongToggle('${escQ(fp)}')">
@@ -198,10 +262,28 @@ function renderConverterSongs() {
           </div>
         </div>
       `;
-    }).join('');
-  }
+  });
+
+  _convInvalidateRender();
+  const d = _convDeferRender();
+  const token = _convRenderToken;
+  let cursor = 0;
+  const appendSlice = () => {
+    // 被作废时先结算再走人：不结算就是永久 pending。
+    if (token !== _convRenderToken) return d.settle();
+    const end = Math.min(cursor + CONV_RENDER_CHUNK, rows.length);
+    let html = '';
+    for (let i = cursor; i < end; i++) html += rows[i];
+    if (cursor === 0) container.innerHTML = html;
+    else container.insertAdjacentHTML('beforeend', html);
+    cursor = end;
+    if (cursor < rows.length) requestAnimationFrame(appendSlice);
+    else d.settle();
+  };
+  appendSlice();
 
   updateSelectAllState();
+  return d.promise;
 }
 
 // ── 单个歌曲选择（按路径，不按列表索引）──────────────────
@@ -461,6 +543,7 @@ function showConverterEmpty(msg) {
   const container = document.getElementById('converterSongList');
   const info = document.getElementById('converterInfo');
   if (info) info.textContent = msg || '暂无数据';
+  _convInvalidateRender(); // 作废进行中的分片追加，避免空态被后续片覆盖
   if (container) {
     container.innerHTML = `
       <div class="empty-state" style="flex:1;padding:40px;">
@@ -471,7 +554,7 @@ function showConverterEmpty(msg) {
 }
 
 // ── 暴露 init ───────────────────────────────────────────
-export { initConverter, OUTPUT_DIR_PREF };
+export { initConverter, OUTPUT_DIR_PREF, converterRenderIdle };
 
 // ── 全局桥接 ────────────────────────────────────────────
 Object.assign(window, {
@@ -479,4 +562,5 @@ Object.assign(window, {
   _convSongToggle,
   _convSongAdd,
   clearDone,
+  converterRenderIdle,
 });

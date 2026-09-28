@@ -16,6 +16,42 @@ import {
 import { failureTagHtml, isAuthFailure } from '../diagnose.js';
 import { netFailedTasks } from '../netRecovery.js';
 
+// ── 行内 SVG 图标（与 home.js ROW_ICONS 同范式：16px、stroke 1.7、currentColor）──
+// chevronDown / chevronRight 是**折叠/展开**专用的一对，刻意不复用 up/down：
+// 展开/折叠与队列重排住在同一行工具条上，up/down 画的是「带竖杆 + 箭头 + 底横线」的
+// 上下移箭头，语义是「挪动」；折叠三角没有竖杆也没有底横线，只有一个角，语义是
+// 「显隐」。两者混用时用户看到的是「第 3 个箭头」，而按钮点下去干的是完全另一件事
+// （增量223 修的就是这个：展开态曾错用 up，折叠态曾错用 down，与「点它会做什么」
+// 正好相反，撞车的是同行的上移/下移/置顶三枚按钮）。test/dl-fold-chevron.test.js 钉住。
+const DL_ICONS = {
+  play:    '<path d="M6 4.5l12 7.5-12 7.5z" fill="currentColor"/>',
+  down:    '<path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  up:      '<path d="M12 21V9m0 0l-4.5 4.5M12 9l4.5 4.5M4 4h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  top:     '<path d="M12 5l-5 5m5-5l5 5M12 13l-5 5m5-5l5 5M5 21h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  chevronDown:  '<path d="M6 9.5l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  chevronRight: '<path d="M9.5 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  close:   '<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  folder:  '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+  refresh: '<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  sos:     '<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v5m0 3.5v.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  search:  '<circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 16l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  history: '<path d="M5 5h10l4 4v11H5V5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M15 5v4h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+  note:    '<path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="16" r="2" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  inbox:   '<path d="M4 13h4l2 3h4l2-3h4M4 13l2.5-7h11L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  pause:   '<path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  eye:     '<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  check:   '<path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+};
+
+function svgIcon(name) {
+  return `<svg class="row-icon queue-ico" viewBox="0 0 24 24" aria-hidden="true">${DL_ICONS[name] || ''}</svg>`;
+}
+
+/** 菜单项 iconHtml：contextMenu 里 label 仍走 textContent，只有图标走 innerHTML */
+function menuIcon(name) {
+  return svgIcon(name);
+}
+
 // ── DOM 缓存 ──────────────────────────────────────────
 const _dlDom = {
   queueList: null,
@@ -167,12 +203,12 @@ function renderQueue(queue) {
     // 全部 tab 空态给引导（去搜索/看历史）；筛选 tab 空态保持一句话
     el.innerHTML = _dlFilter === 'all' && !queue.length
       ? `<div class="queue-empty queue-empty-guide">
-          <div class="queue-empty-icon">📥</div>
+          <div class="queue-empty-icon">${svgIcon('inbox')}</div>
           <div class="queue-empty-text">${emptyMsg}</div>
-          <div class="queue-empty-hint">搜索喜欢的歌，点 ⬇ 加入下载队列</div>
+          <div class="queue-empty-hint">搜索喜欢的歌，点 ${svgIcon('down')} 加入下载队列</div>
           <div class="queue-empty-actions">
-            <button class="setting-btn" onclick="switchTab('search')">🔍 去搜索</button>
-            <button class="setting-btn" onclick="switchDlSubTab('history')">📜 下载历史</button>
+            <button class="setting-btn" onclick="switchTab('search')">${svgIcon('search')} 去搜索</button>
+            <button class="setting-btn" onclick="switchDlSubTab('history')">${svgIcon('history')} 下载历史</button>
           </div>
         </div>`
       : `<div class="queue-empty">${emptyMsg}</div>`;
@@ -208,7 +244,7 @@ function _queueRowHtml(s) {
       ${s.cover
         ? `<img class="queue-cover" src="${escAttr(s.cover)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
         : ''}
-      <div class="queue-cover-ph" ${s.cover ? 'style="display:none"' : ''}>🎵</div>
+      <div class="queue-cover-ph" ${s.cover ? 'style="display:none"' : ''}>${svgIcon('note')}</div>
       <div class="queue-info" tabindex="0" role="button" onclick="event.stopPropagation();toggleQueueDetail('${escQ(s.taskId)}')" style="cursor:pointer;">
         <div class="queue-title">${esc(s.title || '未知')}</div>
         <div class="queue-status status-${s.status}">${statusLabel(s.status)}${s.error ? ': ' + esc(s.error) : ''}${failureTagHtml(s.errorCode, { fn: 'diagnoseFailure', arg: s.taskId })}</div>
@@ -216,19 +252,19 @@ function _queueRowHtml(s) {
         <div class="progress-bar-wrap"><div class="progress-bar" id="prog-${escAttr(s.taskId)}" style="width:${s.progress||0}%"></div></div>
         <div class="queue-dl-meta" id="progmeta-${escAttr(s.taskId)}"></div>` : ''}
       </div>
-      <button class="queue-detail-toggle" onclick="event.stopPropagation();toggleQueueDetail('${escQ(s.taskId)}')" title="${isExpanded ? '收起详情' : '展开详情'}">${isExpanded ? '▾' : '▸'}</button>
-      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" title="置顶" onclick="event.stopPropagation();reorderQueueItem('${escQ(s.taskId)}','top')">⏫</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" title="上移" onclick="event.stopPropagation();reorderQueueItem('${escQ(s.taskId)}','up')">⬆</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" title="下移" onclick="event.stopPropagation();reorderQueueItem('${escQ(s.taskId)}','down')">⬇</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" onclick="event.stopPropagation();api.cancelDownload('${escQ(s.taskId)}')" title="取消">✕</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'downloading') ? `<button class="queue-cancel" onclick="event.stopPropagation();api.cancelDownload('${escQ(s.taskId)}')" title="取消下载（中断传输并清理临时文件）">✕</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'done' && s.savePath) ? `<button class="queue-cancel" style="color:var(--neon-cyan)" title="本地播放（下载完直接听）" onclick="event.stopPropagation();playQueueItem('${escQ(s.taskId)}')">▶</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'done' && s.savePath) ? `<button class="queue-cancel" style="color:var(--neon-green)" title="打开文件夹" onclick="event.stopPropagation();api.openFolder('${escQ(s.savePath)}')">📂</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'done') ? `<button class="queue-cancel" style="color:var(--neon-cyan)" title="转换格式" onclick="event.stopPropagation();showConvertModal('${escQ(s.savePath || '')}', '${escQ(s.title || '')}')">🔄</button>` : ''}
+      <button class="queue-detail-toggle" onclick="event.stopPropagation();toggleQueueDetail('${escQ(s.taskId)}')" title="${isExpanded ? '收起详情' : '展开详情'}">${svgIcon(isExpanded ? 'chevronDown' : 'chevronRight')}</button>
+      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" title="置顶" onclick="event.stopPropagation();reorderQueueItem('${escQ(s.taskId)}','top')">${svgIcon('top')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" title="上移" onclick="event.stopPropagation();reorderQueueItem('${escQ(s.taskId)}','up')">${svgIcon('up')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" title="下移" onclick="event.stopPropagation();reorderQueueItem('${escQ(s.taskId)}','down')">${svgIcon('down')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'pending') ? `<button class="queue-cancel" onclick="event.stopPropagation();api.cancelDownload('${escQ(s.taskId)}')" title="取消">${svgIcon('close')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'downloading') ? `<button class="queue-cancel" onclick="event.stopPropagation();api.cancelDownload('${escQ(s.taskId)}')" title="取消下载（中断传输并清理临时文件）">${svgIcon('close')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'done' && s.savePath) ? `<button class="queue-cancel" style="color:var(--neon-cyan)" title="本地播放（下载完直接听）" onclick="event.stopPropagation();playQueueItem('${escQ(s.taskId)}')">${svgIcon('play')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'done' && s.savePath) ? `<button class="queue-cancel" style="color:var(--neon-green)" title="打开文件夹" onclick="event.stopPropagation();openFolderSafe('${escQ(s.savePath)}')">${svgIcon('folder')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'done') ? `<button class="queue-cancel" style="color:var(--neon-cyan)" title="转换格式" onclick="event.stopPropagation();showConvertModal('${escQ(s.savePath || '')}', '${escQ(s.title || '')}')">${svgIcon('refresh')}</button>` : ''}
       ${(!_dlSelectionMode && s.status === 'error') ? `
-        <button class="queue-cancel" style="color:var(--neon-yellow)" title="诊断失败原因" onclick="event.stopPropagation();window.diagnoseFailure('${escQ(s.taskId)}')">🆘</button>
-        <button class="queue-cancel" style="color:var(--neon-orange)" title="重试下载" onclick="event.stopPropagation();retryQueueItem('${escQ(s.taskId)}')">🔄</button>
-        <button class="queue-cancel" title="移除" onclick="event.stopPropagation();removeQueueItem('${escQ(s.taskId)}')">✕</button>
+        <button class="queue-cancel" style="color:var(--neon-yellow)" title="诊断失败原因" onclick="event.stopPropagation();window.diagnoseFailure('${escQ(s.taskId)}')">${svgIcon('sos')}</button>
+        <button class="queue-cancel" style="color:var(--neon-orange)" title="重试下载" onclick="event.stopPropagation();retryQueueItem('${escQ(s.taskId)}')">${svgIcon('refresh')}</button>
+        <button class="queue-cancel" title="移除" onclick="event.stopPropagation();removeQueueItem('${escQ(s.taskId)}')">${svgIcon('close')}</button>
       ` : ''}
     </div>
     ${isExpanded ? `
@@ -257,9 +293,9 @@ function _queueGroupHeaderHtml(g) {
   const only = _dlPlatform === g.key;
   return `
     <div class="queue-group-header${collapsed ? ' collapsed' : ''}">
-      <button class="queue-group-fold" title="${collapsed ? '展开该平台' : '收起该平台'}" onclick="toggleDlGroupCollapsed('${escQ(g.key)}')">${collapsed ? '▸' : '▾'}</button>
+      <button class="queue-group-fold" title="${collapsed ? '展开该平台' : '收起该平台'}" onclick="toggleDlGroupCollapsed('${escQ(g.key)}')">${svgIcon(collapsed ? 'chevronRight' : 'chevronDown')}</button>
       <span class="queue-group-title">${esc(groupHeaderLabel(g))}</span>
-      <button class="queue-group-only" title="${only ? '取消只看该平台' : '只看该平台的任务'}" onclick="setDlPlatformFilter('${escQ(g.key)}')">${only ? '✔ 只看' : '👁 只看'}</button>
+      <button class="queue-group-only" title="${only ? '取消只看该平台' : '只看该平台的任务'}" onclick="setDlPlatformFilter('${escQ(g.key)}')">${svgIcon(only ? 'check' : 'eye')} 只看</button>
     </div>`;
 }
 
@@ -271,10 +307,10 @@ function _renderDlGroupToolbar() {
   if (!chip) return;
   if (_dlPlatform) {
     chip.style.display = '';
-    chip.textContent = `👁 只看：${platformLabel(_dlPlatform)} ✕`;
+    chip.innerHTML = `${svgIcon('eye')} 只看：${esc(platformLabel(_dlPlatform))} ${svgIcon('close')}`;
   } else {
     chip.style.display = 'none';
-    chip.textContent = '';
+    chip.innerHTML = '';
   }
 }
 
@@ -321,28 +357,29 @@ function queueRowContext(e) {
   const items = [];
   if (s.status === 'pending') {
     items.push(
-      { icon: '⏫', label: '置顶', onClick: () => reorderQueueItem(taskId, 'top') },
-      { icon: '⬆', label: '上移', onClick: () => reorderQueueItem(taskId, 'up') },
-      { icon: '✕', label: '取消任务', danger: true, onClick: () => api.cancelDownload(taskId) },
+      { iconHtml: menuIcon('top'), label: '置顶', onClick: () => reorderQueueItem(taskId, 'top') },
+      { iconHtml: menuIcon('up'), label: '上移', onClick: () => reorderQueueItem(taskId, 'up') },
+      { iconHtml: menuIcon('close'), label: '取消任务', danger: true, onClick: () => api.cancelDownload(taskId) },
     );
   } else if (s.status === 'downloading') {
-    items.push({ icon: '✕', label: '取消下载', danger: true, onClick: () => api.cancelDownload(taskId) });
+    items.push({ iconHtml: menuIcon('close'), label: '取消下载', danger: true, onClick: () => api.cancelDownload(taskId) });
   } else if (s.status === 'done') {
-    if (s.savePath) items.push({ icon: '▶', label: '本地播放', onClick: () => playQueueItem(taskId) });
-    if (s.savePath) items.push({ icon: '📂', label: '打开文件夹', onClick: () => api.openFolder(s.savePath) });
+    if (s.savePath) items.push({ iconHtml: menuIcon('play'), label: '本地播放', onClick: () => playQueueItem(taskId) });
+    if (s.savePath) items.push({ iconHtml: menuIcon('folder'), label: '打开文件夹', onClick: () => openFolderSafe(s.savePath) });
     if (s.savePath && typeof window.showConvertModal === 'function') {
-      items.push({ icon: '🔄', label: '转换格式', onClick: () => window.showConvertModal(s.savePath, s.title || '') });
+      items.push({ iconHtml: menuIcon('refresh'), label: '转换格式', onClick: () => window.showConvertModal(s.savePath, s.title || '') });
     }
   } else if (s.status === 'error') {
     items.push(
-      { icon: '🆘', label: '诊断失败原因', onClick: () => window.diagnoseFailure(taskId) },
-      { icon: '🔄', label: '重试下载', onClick: () => retryQueueItem(taskId) },
-      { icon: '✕', label: '移除', danger: true, onClick: () => removeQueueItem(taskId) },
+      { iconHtml: menuIcon('sos'), label: '诊断失败原因', onClick: () => window.diagnoseFailure(taskId) },
+      { iconHtml: menuIcon('refresh'), label: '重试下载', onClick: () => retryQueueItem(taskId) },
+      { iconHtml: menuIcon('close'), label: '移除', danger: true, onClick: () => removeQueueItem(taskId) },
     );
   }
   if (!items.length) return;
   showContextMenu(e.clientX, e.clientY, items);
 }
+
 document.addEventListener('contextmenu', queueRowContext);
 
 // ── 单项操作 ─────────────────────────────────────────
@@ -486,7 +523,7 @@ function applyQueuePausedUi(paused) {
   _queuePaused = !!paused;
   const btn = document.getElementById('queuePauseBtn');
   if (btn) {
-    btn.textContent = _queuePaused ? '▶ 继续' : '⏸ 暂停';
+    btn.innerHTML = svgIcon(_queuePaused ? 'play' : 'pause') + (_queuePaused ? ' 继续' : ' 暂停');
     btn.classList.toggle('active', _queuePaused);
     btn.classList.toggle('tab-neon', _queuePaused);
     btn.title = _queuePaused
@@ -563,7 +600,7 @@ async function clearAllDownloads() {
 
 function openSaveDir() {
   const saveDir = getState('saveDir');
-  if (saveDir) api.openFolder(saveDir);
+  if (saveDir) openFolderSafe(saveDir);
   else showToast(t('toast.dlNoSaveDir'), 'warn');
 }
 

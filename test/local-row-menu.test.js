@@ -86,6 +86,10 @@ test('local.js 接线：import 纯函数与 copyText，菜单数组改由 builde
   assert.doesNotMatch(LOCAL_JS, /showContextMenu\(e\.clientX, e\.clientY, \[\r?\n\s*\{ icon: '▶'/);
   assert.match(LOCAL_JS, /reveal: \(\) => revealLocalFile\(s\)/);
   assert.match(LOCAL_JS, /copyPath: \(fp\) => copyLocalPath\(fp\)/);
-  assert.match(LOCAL_JS, /await api\.openFolder\(s\.filePath\)/);
+  // 走 openFolderSafe（utils.js 的唯一入口）而不是裸调 api.openFolder：
+  // 主进程 open-folder 有 approvedDirs 沙箱，裸调会让「被拒」变成静默失败 ——
+  // 用户点了没反应也没有提示。判据与 test/open-folder-entry.test.js 同源。
+  assert.match(LOCAL_JS, /await openFolderSafe\(s\.filePath\)/);
+  assert.doesNotMatch(LOCAL_JS, /api\.openFolder\(/, '裸调 api.openFolder 会静默失败，走 openFolderSafe');
   assert.match(LOCAL_JS, /await copyText\(fp\)/);
 });
