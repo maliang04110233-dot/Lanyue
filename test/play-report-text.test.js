@@ -1,5 +1,5 @@
 /**
- * 增量110：「📋 复制听歌报告」—— playReportText.js 纯函数 + 接线钉
+ * 「📋 复制听歌报告」—— playReportText.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

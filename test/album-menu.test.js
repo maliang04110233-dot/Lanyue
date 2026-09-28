@@ -1,5 +1,5 @@
 /**
- * 增量87：歌曲行右键「所属专辑」操作（albumMenuItems 纯组装 + 接线钉桩）
+ * 歌曲行右键「所属专辑」操作（albumMenuItems 纯组装 + 接线钉桩）
  */
 const test = require('node:test');
 const assert = require('node:assert');

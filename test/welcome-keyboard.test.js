@@ -1,5 +1,5 @@
 /**
- * 增量193：新手引导层的键盘契约——把 182 的三件套推广到第二个模态。
+ * 新手引导层的键盘契约——把 182 的三件套推广到第二个模态。
  * （工号说明：起工时记 187，落库时 187–192 已被并发线用尽，顺延为 193。）
  *
  * 来龙：186 收口 Esc 归属时明记欠账「welcome 层的 Tab/焦点陷阱未立法，本增量只收
@@ -49,7 +49,7 @@ const loadWelcomeFresh = async () => {
   return import(pathToFileURL(R('js', 'views', 'welcome.js')).href + '?tc=' + Math.random());
 };
 
-// ── domStub：从 test/helpers/dom-stub.js 取（增量193 收口——桩只有一个家，
+// ── domStub：从 test/helpers/dom-stub.js 取（收口——桩只有一个家，
 // 本文件对它补出的三件真 DOM 语义已在 helper 里，186 同址共用；⑧是它的自测）──
 
 /**

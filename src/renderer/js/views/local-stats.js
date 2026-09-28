@@ -318,7 +318,7 @@ export async function deleteSelectedDups() {
   if (!selected.size) return;
 
   const count = selected.size;
-  // 增量159（审计 F2 收尾）：旧文案「此操作不可撤销！」是谎话 —— delete-file 走的是
+  // （审计 F2 收尾）：旧文案「此操作不可撤销！」是谎话 —— delete-file 走的是
   // shell.trashItem（test/libraryIpc 钉死"移入回收站后原路径消失"），文件一直在系统回收站里。
   // 吓阻不是诚实；诚实的写法是点名影响（个数 + 总大小）并告知真实退路（回收站可还原）。
   const selSongs = _dupState.groups.flat().filter(s => selected.has(s.filePath));
@@ -361,7 +361,7 @@ export async function deleteSelectedDups() {
   const overlay = document.getElementById('dupModal');
   if (overlay) overlay.remove();
 
-  // 增量159：成功语点名去处（回收站可还原），失败语保留原样逐数播报
+  // 成功语点名去处（回收站可还原），失败语保留原样逐数播报
   showToast(failed > 0
     ? `删除完成：✅ ${deleted} 成功  ❌ ${failed} 失败`
     : `已删除 ${deleted} 个重复文件，它们在系统回收站里，随时可还原`,

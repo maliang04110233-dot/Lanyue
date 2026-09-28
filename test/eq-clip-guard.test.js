@@ -1,6 +1,5 @@
 /**
- * 增量223：EQ 输出级 trim + 命令面板 EQ 条目
- * （原头注释自称「增量213」，而 213 已被 7c0ed3f 用掉 —— 撞号会让后续审查对不上账）
+ * EQ 输出级 trim + 命令面板 EQ 条目
  *
  * trim：正增益抬升会让整首歌跟着变响 —— 纯函数 preampTrimDb 由有效增益现推
  * 固定 trim dB（= -最大单段正增益，非正曲线为 0），镜像到**链首**的 preamp
@@ -178,7 +177,7 @@ test('cycleEqPreset 行为：flat→pop→rock…，手调自定义后下一档�
 
   // 手调成自定义 → 下一档从表首（flat）起，不卡死
   // 手调本身**不许**落盘：eqPreset 仍是上一档 rock、eqGains 仍是 rock 的曲线。
-  // 增量223 之前这里写的是 `prefs.eqPreset === undefined ? null : null` —— 三目两个分支
+  // 之前这里写的是 `prefs.eqPreset === undefined ? null : null` —— 三目两个分支
   // 都是 null，恒等于 null，于是「setEqBand 不写 pref」这句话一个字节都没验到。
   // 恒真断言比缺断言更坏：它给「这条不变量有人守着」的假绿。
   eq.setEqBand(0, 7);

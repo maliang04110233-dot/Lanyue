@@ -1,5 +1,5 @@
 /**
- * 增量97：拖入音频文件即播（blob 队列行 source:'drop'，重启不残留，零新通道）
+ * 拖入音频文件即播（blob 队列行 source:'drop'，重启不残留，零新通道）
  *
  * dragdrop.js 此前只接管 .lrc，其余文件不处理；本增量把资源管理器里的
  * 音频文件（可多选）直接拖进窗口即入播放队列即播：URL.createObjectURL

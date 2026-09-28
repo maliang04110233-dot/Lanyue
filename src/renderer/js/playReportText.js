@@ -1,5 +1,5 @@
 /**
- * 听歌报告纯文本（增量110）—— 纯函数，node 可直测
+ * 听歌报告纯文本—— 纯函数，node 可直测
  *
  * 报告弹层只有 HTML，想发群聊只能截图；这里把同一份统计投影成
  * 一段纯文本，交给 songShare.copyText 进剪贴板。歌手聚合从
@@ -58,13 +58,13 @@ export function formatReportText(d) {
     lines.push('', `🎤 最爱歌手 TOP ${ta.length}`);
     ta.forEach((x, i) => lines.push(`${i + 1}. ${x.artist} (${+x.count || 0} 次)`));
   }
-  // 每日听歌（增量113）：只列有账的天，零天省略；全无则整段省略
+  // 每日听歌：只列有账的天，零天省略；全无则整段省略
   const daily = Array.isArray(s.daily) ? s.daily.filter(b => b && +b.secs > 0) : [];
   if (daily.length) {
     lines.push('', `📅 每日听歌 · 近 ${s.daily.length} 天`);
     daily.forEach(b => lines.push(`${b.label}：${Math.max(1, Math.round(+b.secs / 60))}分钟`));
   }
-  // 本周/本月（增量116）：账到才出段；上周期基数只在该周有账时附带
+  // 本周/本月：账到才出段；上周期基数只在该周有账时附带
   const _mins = (x) => `${Math.max(1, Math.round(+x / 60))}分钟`;
   const wk = s.week && +s.week.secs > 0 ? s.week : null;
   const mo = s.month && +s.month.secs > 0 ? s.month : null;

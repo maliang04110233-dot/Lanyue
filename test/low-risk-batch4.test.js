@@ -131,7 +131,7 @@ test('shortcuts: 帮助弹窗要能切换且 Esc 可关；Ctrl 组合不得被�
   const src = read('renderer', 'js', 'shortcuts.js');
   assert.match(src, /if \(overlay\) \{\s*overlay\.remove\(\);\s*return;/,
     '帮助开着时按 ? 应关闭（toggle），不是移除后无条件重建');
-  // 增量197 重钉：closeActiveModal 不再点名 shortcutsHelp（手抄清单已拆），
+  // 重钉：closeActiveModal 不再点名 shortcutsHelp（手抄清单已拆），
   // 「Esc 关帮助」改由注册表承载——创建点必须自报关闭契约，实弹行为见 modal-registry ⑧。
   assert.match(src, /overlay\.setAttribute\('data-modal-close', '-'\)/,
     '帮助浮层须登记 Esc 关闭契约（短横哨兵 = 注册表摘除本体）');

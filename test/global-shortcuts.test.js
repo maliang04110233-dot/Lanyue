@@ -1,5 +1,5 @@
 /**
- * 增量218：全局快捷键可自定义 —— 白名单、默认态、去重与三侧对账
+ * 全局快捷键可自定义 —— 白名单、默认态、去重与三侧对账
  *
  * 改造前的真实状态（src/main/index.js:388）：四枚媒体键写死在函数体里的字面量数组，
  * 设置页只有一枚「全局媒体键」总开关。用户能做的一切是「全用」或「全不用」：
@@ -46,7 +46,7 @@ function acc() {
 
 // ── A：模块形状 ────────────────────────────────────────
 
-test('增量218 模块导出齐全（白名单/目标清单/归一/读绑定/默认 prefs）', () => {
+test(' 模块导出齐全（白名单/目标清单/归一/读绑定/默认 prefs）', () => {
   const m = acc();
   for (const name of ['ALLOWED_ACCELERATORS', 'UNBOUND', 'SHORTCUT_TARGETS',
     'normalizeAccelerator', 'readBindings', 'defaultShortcutPrefs']) {
@@ -72,7 +72,7 @@ function prefSource(map) {
 
 // ── B：升级即刻的行为等价 ──────────────────────────────
 
-test('增量218 默认映射逐字复现改造前写死的那三枚媒体键', () => {
+test(' 默认映射逐字复现改造前写死的那三枚媒体键', () => {
   const m = acc();
   // 全新安装：prefs 里什么都没有，取值器一律回 undefined
   const got = m.readBindings(() => undefined);
@@ -83,7 +83,7 @@ test('增量218 默认映射逐字复现改造前写死的那三枚媒体键', (
   ], '默认态必须与升级前一模一样：用户没动过设置就不许感到行为变了（显示/隐藏窗口默认不抢键）');
 });
 
-test('增量218 每个目标的默认值都在白名单里（未绑定除外）', () => {
+test(' 每个目标的默认值都在白名单里（未绑定除外）', () => {
   const m = acc();
   const bad = m.SHORTCUT_TARGETS
     .filter((t) => t.default !== m.UNBOUND && !m.ALLOWED_ACCELERATORS.includes(t.default))
@@ -91,7 +91,7 @@ test('增量218 每个目标的默认值都在白名单里（未绑定除外）'
   assert.deepStrictEqual(bad, [], '默认值不在白名单 = 出厂即归一，界面与注册行为对不上：' + bad.join(', '));
 });
 
-test('增量218 默认 prefs 表每次都是新对象（防止调用方就地改坏出厂值）', () => {
+test(' 默认 prefs 表每次都是新对象（防止调用方就地改坏出厂值）', () => {
   const m = acc();
   const a = m.defaultShortcutPrefs();
   a[m.SHORTCUT_TARGETS[0].prefKey] = 'Ctrl+Alt+Space';
@@ -101,7 +101,7 @@ test('增量218 默认 prefs 表每次都是新对象（防止调用方就地改
 
 // ── 归一：外部数据（备份导入/手改 prefs.json）不得越界 ──
 
-test('增量218 归一只放行白名单与未绑定，其余回落该目标默认值', () => {
+test(' 归一只放行白名单与未绑定，其余回落该目标默认值', () => {
   const m = acc();
   assert.strictEqual(m.normalizeAccelerator('Ctrl+Alt+Space', 'MediaPlayPause'), 'Ctrl+Alt+Space');
   assert.strictEqual(m.normalizeAccelerator(m.UNBOUND, 'MediaPlayPause'), m.UNBOUND,
@@ -112,7 +112,7 @@ test('增量218 归一只放行白名单与未绑定，其余回落该目标默�
   }
 });
 
-test('增量218 一枚键只能有一个动作：按目标清单顺序先到先得', () => {
+test(' 一枚键只能有一个动作：按目标清单顺序先到先得', () => {
   const m = acc();
   const [playPause, prev, next] = m.SHORTCUT_TARGETS;
   const prefs = m.defaultShortcutPrefs();
@@ -126,7 +126,7 @@ test('增量218 一枚键只能有一个动作：按目标清单顺序先到先�
   assert.ok(got.some((b) => b.id === playPause.id));
 });
 
-test('增量218 解绑与垃圾值混合输入不崩、顺序稳定', () => {
+test(' 解绑与垃圾值混合输入不崩、顺序稳定', () => {
   const m = acc();
   const prefs = { [m.SHORTCUT_TARGETS[0].prefKey]: m.UNBOUND, [m.SHORTCUT_TARGETS[2].prefKey]: 42 };
   const got = m.readBindings(prefSource(prefs));
@@ -151,7 +151,7 @@ function parseSelectOptions(html) {
   return out;
 }
 
-test('增量218 设置页四枚下拉的候选项与白名单逐字相等（多一枚少一枚都算漂移）', () => {
+test(' 设置页四枚下拉的候选项与白名单逐字相等（多一枚少一枚都算漂移）', () => {
   const m = acc();
   const selects = parseSelectOptions(read('src/renderer/index.html'));
   const expected = [m.UNBOUND].concat(m.ALLOWED_ACCELERATORS);
@@ -167,14 +167,14 @@ test('增量218 设置页四枚下拉的候选项与白名单逐字相等（多�
   assert.deepStrictEqual(missing, [], '设置页候选项与主进程白名单不符：\n  ' + missing.join('\n  '));
 });
 
-test('增量218 四个 pref 键都在 set-pref 白名单里（否则是只能读不能改的死旋钮）', () => {
+test(' 四个 pref 键都在 set-pref 白名单里（否则是只能读不能改的死旋钮）', () => {
   const m = acc();
   const { ALLOWED_PREF_KEYS } = require('../src/main/ipc/prefs');
   const bad = m.SHORTCUT_TARGETS.filter((t) => !ALLOWED_PREF_KEYS.has(t.prefKey)).map((t) => t.prefKey);
   assert.deepStrictEqual(bad, [], '这些键渲染层写不进去：' + bad.join(', '));
 });
 
-test('增量218 渲染层 prefs 表的默认值与判据之家逐字相等（这张表同时管回填与恢复默认）', () => {
+test(' 渲染层 prefs 表的默认值与判据之家逐字相等（这张表同时管回填与恢复默认）', () => {
   const m = acc();
   const code = stripComments(read('src/renderer/js/views/settings.js'));
   const bad = [];
@@ -194,7 +194,7 @@ test('增量218 渲染层 prefs 表的默认值与判据之家逐字相等（这
   assert.deepStrictEqual(bad, [], '渲染层与 src/shared/accelerators.js 漂移：\n  ' + bad.join('\n  '));
 });
 
-test('增量218 总开关与四枚下拉共用一个重注册出口', () => {
+test(' 总开关与四枚下拉共用一个重注册出口', () => {
   const code = stripComments(read('src/renderer/js/views/settings.js'));
   const m = acc();
   const defs = code.match(/function reapplyGlobalShortcuts\(/g) || [];
@@ -216,7 +216,7 @@ test('增量218 总开关与四枚下拉共用一个重注册出口', () => {
     '清单里躺着判据之家不认识的动作键（改名后忘同步 = 静默失灵）');
 });
 
-test('增量218 恢复默认也会重注册（借道 change 事件，不新开第二个出口）', () => {
+test(' 恢复默认也会重注册（借道 change 事件，不新开第二个出口）', () => {
   const code = stripComments(read('src/renderer/js/views/settings.js'));
   const reset = code.slice(code.indexOf('async function resetAllSettings'));
   assert.ok(reset.length > 100, '没找到 resetAllSettings');
@@ -226,7 +226,7 @@ test('增量218 恢复默认也会重注册（借道 change 事件，不新开�
 
 // ── D：判据之家唯一 ────────────────────────────────────
 
-test('增量218 主进程不再自带第二份媒体键清单', () => {
+test(' 主进程不再自带第二份媒体键清单', () => {
   const m = acc();
   const code = stripComments(read('src/main/index.js'));
   assert.ok(/require\('\.\.\/shared\/accelerators'\)/.test(code),
@@ -236,7 +236,7 @@ test('增量218 主进程不再自带第二份媒体键清单', () => {
     '这些 accelerator 字面量又回到 index.js 了（改一处漏一处的老毛病）：' + leaked.join(', '));
 });
 
-test('增量218 显示/隐藏窗口是主进程内动作，不借道新 IPC 通道', () => {
+test(' 显示/隐藏窗口是主进程内动作，不借道新 IPC 通道', () => {
   const m = acc();
   const showHide = m.SHORTCUT_TARGETS.find((t) => t.id === 'showHide');
   assert.strictEqual(showHide.channel, null, 'showHide 不该有通道：它是主进程自己的窗口动作');
@@ -247,7 +247,7 @@ test('增量218 显示/隐藏窗口是主进程内动作，不借道新 IPC 通�
     '快捷键相关通道必须仍只有那一条既有的：' + before.join(', '));
 });
 
-test('增量218 新增文案 zh/en 成对且都进了词典', () => {
+test(' 新增文案 zh/en 成对且都进了词典', () => {
   const zh = JSON.parse(read('src/renderer/js/lang/zh.json'));
   const en = JSON.parse(read('src/renderer/js/lang/en.json'));
   const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) =>

@@ -188,7 +188,7 @@ async function subscriptionQueueNew(key) {
   }
 }
 
-/** 新歌行「⬇」逐首入队（增量104：语义与 downloadPlaylistSong 对齐，走既有 addToQueue 通道）。
+/** 新歌行「⬇」逐首入队（语义与 downloadPlaylistSong 对齐，走既有 addToQueue 通道）。
  *  用 id 而非下标定位：主进程推送会整体替换 _subList，点击时列表可能已变 */
 async function subscriptionDownloadNew(key, songId) {
   const entry = _subList.find(e => e.key === key);

@@ -1,5 +1,5 @@
 /**
- * 增量145：A-B 片段导出为独立音频文件
+ * A-B 片段导出为独立音频文件
  *   - src/utils/audioConvert.js —— normalizeClip / clipNameSuffix / -ss -t 参数位 / 输出命名
  *   - src/renderer/js/abClip.js —— 出片前判定（纯函数，不碰 window）
  *   - 真 ffmpeg 冒烟：产物时长必须真的短于源（否则说明 -ss/-t 根本没生效）

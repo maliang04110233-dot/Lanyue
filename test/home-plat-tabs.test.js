@@ -1,5 +1,5 @@
 /**
- * 增量125：首页平台 tab 互斥切换
+ * 首页平台 tab 互斥切换
  *
  * 纯函数部分（homePlatTabs.js）可真跑；DOM 接线部分只能静态钉 ——
  * home.js 顶层就有 document 访问，node 下 import 不可行（同其它视图增量）。

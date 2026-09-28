@@ -411,7 +411,7 @@ let _playRequestId = 0;
 
 async function playSongByIdx(idx, song) {
   if (!song) return;
-  // 拖放即播行（增量97）：blob URL 是 drop 现场造的，不走取流链路；
+  // 拖放即播行：blob URL 是 drop 现场造的，不走取流链路；
   // 跨会话残留（理论上已被 sanitizeSavedQueue 滤掉）只提示不发起请求
   if (song.source === 'drop') {
     if (song._blobUrl) {
@@ -465,7 +465,7 @@ async function playSongByIdx(idx, song) {
   }
 }
 
-// ── 下一首预取（增量124）──────────────────────────────
+// ── 下一首预取──────────────────────────────
 // 切歌空白来自「取流 + 代理」两次串行网络往返。当前歌只剩 20s 时在后台把下一首的直链取好，
 // 下一首播时直接开播（判定口径全在 playPrefetch.js，此处只做网络调用与缓存）。
 const _prefetch = createPrefetchStore();
@@ -747,7 +747,7 @@ export function cyclePlaybackRate() {
 }
 
 /**
- * 音量与倍速的「默认态」（增量184）：设置页「恢复所有设置」叫这一家。
+ * 音量与倍速的「默认态」：设置页「恢复所有设置」叫这一家。
  * 这两个旋钮住在播放器上（音量滑条、倍速按钮），不在 GENERAL_PREFS 表里 —— 表管不着它们，
  * 于是过去的"恢复默认"漏掉了它们：滑条仍停在用户上次拖到的 15%、倍速仍是 2x，重启照旧。
  * 委派既有的 setVolume / _applyPlaybackRate：滑条、百分比、按钮图标、aria 各只有一家会改。
@@ -930,7 +930,7 @@ export function onAudioEnded() {
   // 播放结束时清除进度记忆（已播完不需要恢复）
   const curSong = getState('currentPlaying');
   if (curSong) { try { savePlayProgress(curSong, 0); } catch (_e) { /* ignore */ } }
-  // 「播完当前歌曲再停」（增量120）排在连播/单曲循环之前：闩命中即收口，否则单曲循环永远等不到停
+  // 「播完当前歌曲再停」排在连播/单曲循环之前：闩命中即收口，否则单曲循环永远等不到停
   if (typeof window.consumeSleepEndStop === 'function' && window.consumeSleepEndStop()) {
     updatePlayStatsOnStop();
     audio.pause();

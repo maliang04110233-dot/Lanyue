@@ -612,7 +612,7 @@ async function resetQualityBySource() {
   showToast(t('toast.qualityFollowReset'), 'info');
 }
 
-// ── 换源排除平台（增量126-B）─────────────────────────────
+// ── 换源排除平台─────────────────────────────
 // 清单由主进程 resolveTrackService 每次解析时读取：勾选的平台不再出现在
 // 跨源候选与 _altSource 记忆里；该平台自己的歌曲照常播放/下载（本源不受限）。
 let _fallbackDisabledTimer = null;
@@ -826,7 +826,7 @@ function renderDownloadTemplates() {
     const isActive = tpl.id === _dlActiveTemplate;
     // id 可能是云同步/导入的外部数据 —— 与账号卡片同一约定：实参走 escQ、属性走 escAttr
     const idArg = "'" + escQ(tpl.id) + "'";
-    // 落盘真正用的是 subpath（相对下载目录的片段，增量169 起才存在）；
+    // 落盘真正用的是 subpath（相对下载目录的片段，f5f5a08 起才存在）；
     // 老模板、以及从别的下载目录同步来的模板没这个字段，只能显示绝对路径
     const hasSub = typeof tpl.subpath === 'string' && !!tpl.subpath;
     const shown = hasSub ? tpl.subpath : tpl.path;
@@ -1232,7 +1232,7 @@ function rotateMcpToken() {
   showToast(t('toast.mcpTokenRotated'), 'warn', 5000);
 }
 
-// ── 设置项搜索（增量102：settingsSearch.js 纯函数的接线层）────────
+// ── 设置项搜索（settingsSearch.js 纯函数的接线层）────────
 // DOM 拍平成 {title, blocks:[{kind,text}]} 喂纯函数，计划用 .srch-hide 类回写：
 // 只加减这个类、绝不碰行内 display —— 有些行本就按条件隐藏，清了会把它放出来。
 function _settingBlockNodes(el) {

@@ -1,5 +1,5 @@
 /**
- * 增量213：AI 创作的请求体对齐 MiniMax music_generation 真实 schema
+ * AI 创作的请求体对齐 MiniMax music_generation 真实 schema
  *
  * 查 2026-09 官方文档（platform.minimaxi.com / platform.minimax.cn，
  * api-reference/music-generation 的 GenerateMusicReq）证实：请求字段是

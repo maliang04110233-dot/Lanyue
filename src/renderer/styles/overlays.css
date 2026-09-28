@@ -89,7 +89,7 @@
   border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
 }
 
-/* ── 设置页搜索（增量102）：只加减 .srch-hide，不碰条件隐藏行的内联样式 ── */
+/* ── 设置页搜索：只加减 .srch-hide，不碰条件隐藏行的内联样式 ── */
 .settings-search-input { flex: 0 1 260px; margin: 0 var(--sp-4); }
 .settings-nav-item { position: relative; }
 .settings-nav-hit {
@@ -407,7 +407,7 @@
   font-variant-numeric: tabular-nums;
 }
 .eq-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
-/* 曲线偏离所有预设时补的一句解释（增量187）：推到最左，与右侧两颗按钮同行不打架 */
+/* 曲线偏离所有预设时补的一句解释：推到最左，与右侧两颗按钮同行不打架 */
 .eq-custom-hint { margin-right: auto; align-self: center; }
 
 /* ── 账号卡片 ────────────────────────────────────────── */
@@ -814,7 +814,7 @@ kbd {
 .cmdk-group { flex-shrink: 0; font-size: 11px; color: var(--neon-dim); padding: 1px 7px; border-radius: 6px; background: var(--elev-1); }
 .cmdk-hint { padding: 8px 14px; font-size: 11px; color: var(--neon-dim); border-top: 1px solid var(--border-subtle); }
 
-/* ══ 不可逆操作确认弹层（confirmDialog.js，增量176）══════════
+/* ══ 不可逆操作确认弹层（confirmDialog.js）══════════
    替换原生 confirm()：多行点名文案一行一屏展示，不再被系统灰窗压平。 */
 .confirm-dialog-overlay {
   position: fixed; inset: 0; z-index: var(--z-overlay);

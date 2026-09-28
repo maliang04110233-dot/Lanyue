@@ -1,5 +1,5 @@
 /**
- * per-source-setting.test.js — 增量79「单平台并发上限设置入口」守卫
+ * per-source-setting.test.js — 「单平台并发上限设置入口」守卫
  *
  * 手法沿用 eq-behaviour.test.js：无 jsdom，故静态扫描源码文本断言结构。
  *

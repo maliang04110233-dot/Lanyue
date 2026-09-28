@@ -1,5 +1,5 @@
 /**
- * 增量114 测试：搜索页「♥ 批量收藏」
+ * 测试：搜索页「♥ 批量收藏」
  *
  * planBatchFav 纯函数直调（红心是 toggle 语义，判重是批量收藏的命门）；
  * toggleFavoriteByKey 的 silent/返回值是新增契约，旧调用方（单曲红心、

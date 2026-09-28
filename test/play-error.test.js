@@ -1,5 +1,5 @@
 /**
- * 增量146：播放失败分流诊断
+ * 播放失败分流诊断
  *   - src/renderer/js/playError.js —— isLocalFileSong / describePlayError（纯函数，无 DOM）
  *   - src/renderer/js/app.js —— audio error 监听唯一调用点接入
  *

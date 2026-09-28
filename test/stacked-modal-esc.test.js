@@ -1,5 +1,5 @@
 /**
- * 增量186：叠层弹层的键盘归属——早注册的 capture 监听必须向确认框让位。
+ * 叠层弹层的键盘归属——早注册的 capture 监听必须向确认框让位。
  *
  * 来龙：182 给 confirmDialog 装了 capture 相 stopImmediatePropagation 围堵，
  * 但当场记下一条文级欠账：围堵只对"后注册的"监听有效——同节点 capture 队列按

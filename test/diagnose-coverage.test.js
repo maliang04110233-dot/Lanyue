@@ -1,10 +1,10 @@
 /**
- * 增量210：取流回写码 → 诊断码表 的覆盖度门禁
+ * 取流回写码 → 诊断码表 的覆盖度门禁
  *
  * 症状（2026-09-22 静态走查实测，非猜测）：downloadQueue.js:335 把取流结果的
  * `code` 原样写进 song.errorCode，队列行/历史行的徽标（failureTag）和诊断弹层
  * （classifyFailure）都只认 diagnose.js 的 DIAG_TABLE。而取流层实际回写的码比表里多：
- *   PLATFORM_CHANGED（酷狗反爬，增量126-A 就在发）、BAD_PARAMS、FETCH_FAILED、
+ * PLATFORM_CHANGED（酷狗反爬，就在发）、BAD_PARAMS、FETCH_FAILED、
  *   INTERNAL_ERROR、INVALID_ARGS、UNKNOWN_SOURCE、BILI_URL_ERROR —— 七个码在表里一个都没有。
  * 于是用户看到的是一律「未分类的失败 / 复制错误信息反馈」，而且行内连徽标都不戴。
  * 最刺眼的是 PLATFORM_CHANGED：它早已进换源白名单（fallbackCodes.js），

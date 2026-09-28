@@ -1,7 +1,7 @@
 /**
- * 导入 m3u 为用户歌单（增量96）
+ * 导入 m3u 为用户歌单
  *
- * 增量51 的 m3u 导入是「解析→在线搜索→入队下载」；但本地播放器导出的 m3u
+ * 的 m3u 导入是「解析→在线搜索→入队下载」；但本地播放器导出的 m3u
  * 大多数的歌本就躺在曲库里，再造一遍下载是浪费。本模块走第二条路：
  * 路径优先、曲名+歌手兜底，两级匹配本地曲库；命中歌折叠成
  * source:'local' + id=filePath（与收藏红心、播放器 file:// 分支同键形，
@@ -156,7 +156,7 @@ export function pickM3uForPlaylist() {
   input.click();
 }
 
-// node 直测（增量97 dropPlay 复用本模块纯函数）不得被 window 桥炸穿
+// node 直测（dropPlay 复用本模块纯函数）不得被 window 桥炸穿
 if (typeof window !== 'undefined') {
   window.pickM3uForPlaylist = pickM3uForPlaylist;
   window.importM3uAsPlaylist = importM3uAsPlaylist;

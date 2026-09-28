@@ -223,14 +223,14 @@ function fmtHistoryTime(ts) {
 /**
  * 唯一一份"带按钮的 toast"实现：正文 + 一个动作 + 到点自己消失。
  *
- * 增量155 收口：此前只有「已下载过，仍要下载」用到这套结构（手造 div + 按钮 + 定时消失），
+ * 收口：此前只有「已下载过，仍要下载」用到这套结构（手造 div + 按钮 + 定时消失），
  * 播放失败就地重下是第二个消费方 —— 这套结构不许有第二份实现。
  * @param {object}   opts
  * @param {string}   opts.text       正文
  * @param {string}   opts.btnLabel   按钮文字
  * @param {function} opts.onConfirm  点按钮后的回调（点击即关掉这条 toast）
  * @param {number}   [opts.ttl=6000] 停留时长 ms
- * @param {string}   [opts.tone=warn] 色族：'warn' | 'success'（增量177 为首次下载庆祝开的
+ * @param {string}   [opts.tone=warn] 色族：'warn' | 'success'（为首次下载庆祝开的
  *                                   可选项）。只认这两族、类名走 base.css 既有 token 类，
  *                                   不传照旧 warn —— 撤销/仍要下载两处零改动。
  */

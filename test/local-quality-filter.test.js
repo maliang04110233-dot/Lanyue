@@ -1,5 +1,5 @@
 /**
- * 增量123：本地曲库「音质视图过滤」—— localQualityFilter 纯函数 + 接线钉
+ * 本地曲库「音质视图过滤」—— localQualityFilter 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 /**
- * 增量219（上半）：断网这件事，界面要认得
+ * （上半）：断网这件事，界面要认得
  *
  * 队列里那些红色任务此前分两种命运，而且两种都错：
  *   - 断网跑完的任务无码 ⇒ 用户看到一排红条 +「未分类的失败」，只能一条条手点重试；
@@ -29,7 +29,7 @@ const en = JSON.parse(read('src/renderer/js/lang/en.json'));
 
 // ── 1：码清单只有一份，且与判据之家逐字相等 ──────────────
 
-test('增量219 渲染层的网络码清单与 netClass 的 NETWORK_CODES 逐字相等', async () => {
+test(' 渲染层的网络码清单与 netClass 的 NETWORK_CODES 逐字相等', async () => {
   const { NET_CODES } = await fresh();
   assert.deepEqual(NET_CODES, netClass.NETWORK_CODES,
     '渲染层手抄的码表与判据之家漂了：横幅会漏认码，或去重试根本不是网络问题的红条');
@@ -37,7 +37,7 @@ test('增量219 渲染层的网络码清单与 netClass 的 NETWORK_CODES 逐字
 
 // ── 2：挑任务只挑"在等网络"的红条 ────────────────────────
 
-test('增量219 只把 error + 网络码的行算作"在等网络恢复"', async () => {
+test(' 只把 error + 网络码的行算作"在等网络恢复"', async () => {
   const { netFailedTasks } = await fresh();
   const items = [
     { taskId: 'a', status: 'error', errorCode: 'NETWORK_ERROR' },
@@ -52,14 +52,14 @@ test('增量219 只把 error + 网络码的行算作"在等网络恢复"', async
     '下载成功的、排队中的、以及非网络类失败都不该被自动重排');
 });
 
-test('增量219 挑出来的行带 taskId（复网时按它调既有重试通道，不另开通道）', async () => {
+test(' 挑出来的行带 taskId（复网时按它调既有重试通道，不另开通道）', async () => {
   const { netFailedTasks } = await fresh();
   const rows = netFailedTasks([{ taskId: 'x1', status: 'error', errorCode: 'NETWORK_ERROR' }]);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].taskId, 'x1');
 });
 
-test('增量219 空值/非数组/脏行不抛（队列快照随时可能是空的）', async () => {
+test(' 空值/非数组/脏行不抛（队列快照随时可能是空的）', async () => {
   const { netFailedTasks } = await fresh();
   for (const v of [undefined, null, '', [], {}]) {
     assert.deepEqual(netFailedTasks(v), [], `${JSON.stringify(v)} 应返回空数组而不是抛`);
@@ -70,7 +70,7 @@ test('增量219 空值/非数组/脏行不抛（队列快照随时可能是空�
 
 // ── 3：引擎自归类的码必须在诊断码表登记 ──────────────────
 
-test('增量219 引擎自归类的每枚网络码都有徽标与真诊断（不许掉进"未分类"）', async () => {
+test(' 引擎自归类的每枚网络码都有徽标与真诊断（不许掉进"未分类"）', async () => {
   const { failureTag, classifyFailure } = await import(`../src/renderer/js/diagnose.js?ck=${Math.random()}`);
   for (const code of netClass.NETWORK_CODES) {
     const tag = failureTag(code);
@@ -88,7 +88,7 @@ test('增量219 引擎自归类的每枚网络码都有徽标与真诊断（不�
 
 const COPY_KEYS = ['download.netOffline', 'download.netWaiting', 'toast.netRequeued'];
 
-test('增量219 网络横幅与复网提示的中英文案成对，占位符也成对', () => {
+test(' 网络横幅与复网提示的中英文案成对，占位符也成对', () => {
   for (const key of COPY_KEYS) {
     const a = zh[key];
     const b = en[key];
@@ -101,7 +101,7 @@ test('增量219 网络横幅与复网提示的中英文案成对，占位符也�
   assert.match(zh['toast.netRequeued'], /\{count\}/);
 });
 
-test('增量219 横幅元素在 index.html 里，且 JS 用的 id 与它一字不差', () => {
+test(' 横幅元素在 index.html 里，且 JS 用的 id 与它一字不差', () => {
   const html = read('src/renderer/index.html');
   const view = read('src/renderer/js/views/download.js');
   const m = html.match(/id="(netBanner)"/);
@@ -110,7 +110,7 @@ test('增量219 横幅元素在 index.html 里，且 JS 用的 id 与它一字�
     'download.js 没按这个 id 找元素 —— 横幅会静默不出现（双 #saveDirText 的老坑）');
 });
 
-test('增量219 复网自动续跑走 online/offline 事件，且尊重队列暂停', () => {
+test(' 复网自动续跑走 online/offline 事件，且尊重队列暂停', () => {
   const view = read('src/renderer/js/views/download.js');
   assert.match(view, /addEventListener\(\s*['"]offline['"]/, '没听 offline：横幅不会在断网时出现');
   assert.match(view, /addEventListener\(\s*['"]online['"]/, '没听 online：复网后红条仍要人手一条条点');

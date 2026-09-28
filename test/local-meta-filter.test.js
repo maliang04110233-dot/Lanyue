@@ -1,8 +1,8 @@
 /**
- * 增量126：本地曲库「元数据完整度」视图过滤 —— localMetaFilter 纯函数 + 接线钉
+ * 本地曲库「元数据完整度」视图过滤 —— localMetaFilter 纯函数 + 接线钉
  *
  * 附一条**过滤器接线回归钉**：所有本地库过滤轴（收藏/格式/音质/完整度/排序）
- * 的循环函数都必须重跑 filterLocalSongs()。增量123 的 cycleLocalQual 写成了
+ * 的循环函数都必须重跑 filterLocalSongs()。37187d2 的 cycleLocalQual 写成了
  * renderLocalSongs()（只重画旧数组），按钮换态不生效且旧测试把这个错钉成了
  * 「期望」—— 本钉按函数体逐个校验，专治这一类。
  */
@@ -122,7 +122,7 @@ test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + �
   assert.ok(!FILT_JS.includes('document') && !FILT_JS.includes('innerHTML'));
 });
 
-test('回归钉：每条本地库过滤轴的循环函数都必须重跑 filterLocalSongs（增量123 漏调致按钮失效）', () => {
+test('回归钉：每条本地库过滤轴的循环函数都必须重跑 filterLocalSongs（漏调致按钮失效）', () => {
   const axes = ['toggleLocalFavOnly', 'cycleLocalFmt', 'cycleLocalQual', 'cycleLocalSort', 'cycleLocalMeta'];
   for (const fn of axes) {
     const body = fnBody(LOCAL_JS, fn);

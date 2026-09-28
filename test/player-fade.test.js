@@ -1,5 +1,5 @@
 /**
- * 播放淡入 / 淡出（增量66 / 增量119）纯函数 + 接线钉
+ * 播放淡入 / 淡出（/）纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

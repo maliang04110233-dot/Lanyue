@@ -1,9 +1,9 @@
 /**
- * 播放队列 → 用户歌单的纯函数（增量76）。
+ * 播放队列 → 用户歌单的纯函数。
  * 队列行本就是原始歌曲对象（url 只在取流后的 currentPlaying 上），
  * 这里只做三件事：判可持久、盖 addedAt（歌单详情「添加时间」排序依赖它）、
  * 生成带时间的默认歌单名。无 DOM / api 依赖，node 可直接单测。
- * 增量118：原 queueToSongs（无脑滤空+盖章）退役 —— 整单存为改走 pickPlSavableRows。
+ * 原 queueToSongs（无脑滤空+盖章）退役 —— 整单存为改走 pickPlSavableRows。
  */
 
 export function defaultQueuePlaylistName(date = new Date()) {
@@ -12,7 +12,7 @@ export function defaultQueuePlaylistName(date = new Date()) {
 }
 
 /**
- * 这行能不能存进歌单（增量115）：drop 行是临时 blob（重启即死）；
+ * 这行能不能存进歌单：drop 行是临时 blob（重启即死）；
  * 本地行靠 filePath 重播；在线行靠 id+source 取流 —— 缺键的都是死行。
  */
 export function isPlSavableRow(s) {

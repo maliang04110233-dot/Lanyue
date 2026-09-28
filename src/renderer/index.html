@@ -338,7 +338,7 @@
             <button class="tab" onclick="openSaveDir()" data-i18n="download.openDir">📂 打开目录</button>
             <button class="tab tab-neon" onclick="exportCurrentPlaylist()" data-i18n="download.exportList">📤 导出列表</button>
           </div>
-          <!-- 网络状态横幅（增量219）：只在断网时出现，文字与条数由 download.js 走词典填 -->
+          <!-- 网络状态横幅：只在断网时出现，文字与条数由 download.js 走词典填 -->
           <div id="netBanner" class="net-banner" role="status" aria-live="polite" hidden></div>
           <!-- 选择操作栏 -->
           <div id="dlSelectionBar" class="dl-selection-bar" style="display:none">
@@ -1377,7 +1377,7 @@
   </div>
 </div>
 
-<!-- 我的歌单：回收站弹窗（增量157：删除兜底，30 天内可恢复 / 彻底删除） -->
+<!-- 我的歌单：回收站弹窗（删除兜底，30 天内可恢复 / 彻底删除） -->
 <div class="playlist-modal-overlay hidden" id="playlistTrashModal" onclick="event.target === this && closePlaylistTrash()" data-modal data-modal-close="closePlaylistTrash">
   <div class="playlist-modal" style="min-width:380px;max-width:460px;">
     <div class="playlist-modal-header">

@@ -1,5 +1,5 @@
 /**
- * 增量115 测试：播放队列多选「🎼 加歌单」
+ * 测试：播放队列多选「🎼 加歌单」
  *
  * pickPlSavableRows/isPlSavableRow 纯函数直调（死行进歌单即坏数据，
  * 判形是命门）；app/HTML/面板接线走静态钉。
@@ -13,7 +13,7 @@ const APP_JS = fs.readFileSync(path.join(__dirname, '../src/renderer/js/app.js')
 const HTML = fs.readFileSync(path.join(__dirname, '../src/renderer/index.html'), 'utf8');
 const PALETTE_JS = fs.readFileSync(path.join(__dirname, '../src/renderer/js/commandPalette.js'), 'utf8');
 const QP_JS = fs.readFileSync(path.join(__dirname, '../src/renderer/js/queuePlaylist.js'), 'utf8');
-// 增量191 起，用户反馈文案住在语言包里（源码只留键名），接线钉要两侧都看得见的东西才能钉稳
+// 45838e3 起，用户反馈文案住在语言包里（源码只留键名），接线钉要两侧都看得见的东西才能钉稳
 const ZH = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/renderer/js/lang/zh.json'), 'utf8'));
 
 async function fresh() {
@@ -54,7 +54,7 @@ test('接线钉：app 判形调用 + 按钮计数 + window 挂桥 + HTML/面板�
   assert.match(APP_JS, /window\.pqSelAddPlaylist = \(\) => \{/);
   assert.ok(APP_JS.includes('filter(s => _pqSel.has(s))'), '按队列原序投影，不跟勾选乱序');
   assert.ok(APP_JS.includes('pickPlSavableRows(picked);'));
-  // 增量191：这句「先勾选」提示搬进了语言包（英文界面要能翻）。判据跟着搬，源码与词典两侧都钉：
+  // 这句「先勾选」提示搬进了语言包（英文界面要能翻）。判据跟着搬，源码与词典两侧都钉：
   // 只钉源码，词典能悄悄换词；只钉词典，源码能悄悄换键。
   assert.ok(APP_JS.includes("showToast(t('toast.pickRowsForPlaylist'), 'warn')"),
     '没勾选时的提示仍走 toast.pickRowsForPlaylist 键');
@@ -63,5 +63,5 @@ test('接线钉：app 判形调用 + 按钮计数 + window 挂桥 + HTML/面板�
   assert.ok(APP_JS.includes("window.quickAddToPlaylist(rows)"), '复用既有批量链，零新通道');
   assert.match(HTML, /<button class="pq-clear-btn hidden" id="pqSelPlBtn" onclick="pqSelAddPlaylist\(\)"/);
   assert.match(PALETTE_JS, /id: 'pq-selpl'[\s\S]{0,220}?_call\('pqSelAddPlaylist'\)/);
-  assert.ok(APP_JS.includes("const songs = pickPlSavableRows(getState('playQueue') || []);"), '增量118：整单存为同样滤死行');
+  assert.ok(APP_JS.includes("const songs = pickPlSavableRows(getState('playQueue') || []);"), '整单存为同样滤死行');
 });

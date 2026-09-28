@@ -1,9 +1,9 @@
 /**
- * prefs 白名单漂移守护（增量119）
+ * prefs 白名单漂移守护
  *
  * set-pref 有键白名单（src/main/ipc/prefs.js，H9 防任意键注入），但白名单是手写的：
  * 渲染层新增一个偏好键却忘了登记时，写入会被主进程静默拒绝（只打一行 warn），
- * 表现就是「这个设置重启就失效」。增量119 勘探一次就抓出 9 个这类键
+ * 表现就是「这个设置重启就失效」。 勘探一次就抓出 9 个这类键
  * （fadeInMs / perSourceConcurrency / maxAttempts / autoLyric / autoCover …）。
  * 本测试把「渲染层会写的键」扫出来跟白名单对账，从此这类漂移当场变红。
  */
@@ -49,7 +49,7 @@ test('渲染层写的每个 pref 键都在 set-pref 白名单里（否则重启�
   assert.deepEqual(missing, [], '这些键能写却被白名单拒绝: ' + missing.join(', '));
 });
 
-test('增量119 补录的 9 个键已在白名单（曾经静默被拒的设置项）', () => {
+test('7f134d4 补录的 9 个键已在白名单（曾经静默被拒的设置项）', () => {
   for (const k of [
     'fadeInMs', 'fadeOutMs', 'perSourceConcurrency', 'maxAttempts',
     'autoLyric', 'autoCover', 'dismissedSongs', 'lyricsVisible', 'lyricOverrides',

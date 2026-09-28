@@ -1,5 +1,5 @@
 /**
- * 搜索结果「不感兴趣」屏蔽（增量69）
+ * 搜索结果「不感兴趣」屏蔽
  *
  * 纯函数段 node 直测（不导入 state.js/logger.js，保持零依赖）；
  * DOM 段沿用 edit-overlay + createElement 模式管理已屏蔽列表。

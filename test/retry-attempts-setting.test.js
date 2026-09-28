@@ -1,5 +1,5 @@
 /**
- * retry-attempts-setting.test.js — 增量80「单曲失败尝试次数设置」守卫
+ * retry-attempts-setting.test.js — 「单曲失败尝试次数设置」守卫
  *
  * 混合手法（同 per-source-setting 的静态部分 + downloadQueue.test.js 的
  * prefs-patch 运行时部分）：

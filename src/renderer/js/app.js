@@ -396,7 +396,7 @@ async function init() {
         const cur = getState('currentPlaying');
         if (!cur || !_audio.error) return;
         const e = describePlayError(cur, _audio.error.code);
-        // 增量155：本地文件行播不出来 = 盘和记录的引用断了，就地给一口「⬇ 重新下载」，
+        // 本地文件行播不出来 = 盘和记录的引用断了，就地给一口「⬇ 重新下载」，
         // 不必让人翻到下载历史页去找那一行。判据（哪些行真有源可下）在 playError.js。
         const retry = playFailureRetry(cur, _audio.error.code);
         if (retry) {
@@ -1065,7 +1065,7 @@ async function addPlaylistToQueueClick(skipExisting) {
   }
 }
 
-// ── 弹层勾选 → 我的歌单（增量98，plModalSave 纯函数的接线层）──────
+// ── 弹层勾选 → 我的歌单（plModalSave 纯函数的接线层）──────
 async function savePlModalAsPlaylist() {
   const modal = document.getElementById('playlistModal');
   if (!modal || modal.classList.contains('hidden')) {
@@ -1362,7 +1362,7 @@ window.dedupePlayQueue = () => {
   showToast(t('toast.queueDupRemoved', { count: r.removed }), 'success');
 };
 
-// ── 队列多选批量移除（增量101）：选态装行对象引用，下标漂移不误伤 ──
+// ── 队列多选批量移除：选态装行对象引用，下标漂移不误伤 ──
 let _pqSelMode = false;
 const _pqSel = new Set();
 
@@ -1419,7 +1419,7 @@ window.removeCheckedFromQueue = async () => {
   showToast(t('toast.rowsRemoved', { count: r.removed }), 'success');
 };
 
-// 队列多选「🎼 加歌单」（增量115）：勾选行按队列原序投影成可持久行，
+// 队列多选「🎼 加歌单」：勾选行按队列原序投影成可持久行，
 // 喂 quickAddToPlaylist 既有批量链（引擎端 id+source 去重）。drop 行是
 // 临时 blob、本地行缺 filePath 播不动 —— 都被纯函数挡在门外。
 window.pqSelAddPlaylist = () => {
@@ -1433,7 +1433,7 @@ window.pqSelAddPlaylist = () => {
   if (typeof window.quickAddToPlaylist === 'function') window.quickAddToPlaylist(rows);
 };
 
-// 播放队列「📋 复制曲单」（增量147）：多选模式下只复制勾到的行，否则整队，
+// 播放队列「📋 复制曲单」：多选模式下只复制勾到的行，否则整队，
 // 一行一首「歌名 - 歌手」纯文本进剪贴板（同 108 的两个消费方口径）。
 // 入口刻意只挂命令面板：pq-header 已 6 个按钮，而 .pq-panel 是不换行的
 // flex + overflow:hidden，第 7 个会被静默裁掉。
@@ -1450,7 +1450,7 @@ window.copyQueueListText = async () => {
 
 // 播放队列一键存为歌单（queuePlaylist 纯函数的接线层）：
 // 名称自动生成「播放队列 · MM-DD HH:mm」，建好后可在歌单编辑器改名/换封面。
-// 增量118：走 pickPlSavableRows —— 整单存为同样不收死行（drop 临时行 / 缺 filePath 的本地行）
+// 走 pickPlSavableRows —— 整单存为同样不收死行（drop 临时行 / 缺 filePath 的本地行）
 window.saveQueueAsPlaylist = async () => {
   const songs = pickPlSavableRows(getState('playQueue') || []);
   if (!songs.length) { showToast(t('toast.queueNotSavable'), 'warn', 2800); return; }

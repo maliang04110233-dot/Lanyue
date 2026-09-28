@@ -27,7 +27,7 @@ function escapeRe(s) {
 
 /**
  * 从 ESM 源码推导导出名（四种写法：function / async function / const-let-var / export{} 别名）。
- * 派生清单漏一种写法 = 那一类导出一律不在判据视野里（增量192 前 `export const` 就是隐形的）。
+ * 派生清单漏一种写法 = 那一类导出一律不在判据视野里（前 `export const` 就是隐形的）。
  * @param {string} src 源码文本（不是路径：读文件与判存在性归调用方）
  * @returns {string[]} 升序去重
  */
@@ -73,7 +73,7 @@ function internalUsesOf(src, name) {
  *
  * 活路有两条，任一条成立即算活：
  *   ① 别的渲染模块提到它（跨模块 import / 调用）；
- *   ② 本模块内部有调用点（导出只是为可测性，压缩器绝不会丢它 —— 增量187 的
+ * ② 本模块内部有调用点（导出只是为可测性，压缩器绝不会丢它 —— c664fdf 的
  *      matchPresetName 就是被旧判据按①单独判成孤儿、从此天天红的）。
  * 反过来：只有声明处提到自己、或只在别人的注释里出现过 ⇒ 仍然判死（189 的幽灵键同一把尺）。
  * @param {{selfSrc:string, otherSrc:string, names:string[]}} p
@@ -103,7 +103,7 @@ const NOTHING_TO_JUDGE_NOTE = '包已陈旧且工作树没有 dist/ 产物 —�
 /**
  * 选出「渲染层 bundle 内容断言」该判哪份产物。
  *
- * 分工（增量192 立的口径）：**内容**断言（逻辑有没有被 tree-shake、window 挂载在不在）
+ * 分工（433eb5b 立的口径）：**内容**断言（逻辑有没有被 tree-shake、window 挂载在不在）
  * 判最新鲜的那份构建产物；**成员**断言（平台模块/拷贝清单/图标字节/依赖树）判包本身。
  * 旧包不该让内容断言天天红，但退化必须写在脸上，否则就成了"门禁绿着而没人重新打过包"。
  * @param {{asarBundle:string, distBundle:string, stale:boolean}} p 两份产物文本（缺则空串）

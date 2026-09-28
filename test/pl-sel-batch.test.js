@@ -1,5 +1,5 @@
 /**
- * 增量112 测试：歌单详情多选「⬇ 下载已勾选 / ▶ 播放已勾选」
+ * 测试：歌单详情多选「⬇ 下载已勾选 / ▶ 播放已勾选」
  * plSelBatch 纯函数直调 + 接线静态钉（views/playlist.js / index.html / commandPalette.js）
  */
 const test = require('node:test');
@@ -55,7 +55,7 @@ test('playlist.js 接线：_playFrom 抽取、整单入队去重、多选两动�
   assert.ok((PL_JS.match(/status !== 'done'/g) || []).length === 1, '整单入队的内联判重应已移入 plSelBatch');
   assert.ok((PL_JS.match(/planSelEnqueue\(/g) || []).length === 2, '整单 + 多选各调一次');
   assert.ok((PL_JS.match(/enqueueSkipSuffix\(/g) || []).length === 2, '两条批量线共用文案后缀');
-  // 勾选提取复用增量99 的 splitBySelection（键=歌身份），不再自造第二套选态
+  // 勾选提取复用0178f20 的 splitBySelection（键=歌身份），不再自造第二套选态
   assert.equal((PL_JS.match(/splitBySelection\(_currentDetailSongs, _plSelKeys\)/g) || []).length, 1);
   assert.ok(/function _plSelPicked\(\) \{\n {2}return splitBySelection\(_currentDetailSongs, _plSelKeys\)\.removed;/.test(PL_JS));
   assert.ok((PL_JS.match(/_plSelPicked\(\)/g) || []).length === 3, '定义1 + 下载/播放各1');

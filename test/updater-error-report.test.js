@@ -1,5 +1,5 @@
 /**
- * 单元测试：自动更新失败时的「说什么、什么时候说」（增量206）
+ * 单元测试：自动更新失败时的「说什么、什么时候说」
  *
  * 为什么单独钉这一处（2026-09-21 用户截图）：
  *   弹窗显示「更新失败：net::ERR_CONNECTION_RESET」——两条独立缺陷叠出来的：
@@ -188,7 +188,7 @@ test('守卫：updater.js 接了 updateError，且不再自带第二份文案函
     '文案函数只能住在 updateError.js，两处各一份必然漂移');
 });
 
-// 增量216 之后，"把 mirrorTried 传给文案函数"这件事收进了 manualFailureInfo 一处
+// 4e30160 之后，"把 mirrorTried 传给文案函数"这件事收进了 manualFailureInfo 一处
 // （三条出口还要各自带上 manualUrl，各写一遍 opts 必然漂移）。这里钉的是同一条
 // 纪律的当前形态：文案派生只有一个调用点，两个事实参数都在那里传。
 test('守卫：文案派生只有一个调用点，mirrorTried 与 manualAvailable 都在那里传', () => {

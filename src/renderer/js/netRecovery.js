@@ -1,7 +1,7 @@
 /**
  * MusicDL 渲染层 — 「哪些红条是在等网络」
  *
- * 引擎（增量219 下半）给断网/超时的下载终态补上了 NETWORK_ERROR / NETWORK_TIMEOUT 两枚码，
+ * 引擎（下半）给断网/超时的下载终态补上了 NETWORK_ERROR / NETWORK_TIMEOUT 两枚码，
  * 渲染层这才第一次有可能不问用户就把它们挑出来：断网时横幅报个数，复网时按个数自动重新入队。
  *
  * 判据之家在 src/shared/netClass.js（渲染层不能 import src/shared，见 sidecar 家法），

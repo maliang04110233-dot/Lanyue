@@ -48,7 +48,7 @@ test('classifyFailure: 全不命中归未分类且可重试，空输入不炸', 
   assert.ok(e.cause && e.advice);
 });
 
-// ── 批量聚合（增量40） ─────────────────────────────────
+// ── 批量聚合 ─────────────────────────────────
 test('groupFailures: 按分类聚合降序，非 error 与空项被忽略', async () => {
   const { groupFailures } = await fresh();
   const err = (code, error, title) => ({ status: 'error', errorCode: code, error, title, taskId: 't' + title });

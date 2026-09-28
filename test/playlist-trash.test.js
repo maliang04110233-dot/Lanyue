@@ -1,5 +1,5 @@
 /**
- * 歌单回收站 + 撤销删除（增量156/157，审计 F2「删除必见影响 → 5 秒撤销 → 回收站兜底」）
+ * 歌单回收站 + 撤销删除（/157，审计 F2「删除必见影响 → 5 秒撤销 → 回收站兜底」）
  *
  * 三层覆盖（沿用本仓惯例）：
  *  1. 纯函数：utils/playlistTrash.js 的挪站/放回/过期清/列表视图/彻底删除，零 IO；
@@ -255,7 +255,7 @@ test('端到端：register() 启动清过期 —— 31 天前的条目没了，�
   assert.equal(tr[0].playlist.id, 'pl_b');
 });
 
-test('端到端（增量157）：get-user-playlists({trash:true}) 返回带倒计时的视图，普通调用不受影响', async () => {
+test('端到端：get-user-playlists({trash:true}）返回带倒计时的视图，普通调用不受影响', async () => {
   fresh();
   const created = await invoke('save-user-playlist')(null, { name: '删了看看', songs: [{ id: 1, source: 'netease' }] });
   const pl = created.playlist;
@@ -272,7 +272,7 @@ test('端到端（增量157）：get-user-playlists({trash:true}) 返回带倒�
   assert.ok(!plain.some(p => p.id === pl.id));
 });
 
-test('端到端（增量157）：回收站里"再删一次"= 彻底删除；此后既不在列表也不在回收站', async () => {
+test('端到端：回收站里"再删一次"= 彻底删除；此后既不在列表也不在回收站', async () => {
   fresh();
   const created = await invoke('save-user-playlist')(null, { name: '彻底删', songs: [] });
   const pl = created.playlist;
@@ -288,7 +288,7 @@ test('端到端（增量157）：回收站里"再删一次"= 彻底删除；此�
   assert.match(third.error, /不存在/);
 });
 
-test('端到端（增量157）：回收站视图条目走 save-user-playlist = 恢复，id 内容原样回列表', async () => {
+test('端到端：回收站视图条目走 save-user-playlist = 恢复，id 内容原样回列表', async () => {
   fresh();
   const created = await invoke('save-user-playlist')(null, { name: '从站内回', songs: [{ id: 9, source: 'netease', title: 'y' }] });
   const pl = created.playlist;
@@ -323,7 +323,7 @@ test('渲染层：确认框点名歌单与歌数，删除后走带「撤销」�
   const dict = require('../src/renderer/js/lang/zh.json');
   const fn = src.match(/async function deletePlaylist[\s\S]*?\n}\n/);
   assert.ok(fn, 'deletePlaylist 找不到了（改名/挪走时同步本测试）');
-  // 文案已收进词典（增量210 一批）：断言从「源码里有中文模板串」改成
+  // 文案已收进词典（一批）：断言从「源码里有中文模板串」改成
   // 「源码把 name / count 传进去了，且词典那一格真的点得着名与数」。
   // 只钉 t('toast.plConfirmDelete' 是不够的 —— 那只证明接了词典，
   // 不证明这条文案还守着 F2 纪律。两侧都要钉。
@@ -342,7 +342,7 @@ test('渲染层：确认框点名歌单与歌数，删除后走带「撤销」�
   assert.match(undo[0], /api\.saveUserPlaylist\(pl\)/, '撤销必须走既有保存通道，不许另开通道');
 });
 
-test('渲染层（增量157）：回收站入口/弹窗/四个函数接线齐全，恢复与彻底删除都走既有通道', () => {
+test('渲染层：回收站入口/弹窗/四个函数接线齐全，恢复与彻底删除都走既有通道', () => {
   const html = read('src/renderer/index.html');
   assert.match(html, /id="plTrashBtn"[^>]*onclick="openPlaylistTrash\(\)"/, '工具条回收站按钮没接上');
   assert.match(html, /id="playlistTrashModal"/, '回收站弹窗没了');

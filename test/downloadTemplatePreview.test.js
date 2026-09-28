@@ -7,9 +7,9 @@
  *
  * 覆盖的两条承诺：
  *   1) 'preview-naming-template' 一条通道吃两种入参：字符串=文件名模板（老口径，
- *      设置页命名输入框在用），{ pathTpl }=目录模板（增量172 的实时预览）。
+ * 设置页命名输入框在用），{ pathTpl }=目录模板（668bad9 的实时预览）。
  *      为预览再开一条通道没有意义，但两种入参必须在同一次调用里互不污染。
- *   2) 增量169 修掉的"相对路径按进程 CWD 解析"：用户照提示写 {artist}/{album}
+ * 2) f5f5a08 修掉的"相对路径按进程 CWD 解析"：用户照提示写 {artist}/{album}
  *      必须存得下来，并且存下的 subpath 就是这段相对片段（落盘时按它建目录）。
  */
 
@@ -60,7 +60,7 @@ async function invoke(channel, arg) {
 
 // ── 1) 预览：两种入参同一通道 ────────────────────────────────
 
-test('字符串入参仍是文件名模板预览（老口径不许被增量172 挤坏）', async () => {
+test('字符串入参仍是文件名模板预览（老口径不许被668bad9 挤坏）', async () => {
   const r = await invoke('preview-naming-template', '{artist} - {title}');
   assert.equal(r.preview, '周杰伦 - 晴天.mp3');
   assert.deepEqual(r.unknown, []);

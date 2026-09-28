@@ -6,7 +6,7 @@
  * keywords 兜底拼音/英文/别称。面板本身只是「一个输入框 + 一张表」，
  * 所有动作复用既有 window 桥接，零新增 IPC。
  *
- * 键盘契约（增量195，182/193 三件套推广到第三个模态）：
+ * 键盘契约（182/193 三件套推广到第三个模态）：
  * ① open 即同步聚焦输入框——呼出即可打字，不留 30ms 空窗；
  * ② capture 围堵（承 193「让位优先于围堵」）：hasOpenConfirm() 先让位，
  *    随后 stopImmediatePropagation 封层——面板开着，一个键都不漏给背景的
@@ -214,7 +214,7 @@ function _ensureOverlay() {
   el.className = 'edit-overlay hidden';
   el.setAttribute('role', 'dialog'); // ⑦：读屏须知道"世界换成了面板"
   el.setAttribute('aria-modal', 'true');
-  // 浮层注册表自报家门（增量197，还 195 的账）：手抄清单时代 cmdkOverlay 从来
+  // 浮层注册表自报家门（还 195 的账）：手抄清单时代 cmdkOverlay 从来
   // 不在表里，背景键守卫与 Esc 双双失明；195 的围堵是第二保险，注册表是正源。
   el.setAttribute('data-modal', '');
   el.setAttribute('data-modal-close', 'closeCommandPalette');

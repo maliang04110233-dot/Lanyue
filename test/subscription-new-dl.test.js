@@ -1,5 +1,5 @@
 /**
- * 增量104：订阅新歌行「⬇ 逐首下载 + ✔ 状态徽标」—— subNewDl.js 纯函数 + 接线钉
+ * 订阅新歌行「⬇ 逐首下载 + ✔ 状态徽标」—— subNewDl.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

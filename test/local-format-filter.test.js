@@ -1,5 +1,5 @@
 /**
- * 增量107：本地曲库「🎞 格式过滤」—— localFormatFilter.js 纯函数 + 接线钉
+ * 本地曲库「🎞 格式过滤」—— localFormatFilter.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

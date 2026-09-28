@@ -1,12 +1,12 @@
 /**
- * 增量219（下半）：断网跑完的任务要留下真话
+ * （下半）：断网跑完的任务要留下真话
  *
  * 改造前的实证：src/main/downloadQueue.js 的 catch 里
  *   `const isRetriable = /HTTP\s*(403|404|410)/i.test(msg)` 之后直接 break，
  *   而 `song.errorCode` 只在「取流返回 fatal」那一条路上才写（335 行）。
  *   ⇒ 断网导致的下载失败既没有任何码，也没有任何分类：
- *     队列行与历史行不戴徽标（增量162 的徽标只认码），
- *     诊断弹层只会说「未分类的失败，请复制错误信息反馈」（增量158 起的兜底文案），
+ * 队列行与历史行不戴徽标（cb2c416 的徽标只认码），
+ * 诊断弹层只会说「未分类的失败，请复制错误信息反馈」（372d675 起的兜底文案），
  *     渲染层更不可能知道「这些红色任务是等网络恢复的」——于是复网后它们就一直是红的。
  *
  * 本文件钉住：
@@ -88,7 +88,7 @@ async function waitFor(fn, { timeout = 3000, interval = 5 } = {}) {
 // A：网络类失败带上真码
 // ══════════════════════════════════════════════════════════
 
-test('增量219 断连类传输失败 ⇒ 终态带 NETWORK_ERROR（队列与历史同码）', async () => {
+test(' 断连类传输失败 ⇒ 终态带 NETWORK_ERROR（队列与历史同码）', async () => {
   const { song, historyAdds } = await runOne({
     downloadFileWithRetry: async () => { throw Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }); },
   });
@@ -96,14 +96,14 @@ test('增量219 断连类传输失败 ⇒ 终态带 NETWORK_ERROR（队列与历
   assert.strictEqual(historyAdds[0].errorCode, 'NETWORK_ERROR', '历史行的徽标与队列行同一个码，不能一边有一边没有');
 });
 
-test('增量219 Chromium 层的断网名（net::ERR_INTERNET_DISCONNECTED）也认得', async () => {
+test(' Chromium 层的断网名（net::ERR_INTERNET_DISCONNECTED）也认得', async () => {
   const { song } = await runOne({
     downloadFileWithRetry: async () => { throw new Error('net::ERR_INTERNET_DISCONNECTED'); },
   });
   assert.strictEqual(song.errorCode, 'NETWORK_ERROR');
 });
 
-test('增量219 超时类分档为 NETWORK_TIMEOUT', async () => {
+test(' 超时类分档为 NETWORK_TIMEOUT', async () => {
   const { song } = await runOne({
     downloadFileWithRetry: async () => { throw new Error('下载超时'); },
   });
@@ -114,21 +114,21 @@ test('增量219 超时类分档为 NETWORK_TIMEOUT', async () => {
 // B/C/D：不许乱认领、不许覆盖更准的码、取消不算失败
 // ══════════════════════════════════════════════════════════
 
-test('增量219 磁盘满不写网络码（把磁盘问题说成网络问题会让人查半天网络）', async () => {
+test(' 磁盘满不写网络码（把磁盘问题说成网络问题会让人查半天网络）', async () => {
   const { song } = await runOne({
     downloadFileWithRetry: async () => { throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' }); },
   });
   assert.strictEqual(song.errorCode, undefined, '非网络失败保持无码，由关键词兜底说话');
 });
 
-test('增量219 取流层已经写好的码不被传输层覆盖', async () => {
+test(' 取流层已经写好的码不被传输层覆盖', async () => {
   const { song } = await runOne({
     getDownloadUrlSmart: async () => ({ error: '需要 VIP', fatal: true, code: 'VIP_REQUIRED' }),
   });
   assert.strictEqual(song.errorCode, 'VIP_REQUIRED');
 });
 
-test('增量219 用户主动取消不写错误码（取消不是失败）', async () => {
+test(' 用户主动取消不写错误码（取消不是失败）', async () => {
   const { song, historyAdds } = await runOne({
     downloadFileWithRetry: async () => { throw Object.assign(new Error('aborted'), { cancelled: true }); },
   });
@@ -140,7 +140,7 @@ test('增量219 用户主动取消不写错误码（取消不是失败）', asyn
 // E：传输层判定同源
 // ══════════════════════════════════════════════════════════
 
-test('增量219 传输层不再自带第二份瞬时错误正则', () => {
+test(' 传输层不再自带第二份瞬时错误正则', () => {
   const code = stripComments(read('src/utils/downloader.js'));
   assert.ok(/require\(['"]\.\.\/shared\/netClass['"]\)/.test(code), 'downloader.js 没接 netClass 判据');
   assert.ok(/isTransportFailure\(/.test(code), '判据 require 了却没在重试分支上调用');

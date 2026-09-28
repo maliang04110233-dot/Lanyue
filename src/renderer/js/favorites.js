@@ -55,7 +55,7 @@ export function toggleLocalFavorite(song) {
 }
 
 /**
- * 播放队列行 → 收藏对象（增量92）：本地行与本地曲库同走 filePath:local 键
+ * 播放队列行 → 收藏对象：本地行与本地曲库同走 filePath:local 键
  * （行对象 id 未必是 filePath，直接heart会和本地库红心分裂成两条）；
  * 无 id 的行（异常数据）不出红心。
  */
@@ -66,7 +66,7 @@ export function queueFavSong(s) {
 }
 
 /**
- * 收藏/取消当前正在播放的歌（增量95，命令面板入口）。
+ * 收藏/取消当前正在播放的歌（命令面板入口）。
  *
  * 五个行面红心只覆盖列表行；主播放器/迷你窗/桌面词上没有点心处。
  * 键对齐直接复用 queueFavSong（本地折叠 filePath:local，与本地库/队列
@@ -105,7 +105,7 @@ export function favHeartClick(btn) {
 
 /**
  * 按收藏键切换状态并就地刷新全部红心按钮。
- * @param {boolean} [silent] 批量路径用（增量114）：不弹单曲 toast，成败看返回值，
+ * @param {boolean} [silent] 批量路径用：不弹单曲 toast，成败看返回值，
  *   由调用方聚合播报；缺省时行为与旧版逐字一致。
  */
 export async function toggleFavoriteByKey(key, silent) {

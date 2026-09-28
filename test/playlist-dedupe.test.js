@@ -1,5 +1,5 @@
 /**
- * 增量84：歌单详情「🧹 清重复」
+ * 歌单详情「🧹 清重复」
  * = mergeSongLists(base, []) 折叠曲内重复（保留首次出现）+ 视图/面板接线
  */
 const test = require('node:test');

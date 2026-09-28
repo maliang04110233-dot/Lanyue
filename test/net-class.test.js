@@ -1,5 +1,5 @@
 /**
- * 增量219：连通性失败的判据收进一处中性模块（src/shared/netClass.js）
+ * 连通性失败的判据收进一处中性模块（src/shared/netClass.js）
  *
  * 改造前的真实状态：
  *   - 「这条失败是不是网络类」只有主进程更新器那条线会问（正则写死在 src/main/updateError.js，
@@ -42,7 +42,7 @@ function net() {
 // 1-3：哪些文本算「重试有意义」的网络失败
 // ══════════════════════════════════════════════════════════
 
-test('增量219 超时族归 NETWORK_TIMEOUT', () => {
+test(' 超时族归 NETWORK_TIMEOUT', () => {
   const m = net();
   for (const msg of [
     'net::ERR_TIMED_OUT',
@@ -54,7 +54,7 @@ test('增量219 超时族归 NETWORK_TIMEOUT', () => {
   }
 });
 
-test('增量219 断连族归 NETWORK_ERROR（Chromium 与 Node 两套命名都要覆盖）', () => {
+test(' 断连族归 NETWORK_ERROR（Chromium 与 Node 两套命名都要覆盖）', () => {
   const m = net();
   for (const msg of [
     'read ECONNRESET',
@@ -70,7 +70,7 @@ test('增量219 断连族归 NETWORK_ERROR（Chromium 与 Node 两套命名都�
   }
 });
 
-test('增量219 非网络失败一律不认领（不许把鉴权/磁盘问题说成网络问题）', () => {
+test(' 非网络失败一律不认领（不许把鉴权/磁盘问题说成网络问题）', () => {
   const m = net();
   for (const msg of [
     'HTTP 403 Forbidden',
@@ -91,7 +91,7 @@ test('增量219 非网络失败一律不认领（不许把鉴权/磁盘问题说
 // 4：证书/TLS 单独一档 —— 「稍后再试」对它不成立
 // ══════════════════════════════════════════════════════════
 
-test('增量219 TLS 与传输失败分档：TLS 不算可自动重试', () => {
+test(' TLS 与传输失败分档：TLS 不算可自动重试', () => {
   const m = net();
   const tls = [
     'net::ERR_CERT_AUTHORITY_INVALID',
@@ -109,7 +109,7 @@ test('增量219 TLS 与传输失败分档：TLS 不算可自动重试', () => {
 // 5：入参形状要宽（引擎给的是错误对象，队列快照给的是 {errorCode, error}）
 // ══════════════════════════════════════════════════════════
 
-test('增量219 判定吃四种形状：字符串 / Error / 队列条目 / 裸码', () => {
+test(' 判定吃四种形状：字符串 / Error / 队列条目 / 裸码', () => {
   const m = net();
   assert.strictEqual(m.isConnectivityFailure('read ECONNRESET'), true);
   assert.strictEqual(m.isConnectivityFailure(new Error('net::ERR_TIMED_OUT')), true);
@@ -125,7 +125,7 @@ test('增量219 判定吃四种形状：字符串 / Error / 队列条目 / 裸�
 // 6：码不许拼错
 // ══════════════════════════════════════════════════════════
 
-test('增量219 NETWORK_CODES 每枚都是 errors.js 真定义过的码', () => {
+test(' NETWORK_CODES 每枚都是 errors.js 真定义过的码', () => {
   const m = net();
   const { ERROR_CODES } = require(path.join(ROOT, 'src/shared/errors.js'));
   assert.ok(Array.isArray(m.NETWORK_CODES) && m.NETWORK_CODES.length >= 2, '清单本身不能空');
@@ -138,14 +138,14 @@ test('增量219 NETWORK_CODES 每枚都是 errors.js 真定义过的码', () => 
 // 7-8：判据之家只有一处
 // ══════════════════════════════════════════════════════════
 
-test('增量219 更新器不再自带第二份正则', () => {
+test(' 更新器不再自带第二份正则', () => {
   const code = stripComments(read('src/main/updateError.js'));
   assert.ok(!/net::ERR_/.test(code), 'updateError.js 里仍写着 net:: 正则：同一判据开了第二个门禁');
   assert.ok(!/TRANSPORT_ERROR\s*=\s*\//.test(code), 'TRANSPORT_ERROR 仍在本地声明');
   assert.ok(/require\(['"]\.\.\/shared\/netClass['"]\)/.test(code), '没有改成消费中性模块');
 });
 
-test('增量219 引擎侧的认领只问判据，不再自己列一遍网络码', () => {
+test(' 引擎侧的认领只问判据，不再自己列一遍网络码', () => {
   const code = stripComments(read('src/main/downloadQueue.js'));
   assert.ok(/require\(['"]\.\.\/shared\/netClass['"]\)/.test(code), '下载引擎没接 netClass 判据');
   assert.ok(!/['"]NETWORK_(?:TIMEOUT|ERROR)['"]/.test(code),
@@ -156,7 +156,7 @@ test('增量219 引擎侧的认领只问判据，不再自己列一遍网络码'
 // 9：老语义不动（真调用，不是查源码）
 // ══════════════════════════════════════════════════════════
 
-test('增量219 迁移判据后 updateError 的说话口径一字未变', () => {
+test(' 迁移判据后 updateError 的说话口径一字未变', () => {
   const upd = require(path.join(ROOT, 'src/main/updateError.js'));
   // TLS 仍算"网络类"（该给手动下载入口），但文案说的是证书拦截而不是"稍后再试"
   assert.strictEqual(upd.isNetworkFailure({ message: 'net::ERR_CERT_REVOKED' }), true);

@@ -1,5 +1,5 @@
 /**
- * 增量111：睡眠定时「⌛ 自定义分钟」—— parseSleepMinutes 纯函数 + 弹层接线钉
+ * 睡眠定时「⌛ 自定义分钟」—— parseSleepMinutes 纯函数 + 弹层接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

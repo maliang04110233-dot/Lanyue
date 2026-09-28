@@ -1,7 +1,7 @@
 /**
  * 搜索页视图管线回归钉
  *
- * 增量130「非单曲视图被陈旧单曲列表覆盖」：
+ * 「非单曲视图被陈旧单曲列表覆盖」：
  * 缺陷：`_dlLastList` 只在 renderSongList 里被赋值、**从不置空**；而四处重绘入口
  *   search.js:171（隐藏已下载）、:179（排序）、:888（队列变化，300ms 防抖）、
  *   :893（屏蔽变化）
@@ -16,7 +16,7 @@
  * （不选「重绘入口加 _searchType === 'song' 守卫」：loadSingerDetail 的 albums 分支
  *   search.js:855 不改 _searchType，守卫会放行、仍被覆盖。）
  *
- * 增量131「异步渲染缺请求序号守卫」：
+ * 「异步渲染缺请求序号守卫」：
  * 缺陷：`_typeSearchReqId` 只在 doSearchByType 内部占号，而它是在 doSearch
  *   **await 完 handleLinkInput 之后**才被调用 —— 序号由「谁的响应先回来」分配，
  *   不是由「谁后发起」分配。先发起的搜索若后返回，反而拿到更大的号，用陈旧结果
@@ -29,7 +29,7 @@
  * 修法：号在**发起时**占（doSearch 开头），同一次搜索的链接识别与类型搜索共用
  *   一个号（doSearchByType 接收 reqId 参数）；接管与否改用返回值传递，无悬挂状态。
  *
- * 增量132「歌手详情头部自毁」：
+ * 「歌手详情头部自毁」：
  * 缺陷：openSingerDetail 把「头部（返回/订阅）+ 页签 + #singerDetailContent」整块写进
  *   #songList；而 loadSingerDetail 的 el 取的是 #singerDetailContent，却调
  *   renderSongList / renderAlbumList —— 这两个函数写的是 **#songList**。
@@ -81,7 +81,7 @@ function fnBody(src, name) {
 
 /**
  * 抽「签名 + 函数体」整段。
- * 增量131 需要它：请求序号可以写在参数默认值里（`reqId = ++_typeSearchReqId`），
+ * 需要它：请求序号可以写在参数默认值里（`reqId = ++_typeSearchReqId`），
  * 只在函数体内找「占号」会漏掉这一形态，从而把正确写法误判为缺陷。
  */
 function fnSrc(src, name) {
@@ -166,12 +166,12 @@ test('回归钉：renderSongList 必须是 _dlLastList 的唯一「= list」写�
   assert.deepStrictEqual(others, [], `这些函数不应把自身列表设为徽标锚点：${others.join(', ')}`);
 });
 
-// ── 增量131：请求序号域 ─────────────────────────────────
+// ── 请求序号域 ─────────────────────────────────
 
 /** 凡「渲染列表」的痕迹：三种列表渲染函数的引用（含 renderMap 里的裸引用） */
 const RENDERS_LIST = /\brender(Song|Album|Singer)List\b/;
 
-/** 增量131 关注的函数及其哨兵（用于自检抽段是否被字符串/模板字面量干扰配平） */
+/** 关注的函数及其哨兵（用于自检抽段是否被字符串/模板字面量干扰配平） */
 const REQID_TARGETS = {
   doSearch: 'handleLinkInput',
   doSearchByType: '_searchCacheKey',
@@ -270,7 +270,7 @@ test('回归钉：搜索类型页签高亮只允许由 _syncSearchTypeTabs 单�
   }
 });
 
-// ── 增量132：歌手详情头部自毁 ───────────────────────────
+// ── 歌手详情头部自毁 ───────────────────────────
 
 /** 枚举 function 声明名（本文件的渲染函数都是声明式；箭头函数形态本钉扫不到，见文末说明） */
 function allFnNames(src) {

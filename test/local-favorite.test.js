@@ -1,5 +1,5 @@
 /**
- * 增量88：本地曲库行「♥ 收藏」（localFavSong 键映射 + 行菜单接线，零新 IPC 通道）
+ * 本地曲库行「♥ 收藏」（localFavSong 键映射 + 行菜单接线，零新 IPC 通道）
  *
  * 本地歌收藏复用 toggle-favorite：source 固定 'local'、id 用 filePath，
  * 收藏条目保留 filePath，播放走 player 的 file:// 本地分支。

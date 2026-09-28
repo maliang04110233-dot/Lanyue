@@ -106,7 +106,7 @@ async function kugouGetUrl(id, quality = 'standard') {
     if (!playUrl && quality === 'hq') return kugouGetUrl(id, 'standard');
     if (!playUrl) {
       // playInfo 明确说付费：版权错误码。文案只说本源没有整曲音源 ——
-      // 跨源换源自增量207 起默认关闭（fallbackPolicy.crossSourceEnabled），
+      // 跨源换源自af84b70 起默认关闭（fallbackPolicy.crossSourceEnabled），
       // 这里再写「已自动尝试其他源」就是在撒谎。
       if (payError && /付费|VIP|版权/.test(payError)) {
         return {

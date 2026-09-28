@@ -39,12 +39,12 @@ let _currentPlaylistId = null;
 let _currentDetailSongs = [];
 let _plSongKw = ''; // 详情弹层会话级过滤词（切歌单/关闭即清）
 let _plSortMode = ''; // 详情弹层会话级视图排序（''=默认序，排序中禁拖把手）
-let _plDlMode = 'all'; // 详情弹层下载状态过滤（增量103：all/undone/done，切歌单即复位）
+let _plDlMode = 'all'; // 详情弹层下载状态过滤（all/undone/done，切歌单即复位）
 let _plCardSortMode = ''; // 歌单页卡片排序（会话级，收藏系统单恒置顶）
 let _plCardKw = ''; // 歌单页卡片过滤词（会话级，先过滤后排序）
 // 取流用智能接口（本源失败自动换源）；请求序号做竞态守卫，快速连点只认最后一次
 let _playlistPlayRequestId = 0;
-// 增量99：详情弹层多选移除（会话级）。键是歌的身份（id:source），过滤/排序/重渲染不丢选中
+// 详情弹层多选移除（会话级）。键是歌的身份（id:source），过滤/排序/重渲染不丢选中
 let _plSelMode = false;
 let _plSelKeys = new Set();
 
@@ -551,7 +551,7 @@ async function removeSongFromPlaylist(songId, source) {
   }
 }
 
-// ── 多选批量移除（增量99）───────────────────────────────
+// ── 多选批量移除───────────────────────────────
 function _resetPlSel() {
   _plSelMode = false;
   _plSelKeys = new Set();
@@ -640,7 +640,7 @@ async function removeCheckedFromPlaylist() {
   }
 }
 
-// ── 多选批量动作（增量112）：下载已勾选 / 播放已勾选 ─────────
+// ── 多选批量动作：下载已勾选 / 播放已勾选 ─────────
 /** 按歌单存储序取出勾选的歌（与99移除同一条链：键集现算，隐形/已消失的自然跳过） */
 function _plSelPicked() {
   return splitBySelection(_currentDetailSongs, _plSelKeys).removed;
@@ -774,7 +774,7 @@ function editPlaylist(playlistId) {
 }
 
 async function deletePlaylist(playlistId) {
-  // 增量156（审计 F2）：删除必见影响 —— 确认框点名歌单与歌数，
+  // （审计 F2）：删除必见影响 —— 确认框点名歌单与歌数，
   // 删后 5 秒撤销窗口（走 utils.showActionToast，回收站兜底见 main/ipc/playlist.js）
   const pl = (getState('userPlaylists') || []).find(p => p && p.id === playlistId);
   if (!pl) { showToast(t('toast.plNotFound'), 'warn'); return; }
@@ -814,7 +814,7 @@ async function undoDeletePlaylist(pl) {
   }
 }
 
-// ── 回收站视图（增量157：F2 第三层兜底 —— 没赶上 5 秒撤销的歌单在这里找回）──
+// ── 回收站视图（F2 第三层兜底 —— 没赶上 5 秒撤销的歌单在这里找回）──
 // 数据源仍是既有 get-user-playlists 频道（opts.trash=true 换视图），零新 IPC 通道；
 // 恢复走 save-user-playlist 的"带 id 却不在列表 ⇒ 从回收站放回"分支，
 // 彻底删除走 delete-user-playlist 的"再删一次回收站里的 id"分支。
@@ -890,7 +890,7 @@ async function restoreTrashedPlaylist(playlistId) {
 }
 
 async function purgeTrashedPlaylist(playlistId) {
-  // 增量157：彻底删除是真正不可逆的一层，确认框照 F2 纪律点名歌单与歌数
+  // 彻底删除是真正不可逆的一层，确认框照 F2 纪律点名歌单与歌数
   const e = _plTrash.find(t => t.playlist && t.playlist.id === playlistId);
   if (!e) { showToast(t('toast.plNotInTrash'), 'warn'); return; }
   const pl = e.playlist;
@@ -1048,7 +1048,7 @@ function cyclePlaylistSort() {
   if (_currentPlaylistId) renderPlaylistDetailSongs(_currentDetailSongs);
 }
 
-// ── 详情下载状态过滤循环（增量103：plDlFilter.js 纯函数的接线层）──
+// ── 详情下载状态过滤循环（plDlFilter.js 纯函数的接线层）──
 // 判定复用 dlStatusFor（与行内徽标同一来源），'done' 之外都算未下载
 function _syncPlDlBtn() {
   const btn = document.getElementById('plDlFilterBtn');
@@ -1363,7 +1363,7 @@ async function duplicateCurrentPlaylist() {
 }
 
 // 📋 复制曲单：当前过滤视图整成一行一首纯文本（歌名 - 歌手）进剪贴板，
-// 发群聊直接贴清单；增量58 是行级分享文案（带链接），这里是清单级，零新通道
+// 发群聊直接贴清单；是行级分享文案（带链接），这里是清单级，零新通道
 async function copyPlaylistListText() {
   const lines = toTrackLines(_plVisiblePairs(_currentDetailSongs).map(p => p.song));
   if (!lines.length) { showToast(t('toast.plNothingToCopy'), 'info'); return; }
@@ -1371,7 +1371,7 @@ async function copyPlaylistListText() {
   showToast(ok ? t('toast.plCopiedTitles', { count: lines.length }) : t('toast.copyFailed'), ok ? 'success' : 'error', 2500);
 }
 
-// ── 🧮 跨歌单重复检测（增量117）：纯函数扫描 + 报告弹层 + 复制，零新通道 ──
+// ── 🧮 跨歌单重复检测：纯函数扫描 + 报告弹层 + 复制，零新通道 ──
 let _dedupeGroups = [];
 
 function showDedupeModal(groups) {
@@ -1428,7 +1428,7 @@ async function copyDedupeScanReport() {
   showToast(ok ? t('toast.plDupReportCopied') : t('toast.copyFailed'), ok ? 'success' : 'error', 2500);
 }
 
-/** 🧲 收拢一组重复（增量118）：留首见单、其余整单更新，写完重扫刷新弹层 */
+/** 🧲 收拢一组重复：留首见单、其余整单更新，写完重扫刷新弹层 */
 async function consolidateDup(i) {
   const g = _dedupeGroups[i];
   if (!g || !g.key) { showToast(t('toast.plNoKeyToConsolidate'), 'warn'); return; }
@@ -1531,7 +1531,7 @@ window.closePlaylistEditor = closePlaylistEditor;
 window.savePlaylist = savePlaylist;
 window.editPlaylist = editPlaylist;
 window.deletePlaylist = deletePlaylist;
-// 增量157：回收站视图（弹窗行内按钮经 onclick 全局调用）
+// 回收站视图（弹窗行内按钮经 onclick 全局调用）
 window.refreshPlTrash = refreshPlTrash;
 window.openPlaylistTrash = openPlaylistTrash;
 window.closePlaylistTrash = closePlaylistTrash;

@@ -1,5 +1,5 @@
 /**
- * 增量216：更新失败弹层的内容生成（纯函数，无 DOM）
+ * 更新失败弹层的内容生成（纯函数，无 DOM）
  *
  * 之前失败弹层把 `result.error` 直接插进 innerHTML，三处各拼一份 ——
  * 一处漏转义就是一个 XSS 面（releaseNotes 那条已经踩过，见 updater.js 里

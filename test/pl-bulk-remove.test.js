@@ -1,5 +1,5 @@
 /**
- * 增量99：歌单详情「多选批量移除」
+ * 歌单详情「多选批量移除」
  *
  * 详情弹层此前只能逐行 ✕ 移除；本增量补多选模式：勾选键是歌的身份
  * （id:source，对齐主进程 songKey），过滤/排序/重渲染不丢选中，
@@ -68,9 +68,7 @@ test('接线钉：三按钮入过滤行、行首勾选框跟模式走、整单�
     && /removeCheckedFromPlaylist[\s\S]*?api\.saveUserPlaylist\(\{\s*id: pl\.id/.test(PLAYLIST_JS),
     '提交必须带 id 走整单更新，不逐首发 remove 通道');
   assert.ok(PLAYLIST_JS.includes("askConfirm(t('toast.plConfirmRemove', { count: removed.length, name: pl.name }))"),
-    // 增量223 记账：原写「增量210 收编」，而 210 已被 3761a15（取流失败分类补齐）占用，
-    // 撞号会让全量交叉引用对不上账，故随本批修复改到 223。
-    '不可逆前先确认（走词典，增量223 收编）');
+    '不可逆前先确认（走词典）');
   // 键值对账：源码只留键，词典值必须还是那句「确认把 N 首歌移出歌单…」（防止接错线）
   const zh = JSON.parse(fs.readFileSync(
     path.join(__dirname, '../src/renderer/js/lang/zh.json'), 'utf8'));

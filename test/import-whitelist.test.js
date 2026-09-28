@@ -1,5 +1,5 @@
 /**
- * 增量148：导入白名单与 set-pref 白名单对齐
+ * 导入白名单与 set-pref 白名单对齐
  *
  * 既有测试只钉了「可导入 ⊆ 可写入」这一个方向（防导入注入未知键），
  * 反方向没人管 —— 于是 cloudSync 自己那份手抄清单从 2022 年起 progressively
@@ -30,7 +30,7 @@ const DRIFTED = [
 ];
 
 test('ALLOWED 里的每个非凭证键都可导入（备份里有却 import 不进去 = 静默丢设置）', () => {
-  // 增量151 起凭证键（prefs.SECRET_KEYS）两侧都不走：跨机不可解的密文装进本地
+  // 39733bf 起凭证键（prefs.SECRET_KEYS）两侧都不走：跨机不可解的密文装进本地
   // 配置只会留下一个解不开的脏值。不变量因此是「ALLOWED 减去凭证键 ⊆ 可导入」
   const missing = [...ALLOWED_PREF_KEYS]
     .filter(k => !prefsUtils.SECRET_KEYS.has(k))

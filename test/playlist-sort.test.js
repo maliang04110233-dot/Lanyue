@@ -1,5 +1,5 @@
 /**
- * 歌单拖拽排序纯函数测试（增量61）
+ * 歌单拖拽排序纯函数测试
  * playlistSort.js 无 DOM / window 依赖，动态 import 加缓存戳避免污染。
  */
 import { test } from 'node:test';
@@ -36,7 +36,7 @@ test('moveInList 无效输入返回 null（同位/越界/短列表/非数组）'
   assert.equal(moveInList('ab', 0, 1), null);
 });
 
-// ── 增量67：视图级排序 ────────────────────────────────
+// ── 视图级排序 ────────────────────────────────
 
 const P = (i, song) => ({ song, i });
 
@@ -83,7 +83,7 @@ test('sortPlaylistPairs 添加时间升序、缺 addedAt 垫底', async () => {
   assert.deepEqual(out.map((p) => p.i), [2, 1, 0]);
 });
 
-// ── 增量70：歌单页卡片排序 ─────────────────────────────
+// ── 歌单页卡片排序 ─────────────────────────────
 
 test('nextPlCardSortMode 四档循环、坏值回落', async () => {
   const { nextPlCardSortMode } = await mod();

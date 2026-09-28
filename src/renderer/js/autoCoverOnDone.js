@@ -1,5 +1,5 @@
 /**
- * 下载完成自动嵌封面（增量94）
+ * 下载完成自动嵌封面
  *
  * 设置页「autoCover」开关（prefs 默认 true）此前只有 UI 没有消费方，本模块
  * 把它做实：queue-updated 里新完成的下载行 → read-local-metadata 探测文件

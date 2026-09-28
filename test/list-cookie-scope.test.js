@@ -1,5 +1,5 @@
 /**
- * 增量190：「取曲目」这一族必须带上登录态
+ * 「取曲目」这一族必须带上登录态
  *
  * gateway 的头注释第 2 条写着「统一注入 cookie」，但只有 search / getUrl /
  * getSongDetail / verifyCookie / getRanking 真拿到，**取曲目族一个都没有**：

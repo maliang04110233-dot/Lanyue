@@ -626,7 +626,7 @@ function downloadFileWithRetry(url, savePath, onProgress, extraHeaders = {}, opt
     } catch (e) {
       if (e && e.cancelled) throw e; // 用户取消：绝不续传重试
       attempt++;
-      // 增量219：判据搬到 src/shared/netClass.js。原先这里手抄了一份只列 Node socket 码的
+      // 判据搬到 src/shared/netClass.js。原先这里手抄了一份只列 Node socket 码的
       // 正则，Chromium 抛的 net::ERR_* 一族一条都不匹配 —— 断网时的传输失败既不退避
       // 也不续传，直接判死。code 也要看：网络错误的 message 常是 'aborted' 这类无信息文本。
       if (attempt <= maxRetry && isTransportFailure(e)) {

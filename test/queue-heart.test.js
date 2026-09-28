@@ -1,5 +1,5 @@
 /**
- * 增量92：播放队列行 ♥ 收藏（queueFavSong 键对齐 + 行尾红心）
+ * 播放队列行 ♥ 收藏（queueFavSong 键对齐 + 行尾红心）
  *
  * 队列里的本地行 id 未必是 filePath，直接出红心会和本地曲库的
  * filePath:local 键分裂成两条 —— queueFavSong 统一换算；无 id 行不出红心。

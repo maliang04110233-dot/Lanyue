@@ -1,5 +1,5 @@
 /**
- * 每日听歌时长趋势纯函数（增量113）—— node 可直测，全模块零 DOM
+ * 每日听歌时长趋势纯函数—— node 可直测，全模块零 DOM
  *
  * 听歌统计原来只有累计总时长；这里给 playStats 加 daily 桶
  * （本地日 'YYYY-MM-DD' → 秒），停表时归集，持久化走既有
@@ -62,7 +62,7 @@ function _shiftDay(d, n) {
 }
 
 /**
- * 本周汇总（增量116，周一起始）：{secs, prevSecs, label}。
+ * 本周汇总（周一起始）：{secs, prevSecs, label}。
  * label 为 'M/D-M/D'；上周只作对比基数，daily 脏当空。
  */
 export function weekSummary(daily, now = Date.now()) {

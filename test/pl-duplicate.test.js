@@ -1,5 +1,5 @@
 /**
- * 增量105：歌单「📋 另存副本」—— plDuplicate.js 纯函数 + 接线钉
+ * 歌单「📋 另存副本」—— plDuplicate.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

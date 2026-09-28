@@ -1,5 +1,5 @@
 /**
- * 单元测试：renderer/js/fallbackNotice.js（增量141 换源提示统一）
+ * 单元测试：renderer/js/fallbackNotice.js（换源提示统一）
  *
  * 钉三条口径：
  *   1. fresh 换源（matchedSong）与记忆命中（fromAltMemory）都有文案，

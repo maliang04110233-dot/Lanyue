@@ -1,5 +1,5 @@
 /**
- * 增量184：「恢复所有设置」真正清掉第二批播放偏好（音量/倍速/淡入淡出/队列完成后动作）
+ * 「恢复所有设置」真正清掉第二批播放偏好（音量/倍速/淡入淡出/队列完成后动作）
  *
  * 症状（承诺与兑现的落差，与 177 的表外语言、179 的表外均衡器同族）：
  * 确认弹窗写着「恢复所有设置为默认值」，而它实际只按 GENERAL_PREFS 那张表逐项写回默认 ——
@@ -206,7 +206,7 @@ test('resetAllSettings 叫齐四个家的默认态实现（音量倍速/淡入�
 test('确认弹窗点名它会复原哪些播放偏好（157 的 F2 纪律：承诺要说全）', () => {
   const src = read('src/renderer/js/views/settings.js');
   const body = fnBody(src, 'async function resetAllSettings()');
-  // 增量194：文案的家搬到词典了，所以"叫什么"和"说了什么"分两截钉
+  // 文案的家搬到词典了，所以"叫什么"和"说了什么"分两截钉
   assert.match(body, /askConfirm\(\s*t\('toast\.resetConfirm'\)\s*\)/,
     '确认弹窗必须按键取词，不许在源码里手抄中文');
   const said = String(require('../src/renderer/js/lang/zh.json')['toast.resetConfirm']);

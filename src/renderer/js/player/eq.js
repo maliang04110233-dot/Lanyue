@@ -3,29 +3,29 @@
  *
  * 依赖全局：api（由 app.js 经 window.api getter 注入）、DOM #audioPlayer / #eqPanel
  *
- * 增量77 起 EQ 真实接入音频链路：首次播放后恢复偏好并懒建
+ * 37a57af 起 EQ 真实接入音频链路：首次播放后恢复偏好并懒建
  * AudioContext → MediaElementSource → 5 × BiquadFilter（lowshelf/peaking×3/
- * highshelf）→ destination（增量223 在滤波链首与链尾各插一枚节点，见下两段）。
+ * highshelf）→ destination（在滤波链首与链尾各插一枚节点，见下两段）。
  * _gains 数组是增益的唯一真身（图未建时也能
  * 记录手调值），BiquadFilter 只是它的镜像。图只在「有用户手势上下文」或
  * 首次 playing 事件时创建，AudioContext 挂了就整场生效——绝不静默劫持
  * 原生输出后又不 resume（那会导致无声）。
  * 持久化闭环：eqPreset（曲线名）+ eqBypass + eqGains（逐段手调值）三个
  * 偏好键在预设/手调/重置/bypass 四个动作里都会写，恢复时以 eqGains 为准。
- * 写这三键的家只有一个：saveEqSettings（增量187 把原先分开的两只手合成一处）。
- * 「默认态」也只有一份定义：重置 = applyEqPreset('flat')（增量179 收口，
+ * 写这三键的家只有一个：saveEqSettings（把原先分开的两只手合成一处）。
+ * 「默认态」也只有一份定义：重置 = applyEqPreset('flat')（收口，
  * 此前 resetEq 自带半份归零循环，漏掉预设名、bypass 与按钮高亮）。
  * test/eq-behaviour.test.js 由「现状钉」反转为「正向钉」守卫本实现，
  * test/eq-reset.test.js 守默认态那条路。
  *
- * 增量187 收掉 179 当时记在候选里的那扇门：「当前是哪条曲线」不许有第二个家。
+ * c664fdf 收掉当时记在候选里的那扇门：「当前是哪条曲线」不许有第二个家。
  * 原先除 _gains 外还养着 currentEqPreset 一份抄本，而手调滑块只动 _gains ——
  * 于是曲线已偏离 rock、按钮上的高亮与 pref 里的 eqPreset 仍说 rock（当场说谎，
  * 且谎话能活过重启）。现在高亮与 eqPreset 一律由 matchPresetName(_gains) 现推，
  * 推不出就是 PRESET_CUSTOM（面板上显式标「自定义」），影子变量删除。
  * test/eq-preset-highlight.test.js 守这条路。
  *
- * 增量223（原注释自称「增量213」，而 213 已被 7c0ed3f 用掉，是撞号）：EQ 输出级
+ * EQ 输出级
  * trim + 命令面板入口。preampTrimDb 现推固定 trim dB（有效增益里最大正抬升取反），
  * 镜像到链首的 preamp GainNode；不写第四把 pref。cycleEqPreset 委派 applyEqPreset
  * （三键/高亮/bypass 的唯一家），供 Ctrl+K 的 eq-cycle 调用。
@@ -42,8 +42,8 @@ const EQ_BANDS = [
 ];
 const eqFilters = []; // BiquadFilterNode[]，ensureEqGraph() 填充
 let audioCtx = null;
-let analyserNode = null; // 频谱可视化只读抽头（增量82），随 ensureEqGraph 建立
-// 链首 preamp（增量223）。放链首不是随手摆的：trim 必须与滤波串联才等效于输出衰减，
+let analyserNode = null; // 频谱可视化只读抽头，随 ensureEqGraph 建立
+// 链首 preamp。放链首不是随手摆的：trim 必须与滤波串联才等效于输出衰减，
 // 而插在 filters 之后会让 analyser（频谱的唯一抽头）读到被自己抵消后的信号 ——
 // bass 预设 +6dB 低架配 trim −6dB，图上低频比 flat 还低，EQ 效果在图里看不见。
 // 挪到链首后 analyser 落在滤波链尾，量到的是「EQ 干了什么」而不是「trim 拿走了多少」。
@@ -72,10 +72,10 @@ const _effective = () => (eqBypassed ? _gains.map(() => 0) : _gains);
 const _hasProfile = () => !eqBypassed && _gains.some((g) => g !== 0);
 
 /**
- * 输出级固定 trim（增量223）：有效增益里的**最大单段正抬升**取反（dB）。
+ * 输出级固定 trim：有效增益里的**最大单段正抬升**取反（dB）。
  * 平坦/全负 → 0（不额外衰减）；脏输入安全。preamp GainNode 只是它的镜像。
  *
- * 名字为什么从 clipGuardDb 改成 preampTrimDb（增量223 记账）：它**不是**削波保护。
+ * 名字为什么从 clipGuardDb 改成 preampTrimDb（记账）：它**不是**削波保护。
  * 削波保护要看真实峰值，而这里的输入只有一条静态增益曲线：多段同时抬升会因相位
  * 叠加把峰值推到远超「最大单段 dB」的地方（bass 预设实测 6+3 段可同相），所以这个
  * 数字挡不住任何真实的过载；反过来它对**每一条带正增益的曲线都无条件生效**，于是
@@ -94,7 +94,7 @@ export function preampTrimDb(gains) {
 }
 
 /**
- * 曲线 → 预设名的唯一一只手（增量187）。
+ * 曲线 → 预设名的唯一一只手。
  * 认不出返回 null，由调用方决定怎么交代——绝不"挑一条最接近的"糊上去。
  * 段数不符直接 null：半条曲线不是任何预设。
  */
@@ -149,7 +149,7 @@ function ensureEqGraph() {
   try {
     audioCtx = new AC();
     let node = audioCtx.createMediaElementSource(audio);
-    // 链首 preamp：source → preamp → filters → analyser → destination（增量223）
+    // 链首 preamp：source → preamp → filters → analyser → destination
     preampNode = audioCtx.createGain();
     preampNode.gain.value = 1;
     node.connect(preampNode);
@@ -164,7 +164,7 @@ function ensureEqGraph() {
       node = f;
       eqFilters.push(f);
     }
-    // analyser 落在滤波链尾（增量223）：频谱量到的是 EQ 曲线本身，不含 preamp trim ——
+    // analyser 落在滤波链尾：频谱量到的是 EQ 曲线本身，不含 preamp trim ——
     // 取舍写在文件头与 preampNode 声明处，不是「顺手接在最后一个节点上」。
     analyserNode = audioCtx.createAnalyser();
     analyserNode.fftSize = 256;
@@ -183,7 +183,7 @@ function ensureEqGraph() {
   }
 }
 
-// ── 频谱可视化公开面（增量82）：确保建图 + analyser 只读访问 ──
+// ── 频谱可视化公开面：确保建图 + analyser 只读访问 ──
 export function ensureAudioGraph() { return ensureEqGraph(); }
 export function getAnalyser() { return analyserNode; }
 
@@ -204,10 +204,10 @@ export function applyEqPreset(name) {
       if (labels[i]) labels[i].textContent = gains[i] + 'dB';
     }
   });
-  // 高亮由曲线现推（增量187）：这里刻意不传 name —— 传了就等于又养一份影子状态
+  // 高亮由曲线现推：这里刻意不传 name —— 传了就等于又养一份影子状态
   _syncPresetHighlight();
   // 选预设隐含"EQ 是开着的"（上面刚把 eqBypassed 置 false），按钮必须跟着走：
-  // 增量179 之前这里漏了这一格，于是"重置/选预设"之后按钮还写着 🔇 EQ关闭
+  // c211ee8 之前这里漏了这一格，于是"重置/选预设"之后按钮还写着 🔇 EQ关闭
   _syncBypassBtn();
   saveEqSettings();
 }
@@ -255,7 +255,7 @@ async function restoreEqPresetSetting() {
       if (label) label.textContent = _gains[i] + 'dB';
     });
     _syncBypassBtn();
-    // 增量187：亮哪枚只看恢复出来的曲线，不看 stored 名字 —— 名字可能是上个版本存的谎
+    // 亮哪枚只看恢复出来的曲线，不看 stored 名字 —— 名字可能是上个版本存的谎
     _syncPresetHighlight();
   } catch (e) { /* silent */ }
 }
@@ -279,12 +279,12 @@ export function setEqBand(index, gain) {
 
 export function resetEq() {
   // 默认态只有一份定义：applyEqPreset('flat') 会写齐三键、推滑块、改标签、切高亮。
-  // 增量179 之前这里是自带的一半实现（只推滑块 + 只写 eqGains），于是滑条读 0 而按钮
+  // c211ee8 之前这里是自带的一半实现（只推滑块 + 只写 eqGains），于是滑条读 0 而按钮
   // 仍高亮旧预设、eqBypass 仍是关闭态、重启后按旧 eqPreset 复活 —— 同一件事的两只手必然长歪。
   applyEqPreset('flat');
 }
 
-/** 三键的唯一持久化家：曲线/预设名/开关要么一起写，要么都不写（增量187 收拢） */
+/** 三键的唯一持久化家：曲线/预设名/开关要么一起写，要么都不写（收拢） */
 export async function saveEqSettings() {
    _syncPresetHighlight();
    const gains = getEqGains();

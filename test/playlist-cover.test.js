@@ -1,5 +1,5 @@
 /**
- * 歌单封面纯函数测试（增量62）
+ * 歌单封面纯函数测试
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

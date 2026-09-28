@@ -1,5 +1,5 @@
 /**
- * 操作失败 toast 的错误人话层（增量169）
+ * 操作失败 toast 的错误人话层
  *
  * 来龙去脉：全渲染层 99 处 catch 里，用户可见的 toast 直接拼原始 e.message。
  * Node/Electron 的报错是英文栈文本——「导出失败: ENOENT: no such file or

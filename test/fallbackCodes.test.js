@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { shouldFallbackByCode, FALLBACK_CODES } from '../src/api/services/fallbackCodes.js';
 
-describe('增量126-A：换源白名单', () => {
+describe('换源白名单', () => {
   it('PLATFORM_CHANGED 在白名单内', () => {
     assert.ok(FALLBACK_CODES.has('PLATFORM_CHANGED'));
   });

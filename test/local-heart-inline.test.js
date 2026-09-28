@@ -1,5 +1,5 @@
 /**
- * 增量90：本地曲库行内 ♥ 红心 + 收藏切换统一钩子
+ * 本地曲库行内 ♥ 红心 + 收藏切换统一钩子
  *
  * 行内红心复用 heartBtnHtml(localFavSong(s))；收藏变化后的重过滤从
  * 「各调用方 finally」收敛为 favorites.js 成功后回调 window.onLocalFavToggle

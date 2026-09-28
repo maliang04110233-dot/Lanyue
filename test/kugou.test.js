@@ -571,7 +571,7 @@ test('gateway.getLyrics: 平台返回 {lrc,karaoke} 对象时透传不丢逐字�
   assert.strictEqual(out.karaoke?.meta?.ti, '晴天', 'gateway 把 karaoke 字段折丢了');
 });
 
-// ── 增量207：取流受限文案（换源总开关关闭，不得再承诺换源）────
+// ── 取流受限文案（换源总开关关闭，不得再承诺换源）────
 test('getUrl：playInfo 判付费 ⇒ 只说清要付费，不谎称"已自动尝试其他源"', async () => {
   resetStub((url) => (String(url).includes('getSongInfo.php') ? { error: '该曲需付费' } : {}));
   const r = await kugou.getUrl(

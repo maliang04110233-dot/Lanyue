@@ -86,7 +86,7 @@ test('settings.js: WebDAV 保存时非本机 http 地址必须提示明文风险
   const src = read('js', 'views', 'settings.js');
   assert.match(src, /startsWith\('http:\/\/'\)/, '以 http:// 前缀判定明文传输');
   assert.match(src, /localhost/, '本机地址（localhost/127.x/[::1]）应豁免提示');
-  // 增量194：那句话的家从源码字面量搬进了词典 —— 判据跟着搬，但两截都要钉住：
+  // 那句话的家从源码字面量搬进了词典 —— 判据跟着搬，但两截都要钉住：
   // 调用点得真的按 warn 级把它说出来，词典里那句得真的讲"明文"。
   assert.match(src, /showToast\(\s*t\('toast\.webdavInsecure'\)\s*,\s*'warn'/,
     '非本机 http:// 保存时应给 warn 级 toast 提示，而不是静默保存');
@@ -199,7 +199,7 @@ test('player-controls.js: 定时到期只能暂停，不得调用 togglePlay（�
   assert.match(timerBlock[0], /audio\.pause\(\)/, '到期必须主动 pause');
 });
 
-// ── 增量129：换库路径必须重套筛选（与 refreshLocalLibrary 同一约定）──
+// ── 换库路径必须重套筛选（与 refreshLocalLibrary 同一约定）──
 
 /** 剥注释后再扫描：本仓库有「注释里写代码示例」的惯例，不剥会把说明文字当成代码证据 */
 function stripComments(src) {
@@ -240,7 +240,7 @@ test('local.js: localFiltered 只允许由 filterLocalSongs 写入（多一处�
   assert.strictEqual(writes, 1, `local.js 里应只有 filterLocalSongs 一处写 localFiltered，实际 ${writes} 处`);
 });
 
-// ── 增量133：删重后的库变更必须重跑管线（回调注入管线入口，不是裸渲染器）──
+// ── 删重后的库变更必须重跑管线（回调注入管线入口，不是裸渲染器）──
 
 /** 用花括号配平抽函数体（含首尾大括号）；扫描前请先 stripComments */
 function fnBodyL(src, name) {
@@ -296,7 +296,7 @@ test('回归钉：删重只改源数据，不得就地改派生状态 localFilte
     'deleteSelectedDups 删除成功后必须触发库变更回调，否则列表/网格不会刷新');
 });
 
-// ── 增量159（审计 F2 收尾）：删重确认框必须诚实 —— 点名影响 + 给出真实退路 ──
+// ── （审计 F2 收尾）：删重确认框必须诚实 —— 点名影响 + 给出真实退路 ──
 test('删重确认框：点名个数与总大小、告知进系统回收站可还原；"不可撤销"谎话不得复活', () => {
   const src = read('js', 'views', 'local-stats.js');
   const body = fnBodyL(stripComments(src), 'deleteSelectedDups');
@@ -309,7 +309,7 @@ test('删重确认框：点名个数与总大小、告知进系统回收站可�
   assert.ok(body.includes('随时可还原'), '成功 toast 必须点名去处');
 });
 
-// ── 增量134：首页分区列表与「查看完整榜单」弹窗必须共用同一个过滤词 ──
+// ── 首页分区列表与「查看完整榜单」弹窗必须共用同一个过滤词 ──
 
 test('home.js: 分区列表的计数必须来自过滤结果（用未过滤的 data.length 会让「查看完整榜单」在筛选后仍报全量）', () => {
   const body = fnBodyL(stripComments(read('js', 'views', 'home.js')), 'renderSection');
@@ -354,7 +354,7 @@ test('lang: zh/en 词条必须完全对齐（缺键或占位符不一致会让�
     `以下词条中英占位符不一致（某语言下会原样显示 {n} 之类）：${bad.join(', ')}`);
 });
 
-// ── 增量135：渲染函数不得反向回写源状态 ──
+// ── 渲染函数不得反向回写源状态 ──
 
 const RENDERER_DIR = path.join(__dirname, '..', 'src', 'renderer');
 
@@ -419,7 +419,7 @@ test('接线钉：renderQueue 必须只读 queueSnapshot，不得回写', () => 
     + '而 search.js 的徽标、app.js:740、本文件十余处 getState 全读它');
 });
 
-// ── 增量136：首页空分区降级（失败信号被上游两层抹平，渲染层只能诚实降级）──
+// ── 首页空分区降级（失败信号被上游两层抹平，渲染层只能诚实降级）──
 
 test('回归钉：renderSection 的空数据分支必须走 renderSectionError（不得再写死「暂无数据」）', () => {
   const body = fnBodyL(stripComments(read('js', 'views', 'home.js')), 'renderSection');
@@ -468,7 +468,7 @@ test('接线钉：renderSection 成功路径必须清除 is-unavailable（否则
     '清除必须发生在渲染分支之前 —— 塞进某一个分支里会漏掉另一条路径（grid / list）');
 });
 
-// ── 增量160（IA 收敛第一步）：侧边栏聚为五组 → 增量164（第二步）：首页+搜索合为单一「搜歌」入口 ──
+// ── （IA 收敛第一步）：侧边栏聚为五组 → （第二步）：首页+搜索合为单一「搜歌」入口 ──
 
 test('侧边栏分组：四个分区标题按序就位（164 起「搜歌」收敛为单条目，不再需要段头）', () => {
   const html = read('index.html');
@@ -480,7 +480,7 @@ test('侧边栏分组：四个分区标题按序就位（164 起「搜歌」收�
   assert.ok(!sb.includes('nav.sidebar.title'),
     '「导航」单段旧头已退役：分组标题是纯中文硬写（改版决议：收缩为纯中文），不许再挂 i18n');
   assert.ok(sb.includes('data-i18n="nav.operations.title"'), '「操作」段沿用既有 i18n 键，不动');
-  // 孤儿键清扫必须 zh/en 成对（增量93 教训），否则「键集合一致」钉会红
+  // 孤儿键清扫必须 zh/en 成对（教训），否则「键集合一致」钉会红
   for (const f of ['js/lang/zh.json', 'js/lang/en.json']) {
     assert.ok(!read(...f.split('/')).includes('nav.sidebar.title'), `${f} 残留 nav.sidebar.title`);
   }
@@ -530,7 +530,7 @@ test('侧边栏条目叫法统一：本地曲库 / 歌单（与首页统计、�
   assert.ok(!sc.includes('跳到本地歌曲'), '浮层旧叫法不许复活');
 });
 
-// ── 增量164（IA 收敛第二步）：首页+搜索合并为单一「搜歌」入口 —— 机制钉 ──
+// ── （IA 收敛第二步）：首页+搜索合并为单一「搜歌」入口 —— 机制钉 ──
 
 test('app.js：NAV_ALIAS 是高亮归属的唯一映射（search/history 都归到宿主条目），视图在场判定有唯一真相源', () => {
   const src = read('js', 'app.js');

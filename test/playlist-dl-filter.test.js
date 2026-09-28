@@ -1,5 +1,5 @@
 /**
- * 增量103：歌单详情「⬇ 下载状态过滤」—— plDlFilter.js 纯函数 + 接线钉
+ * 歌单详情「⬇ 下载状态过滤」—— plDlFilter.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -65,7 +65,7 @@ test('接线钉：详情过滤行按钮、统一视图管线、开弹层复位�
   assert.match(PL_JS, /dlBadgeHtml, dlEnsureHistoryLoaded, addDlChangeListener, dlStatusFor/);
   // 渲染与全选共用一个管线（两旧字面量都退役）
   assert.match(PL_JS, /function _plVisiblePairs\(songs\) \{/);
-  // 渲染/全选/复制曲单（增量108）三处读视图都走同一管线
+  // 渲染/全选/复制曲单三处读视图都走同一管线
   assert.equal((PL_JS.match(/_plVisiblePairs\(/g) || []).length, 4); // 定义外三处调用
   assert.ok(!/const pairs = sortPlaylistPairs\(filterPlaylistSongs\(/.test(PL_JS), '仍有未走统一管线的 pairs 计算');
   assert.match(PL_JS, /sortPlaylistPairs\(dlFiltered, _plSortMode\)/);

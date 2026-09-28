@@ -171,7 +171,7 @@ function createResolveTrackService({
     return _disabledCache;
   }
 
-  // 跨源换源总开关（增量207）：**服务本身不藏产品决策**，缺省按「开」，
+  // 跨源换源总开关：**服务本身不藏产品决策**，缺省按「开」，
   // 关掉与否由注入方（api/index.js 读 fallbackPolicy.crossSourceEnabled）决定。
   // getter 抛错同样按「开」处理 —— 读盘故障不该让本来能换源听到的歌彻底播不了。
   let _fallbackCache = null;
@@ -291,7 +291,7 @@ function createResolveTrackService({
       logger.warn('[ResolveTrack] 跨源匹配失败:', (e && e.message) || e);
     }
 
-    // 用户排除清单（增量126-B）：先剔除再重排 —— 禁用的源连健康度投票权都没有。
+    // 用户排除清单：先剔除再重排 —— 禁用的源连健康度投票权都没有。
     // 注意只过滤跨源候选，本源取流（步骤 2）永远不受限。
     candidates = filterDisabledCandidates(candidates, disabledPlatforms());
 

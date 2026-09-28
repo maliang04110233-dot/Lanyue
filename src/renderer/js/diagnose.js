@@ -6,18 +6,18 @@
  * 弹层给出「原因 + 建议 + 可行动作」（前往设置 / 立即重试），
  * 行内徽标只说“是什么”，诊断说“怎么办”——两者共用下面这一张码表。
  *
- * 增量158 起弹层不再专属队列：按钮显隐收成 diagHeals 一处纯规则，
+ * 372d675 起弹层不再专属队列：按钮显隐收成 diagHeals 一处纯规则，
  * 具体动作由调用方那一页经 ctx 注入（队列 retryQueueItem / 历史 retryFromHistory）。
  *
- * 增量162 起「是什么」那一侧也搬了进来：行内失败徽标的短标签与颜色就是 DIAG_TABLE
+ * cb2c416 起「是什么」那一侧也搬了进来：行内失败徽标的短标签与颜色就是 DIAG_TABLE
  * 的字段，failureTagHtml 是全仓唯一的徽标渲染（队列行与历史行共用），
  * 「重试也没用、得先去设置」的鉴权判定同样只有 AUTH_CODES 一处定义。
  *
- * 增量164 起「最近的失败」不再只住队列（队列重启即清空，开机后两条 ⌘K 入口只会说
+ * bd3e549 起「最近的失败」不再只住队列（队列重启即清空，开机后两条 ⌘K 入口只会说
  * 「没有失败任务」，而历史里全是红的）：失败清单由 pickFailureSource 定谁提供 ——
  * 队列优先、队列没有才用历史兜底，两个入口共用 _failureSources 一份取数。
  *
- * 增量175 起徽标自己就是入口：162 让行内戴上了「需VIP / Cookie过期」，但要说「怎么办」
+ * 4ba07a0 起徽标自己就是入口：162 让行内戴上了「需VIP / Cookie过期」，但要说「怎么办」
  * 还得摸到行尾那枚 🆘 —— 而队列进入批量选择模式时那一整组按钮会隐藏。现在点徽标即弹诊断，
  * 页面只交出「入口名 + 机器生成的 id」（diagnoseFailure(taskId) / diagnoseHistoryItem(idx)），
  * 通用层依旧不认识任何一页的动作（158 的规矩）；id 形状不对就不挂点击，宁可少一个入口也不给注入留缝。
@@ -32,13 +32,13 @@ const DIAG_TABLE = {
   UNAVAILABLE: { cause: '曲目当前不可用', advice: '稍后重试；持续失败就换源搜索同名版本', heal: 'retry', tag: { label: '不可用', color: 'var(--neon-purple)' } },
   CDN_EMPTY: { cause: '平台 CDN 返回空数据（多为高峰期限流）', advice: '稍后再试，或用「定时下载」错峰到夜间自动入队', heal: null, tag: { label: 'CDN异常', color: 'var(--neon-red)' } },
   NETWORK_TIMEOUT: { cause: '网络超时', advice: '检查网络/代理；不稳定时到设置把并发数调低再重试', heal: 'retry', tag: { label: '网络超时', color: 'var(--neon-yellow)' } },
-  // 增量219：引擎给断网跑完的下载补的码。缺这一行的话它跟"没登记"一模一样 ——
+  // 引擎给断网跑完的下载补的码。缺这一行的话它跟"没登记"一模一样 ——
   // 队列与历史那一行不戴徽标、弹层说「未分类的失败」，用户根本看不出该去检查网络。
   // 「网络恢复后会自动重排」说的是下载页那条横幅的真话：只有这两枚码会被自动重新入队。
   NETWORK_ERROR: { cause: '网络中断（本机断网或连不上音源）', advice: '恢复网络后下载页会自动重试这些任务；反复失败请检查代理/VPN 或到设置把并发数调低', heal: 'retry', tag: { label: '断网', color: 'var(--neon-yellow)' } },
   NO_AUDIO_STREAM: { cause: '找不到可播放的音频流（付费/加密/下架）', advice: '换一档音质或换源；本地库可用「音质扫描」核对已有文件', heal: null, tag: { label: '无音频流', color: 'var(--neon-red)' } },
   UNKNOWN_PLATFORM: { cause: '链接所属平台暂不支持', advice: '确认链接来自支持列表内的平台', heal: null, tag: { label: '未知平台', color: 'var(--text-dim)' } },
-  // 增量210：下面七行是补登「取流层早就在发、码表却一直没收」的码 —— 缺行不是小事，
+  // 下面七行是补登「取流层早就在发、码表却一直没收」的码 —— 缺行不是小事，
   // 缺一个码 = 队列/历史那一行不戴徽标 + 弹层只会说「未分类的失败，请复制错误信息反馈」。
   // 覆盖度由 test/diagnose-coverage.test.js 机械扫回写层来钉，加码不登记会直接红。
   PLATFORM_CHANGED: { cause: '该平台接口已变更或被反爬拦截', advice: '稍后再试；持续失败就到聚合搜索里换其他平台下载同一歌曲', heal: 'retry', tag: { label: '接口变更', color: 'var(--neon-red)' } },

@@ -1,5 +1,5 @@
 /**
- * 增量86：播放队列面板 🎯 定位正在播放（resolvePlayingIndex 防漂移 + app.js/面板/命令面板接线）
+ * 播放队列面板 🎯 定位正在播放（resolvePlayingIndex 防漂移 + app.js/面板/命令面板接线）
  */
 const test = require('node:test');
 const assert = require('node:assert');

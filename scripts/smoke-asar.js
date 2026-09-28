@@ -36,7 +36,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// 判据住在 scripts/smoke-checks.cjs 一家（增量192）：本文件顶层就 process.exit()，
+// 判据住在 scripts/smoke-checks.cjs 一家：本文件顶层就 process.exit()，
 // 判据留在原地就等于「没有测试能跑它」—— 而一条没人测的判据正是 8a 红了 5 个增量没人发现的原因。
 const {
   stripJsComments, exportedNamesOf, unownedEsmExports, isPackageStale, pickBundleSource,
@@ -201,7 +201,7 @@ if (lockRaw) {
 
 // 7) 渲染层 bundle 存在且含本轮关键符号（防 bundle 被跳过）
 //
-//    ⚠ 内容锚判「最新鲜的那份构建产物」，不硬判 release/ 里的包（增量192）。
+// ⚠ 内容锚判「最新鲜的那份构建产物」，不硬判 release/ 里的包。
 //    `npm run verify` 的顺序是 build → smoke:asar，dist/ 必然反映当前代码；
 //    而 app.asar 只有跑过 `npm run package` 才更新 —— 本机它停在 9/18，于是 187 起
 //    每条内容锚都在说「逻辑被 tree-shake 掉了」，真相只是「包是旧的」（实测：
@@ -249,13 +249,13 @@ check('渲染层 bundle 含 refreshPlayerState（顶栏状态单一判据）',
 const bundleNoComments = stripJsComments(bundle);
 
 // 8a) EQ 簇 → player/eq.js
-//     两类导出要分开证，混在一起必然恒假（v1.0.27 发布时踩到：增量82 加了
+// 两类导出要分开证，混在一起必然恒假（v1.0.27 发布时踩到：加了
 //     ensureAudioGraph / getAnalyser 两个 ESM-only 导出，旧写法要求「eq.js 的全部导出都挂
 //     window」，于是门禁从那天起一直是红的）：
 //     ① 桥接面 —— player.js 从 eq.js import 的那几个，HTML onclick 只认 window，
 //        必须仍在 bundle 里挂上（这才会被 tree-shake / re-export 断链弄丢）；
 //     ② ESM-only —— 其余导出**得有人用**，但"用"有两种：别的渲染模块 import 它，
-//        或它被本模块内部调用（增量187 的 matchPresetName 是后者 —— 导出只为可测性，
+// 或它被本模块内部调用（c664fdf 的 matchPresetName 是后者 —— 导出只为可测性，
 //        压缩器不会丢内部调用点）。旧判据只数前者，于是从 187 起这一支天天红；
 //        真正的死导出（只有声明处提到自己）现在照样咬得住，见 smoke-checks 的注释。
 const eqSrcPath = path.join(RENDERER_JS, 'player', 'eq.js');
@@ -276,7 +276,7 @@ if (fs.existsSync(eqSrcPath)) {
   const orphans = unownedEsmExports({ selfSrc: eqSrc, otherSrc, names: esmOnly });
   const VIZ_ANCHORS = ['音频图初始化失败，频谱不可用'];
   const missingAnchor = VIZ_ANCHORS.filter((s) => !bundle.includes(s));
-  const ok = bridgeNames.length === 7 // 增量223: +cycleEqPreset（原写 213，与 7c0ed3f 撞号）
+  const ok = bridgeNames.length === 7 // +cycleEqPreset
     && missingMount.length === 0
     && orphans.length === 0
     && missingAnchor.length === 0;

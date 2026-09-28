@@ -1,5 +1,5 @@
 /**
- * 下载队列过滤 —— 状态筛选 × 关键词搜索 × 平台（增量121）的 AND 组合
+ * 下载队列过滤 —— 状态筛选 × 关键词搜索 × 平台的 AND 组合
  *
  * 状态标签（全部/下载中/已完成/失败）解决「按阶段看」，输入关键词解决
  * 「在一堆任务里找那首歌」，平台维度解决「哪个源在堵」；三者叠加互不覆盖。
@@ -22,7 +22,7 @@ export function queueItemMatchesKeyword(s, kwLower) {
 /**
  * queue → 过滤后的可见列表（保持原顺序）。
  * mode: 'all' | 'active' | 'done' | 'error'；keyword 前后空白忽略，空串=不过滤。
- * platform（增量121）：平台 id，空串=不过滤；与状态/关键词同为 AND 叠加。
+ * platform：平台 id，空串=不过滤；与状态/关键词同为 AND 叠加。
  * 无 source 的任务按 queueGroup 的约定归 'unknown' 组，所以「只看其他」也要能命中它们。
  */
 const NO_SOURCE_KEY = 'unknown';

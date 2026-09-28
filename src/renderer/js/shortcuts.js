@@ -150,7 +150,7 @@ function focusTab(tabName, focusElId) {
   }
 }
 
-// ── 浮层注册表（增量197）──
+// ── 浮层注册表──
 // 浮层身份写进浮层自己的 DOM，这里只按形状扫描——148/151/185「手抄清单必漏」
 // 的第四次立法：旧版两份手抄 id 清单把 cmdkOverlay/shortcutsHelp/convertModal/
 // dlTemplateEditorModal/playlistTrashModal 全漏了（背景键守卫与 Esc 双双失明），
@@ -217,7 +217,7 @@ export function showShortcutsHelp() {
   overlay = document.createElement('div');
   overlay.id = 'shortcutsHelp';
   overlay.className = 'shortcuts-overlay';
-  // 自报家门进浮层注册表（增量197）：此前 _anyModalOpen 清单漏它 → 帮助开着按
+  // 自报家门进浮层注册表：此前 _anyModalOpen 清单漏它 → 帮助开着按
   // Space 会误触全局播放/暂停；「Esc 关不掉帮助曾被用户卡住」的 legacy 优先
   // 注释，如今属性化为 pri=100 + '-' 哨兵（无导出关闭函数，摘除本体即关）。
   overlay.setAttribute('data-modal', '');
@@ -269,5 +269,5 @@ export function showShortcutsHelp() {
 // ── 全局桥接 ──────────────────────────────────────────
 window.showShortcutsHelp = showShortcutsHelp;
 
-// 浮层注册表契约的测试面（增量197）：只暴露、不改行为——行为契约见 test/modal-registry.test.js
+// 浮层注册表契约的测试面：只暴露、不改行为——行为契约见 test/modal-registry.test.js
 export { _anyModalOpen, closeActiveModal };

@@ -5,7 +5,7 @@
  * 为什么单独成模块：这条过滤原先内联在 views/converter.js 的 filterConverterSongs() 里，
  * 而「扫描到新库」的三条路径（scanLocalForConvert / loadLocalSongsForConvert ×2）都只调
  * renderConverterSongs()，它读的是 state.convFiltered —— 于是新库配旧过滤结果，
- * 列表与计数陈旧（增量128 修）。抽成纯函数后行为可被真实单测覆盖，
+ * 列表与计数陈旧（修）。抽成纯函数后行为可被真实单测覆盖，
  * 而不是只靠源码字面钉（字面钉曾把 renderLocalSongs 的 bug 钉成「预期」）。
  */
 

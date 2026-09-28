@@ -1,11 +1,11 @@
 /**
- * 增量152：外部改名/移动对账
+ * 外部改名/移动对账
  *
  * 症状（用户视角）：在资源管理器里把下载好的歌改了名（或者用了「✏ 批量重命名」之外的
  * 任何工具：音乐标签编辑器、另一台设备同步、手动整理），回到 app：
  *   「✔ 已下载」徽标没了、同一首歌会被重新下一遍、歌单/♥ 收藏里的本地歌播不动、
  *   播放进度归零。而且 app 全程一声不吭 —— 它压根不知道发生过改名。
- * 增量149 治的是"app 自己改的名"；这里治"别人改的名"：曲库扫描本来就握着磁盘上
+ * 治的是"app 自己改的名"；这里治"别人改的名"：曲库扫描本来就握着磁盘上
  * 真实的文件列表和它们的 ID3 标题/歌手，拿它去对账下载历史里指向空路径的记录，
  * 唯一命中就接回来（回写复用 149 的 relinkFileRefs，一条通道都不新开）。
  *
@@ -154,7 +154,7 @@ test('接线：扫描成功后对账并如实上报，前端不另开通道', ()
   assert.ok(/function _relinkNote/.test(local), '扫描提示里得把"接回了几个"说给用户听');
   assert.ok((local.match(/_relinkNote\(/g) || []).length >= 4, '手工扫描/换目录重试/自动刷新三条路径都要说');
   assert.ok(/async function _relinkNote[\s\S]{0,700}loadUserPlaylists/.test(local),
-    '接回之后必须重拉歌单：渲染层还攥着旧路径的话，下次保存歌单就把主进程的回写覆盖回去了（增量149 同一个坑）');
+    '接回之后必须重拉歌单：渲染层还攥着旧路径的话，下次保存歌单就把主进程的回写覆盖回去了（0d07b92 同一个坑）');
   assert.ok(!/api\.(reconcile|relinkRefs|fixPath)/.test(local), '不该为此功能新增前端 API');
 
   const contract = read('src/shared/ipcContract.js');
@@ -162,7 +162,7 @@ test('接线：扫描成功后对账并如实上报，前端不另开通道', ()
   assert.match(contract, /'scan-local-library':\s*\{ invoke: MAIN, args: \[\['dirPath', t\.str\(1024\)\]\] \}/,
     '对账复用扫描的返回值：参数形状不该变');
 
-  // 路径归一只能有一份实现（增量148/151 的教训：手抄的第二份必然漂移）
+  // 路径归一只能有一份实现（/151 的教训：手抄的第二份必然漂移）
   const recon = read('src/utils/reconcileRenames.js');
   assert.ok(/require\('\.\/relinkRefs'\)/.test(recon), '自己另写一份路径归一 = 埋第二把雷');
   assert.ok(!/replace\(\/\\\\\/g/.test(recon), '不该在别处再抄一遍反斜杠归一');

@@ -3,7 +3,7 @@
  *
  * 注册：query-history / history-stats / clear-history / remove-history
  *
- * query-history 的 opts 是自由对象（契约 t.obj()），增量153 由此多接一个只读开关
+ * query-history 的 opts 是自由对象（契约 t.obj()），由此多接一个只读开关
  * markMissing：渲染层要如实告诉用户"这条记录的文件已经不在磁盘上了"，而渲染层没有
  * fs，判活只能在主进程做 —— 为此开新通道不值当，判活也只是查询结果上的一个附加字段。
  */

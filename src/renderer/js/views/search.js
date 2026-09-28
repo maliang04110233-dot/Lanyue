@@ -1003,7 +1003,7 @@ function renderSongList(list, targetEl = null) {
     pairs = kept;
   }
   let dismHidden = 0;
-  [pairs, dismHidden] = filterDismissedPairs(pairs, dismissedKeySet()); // 「不感兴趣」屏蔽（增量69）
+  [pairs, dismHidden] = filterDismissedPairs(pairs, dismissedKeySet()); // 「不感兴趣」屏蔽
   pairs = sortPairs(pairs, _searchSortMode); // 先过滤后排序，stable 排序保留组内原序
   _visibleIdxMap = pairs.map(p => p[1]);
   if (!pairs.length && hiddenCount) {
@@ -1205,7 +1205,7 @@ function batchAddToPlaylist() {
 }
 
 /**
- * 批量：♥ 收藏勾选的歌（增量114）。红心是 toggle 语义，先经 planBatchFav
+ * 批量：♥ 收藏勾选的歌。红心是 toggle 语义，先经 planBatchFav
  * 剔除已收藏的再逐首走单曲切换链（silent 聚合播报，零新通道）。
  */
 async function batchFavorite() {

@@ -6,7 +6,7 @@
  * 完整识别（单曲渲染/歌单专辑弹窗），普通文本走关键词搜索；
  * 例外一：拖入 .lrc（或内容像歌词的 .txt）且当前播的是本地歌曲时，
  * 写 sidecar 歌词（write-local-lrc）并即时生效——下载党批量补歌词的快捷通道。
- * 例外二（增量97）：拖入音频文件（可多选）→ URL.createObjectURL 造
+ * 例外二：拖入音频文件（可多选）→ URL.createObjectURL 造
  * blob: 临时行加入播放队列，闲置时立即开播；不取流、不进收藏、
  * 重启由 sanitizeSavedQueue 滤除（详见 dropPlay.js）。
  *
@@ -118,7 +118,7 @@ document.addEventListener('drop', async (e) => {
   await _handleAudioDrop(e.dataTransfer);
 });
 
-/** 接管拖入的音频文件：blob: 临时行进播放队列，闲置即从第一首开播（增量97） */
+/** 接管拖入的音频文件：blob: 临时行进播放队列，闲置即从第一首开播 */
 async function _handleAudioDrop(dt) {
   const files = dt && dt.files;
   if (!files || !files.length) return;

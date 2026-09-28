@@ -1,5 +1,5 @@
 /**
- * 本地曲库歌手分组纯函数测试（增量68）
+ * 本地曲库歌手分组纯函数测试
  * artistGroups.js DOM 接线段有 typeof document 守卫，node 下仅导出纯函数。
  */
 import { test } from 'node:test';

@@ -116,10 +116,10 @@ async function scanLocalDir() {
 }
 
 /**
- * 主进程扫描后顺手做了"外部改名对账"（增量152），这里做两件必做的事：
+ * 主进程扫描后顺手做了"外部改名对账"，这里做两件必做的事：
  *   1. 把接回了几个说出口 —— 徽标/歌单悄悄变了而不告知，用户下次看到「✔ 已下载」会以为是巧合；
  *   2. 重拉一次歌单：回写改的是盘上的 prefs，渲染层还攥着旧路径那份的话，
- *      下一次收藏/建歌单就会把刚接回来的路径又覆盖回去（增量149 踩过同一个坑）。
+ * 下一次收藏/建歌单就会把刚接回来的路径又覆盖回去（0d07b92 踩过同一个坑）。
  * @returns {Promise<string>} 直接拼进扫描提示的话尾；没接回任何东西时是空串（也不重拉）
  */
 async function _relinkNote(result) {
@@ -184,10 +184,10 @@ async function _doScanLocalDir() {
 
 // ── 过滤 ──────────────────────────────────────────────
 let _localSortMode = 'default'; // 本地曲库排序（会话级，扫描/过滤后都保持生效）
-let _localFavOnly = false;      // 仅看收藏开关（会话级，增量89）
-let _localFmtMode = 'all';      // 格式过滤循环态（会话级，增量107）
-let _localQualMode = 'all';    // 音质视图过滤循环态（会话级，增量123）
-let _localMetaMode = 'all';    // 元数据完整度过滤循环态（会话级，增量126）
+let _localFavOnly = false;      // 仅看收藏开关（会话级）
+let _localFmtMode = 'all';      // 格式过滤循环态（会话级）
+let _localQualMode = 'all';    // 音质视图过滤循环态（会话级）
+let _localMetaMode = 'all';    // 元数据完整度过滤循环态（会话级）
 
 /** 统一排序入口：plays-desc 需要注入 stats 的播放计数表 */
 function _sortL(songs) {
@@ -237,7 +237,7 @@ window.onLocalFavToggle = () => { if (_localFavOnly) filterLocalSongs(); };
 /**
  * 音质过滤循环：五态走一格，按钮文案同步。
  * 必须走 filterLocalSongs()（而非 renderLocalSongs()）——后者只重画
- * 已算好的 localFiltered，换态不会重新过筛，等于按钮点了没用（增量126 修复）。
+ * 已算好的 localFiltered，换态不会重新过筛，等于按钮点了没用（修复）。
  */
 function cycleLocalQual() {
   _localQualMode = nextQualMode(_localQualMode);
@@ -246,7 +246,7 @@ function cycleLocalQual() {
   filterLocalSongs();
 }
 
-/** 元数据完整度过滤循环：五态走一格，按钮文案同步（增量126） */
+/** 元数据完整度过滤循环：五态走一格，按钮文案同步 */
 function cycleLocalMeta() {
   _localMetaMode = nextMetaMode(_localMetaMode);
   const btn = document.getElementById('localMetaBtn');
@@ -1102,7 +1102,7 @@ function renderLocalGrid() {
   return d.promise;
 }
 
-/** 封面墙：按专辑分组渲染（增量212），分片 rAF + token 防竞态 */
+/** 封面墙：按专辑分组渲染，分片 rAF + token 防竞态 */
 function renderLocalAlbumWall() {
   const wall = document.getElementById('localAlbumWall');
   if (!wall) return;

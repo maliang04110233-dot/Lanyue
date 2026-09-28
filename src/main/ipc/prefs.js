@@ -18,7 +18,7 @@ const { DIR_PREF_KEYS } = approvedDirs;
 
 // H9: Whitelist of allowed preference keys to prevent arbitrary key injection
 // 键全集 = 主进程 prefs.get() 读取的键 ∪ 渲染层 getPref/setPref 使用的键（见 src/renderer/js/）
-// 白名单只登记「有消费方、且有写入口」的键（增量189）：挂了名字却没代码读的键，
+// 白名单只登记「有消费方、且有写入口」的键：挂了名字却没代码读的键，
 // set-pref 照样回 true，等于对调用方承诺"设置已保存"而这件事永远不会发生；被代码
 // 读着却进不了白名单的键，则是谁都改不动的死旋钮。两个方向由
 // test/prefs-key-reconciliation.test.js 双向对账，新键与它的消费方/控件必须同一次落地。

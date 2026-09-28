@@ -1,5 +1,5 @@
 /**
- * 增量117：我的歌单「🧮 跨歌单重复检测」
+ * 我的歌单「🧮 跨歌单重复检测」
  *
  * 84 的清重复只在单歌单内部折叠；同一首歌散在收藏夹+自建单+导入单
  * 无人报警。本模块纯函数扫全量歌单出跨单重复组（本地认 filePath、
@@ -56,7 +56,7 @@ test('findCrossPlaylistDupes：≥2 单才算跨、单内重复归 84、散落�
     ['乙', ['收藏', '通勤']],
   ], '单内重复只算一次；×3 在前；丙只在收藏不出');
   assert.deepStrictEqual(g.map(x => x.key), ['O:netease:1', 'O:netease:2'],
-    '增量118：组上带身份键，收拢才找得回这首歌');
+    '组上带身份键，收拢才找得回这首歌');
   assert.deepStrictEqual(findCrossPlaylistDupes(null), []);
   assert.deepStrictEqual(findCrossPlaylistDupes([]), []);
 });
@@ -130,7 +130,7 @@ test('接线钉桩：playlist.js 纯函数导入+三桥、HTML 按钮、面板 p
   assert.match(PALETTE_JS, /\{ id: 'pl-dedupescan'[\s\S]{0,160}?_call\('scanCrossPlaylistDupes'\) \},/);
 });
 
-test('接线钉桩（增量118）：逐行 🧲 收拢按钮 + consolidateDup 走 save-user-playlist，零新通道', () => {
+test('接线钉桩：逐行 🧲 收拢按钮 + consolidateDup 走 save-user-playlist，零新通道', () => {
   assert.match(SCAN_JS, /export function planConsolidate\(playlists, key\) \{/);
   assert.match(PL_JS, /onclick="consolidateDup\(\$\{i\}\)"[^>]*>🧲 收拢<\/button>/, '每行一枚收拢按钮，下标随组走');
   assert.match(PL_JS, /groups\.map\(\(g, i\) =>/);

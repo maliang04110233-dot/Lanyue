@@ -14,7 +14,7 @@ export function moveInList(list, from, to) {
   return next;
 }
 
-// ── 视图级排序（不改存储顺序，只排展示 pairs；与增量34 搜索排序同型）──
+// ── 视图级排序（不改存储顺序，只排展示 pairs；与搜索排序同型）──
 
 export const PL_SORT_MODES = [
   { key: '', label: '↕ 默认序' },
@@ -70,7 +70,7 @@ export function sortPlaylistPairs(pairs, mode) {
   return out;
 }
 
-// ── 歌单页卡片排序（增量70）：系统收藏恒置顶，其余按档排 ──
+// ── 歌单页卡片排序：系统收藏恒置顶，其余按档排 ──
 
 export const PL_CARD_MODES = [
   { key: '', label: '↕ 默认' },

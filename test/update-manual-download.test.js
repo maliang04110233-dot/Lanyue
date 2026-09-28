@@ -1,7 +1,7 @@
 /**
- * 增量216：更新失败时给出「🌐 打开下载页」按钮
+ * 更新失败时给出「🌐 打开下载页」按钮
  *
- * 起点是增量206 收尾时留下的那句文案：网络类失败弹窗写着
+ * 起点是收尾时留下的那句文案：网络类失败弹窗写着
  * 「…或到 GitHub Releases 页面手动下载最新版本」——它让用户去一个页面，
  * 却没给任何入口。应用内没有地址栏，浏览器也不会自动停在那个页面上，
  * 于是这句话对 most users 等于没说。本增量把这句话变成一个可点的按钮。
@@ -70,7 +70,7 @@ test('getReleasesPageUrl：从 app-update.yml 一路派生（就是打包产物�
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 
 test('守卫：仓库名字面量只许活在 build/config.cjs 的 publish 段', () => {
-  // 增量206 之前那句 setFeedURL 硬编码就是这么把真源劈成两半的。旧名 MusicDL
+  // 5bf3fbc 之前那句 setFeedURL 硬编码就是这么把真源劈成两半的。旧名 MusicDL
   // 已有 retry.test.js 的守卫看着，这里补的是**现用名**——它一旦漏进 src，
   // 下次仓库改名又会重演一遍"每次检查先吃一个 301"。
   const offenders = [];
@@ -173,7 +173,7 @@ test('buildUpdateFailure：脏入参不炸，缺省 label 走「更新失败」'
 // 静态守卫只能证明"代码长这样"，证明不了"点得动"。这里让主进程把 payload
 // 交过来（update-error 事件），看按钮是否真的出现在弹层里、点击是否真的把
 // 派生地址原样交给既有 open-external 通道。桩取 test/helpers/dom-stub.js
-// 那个唯一的家（增量193 收口），本增量给它补的只是"任意 data-* 属性"。
+// 那个唯一的家（收口），本增量给它补的只是"任意 data-* 属性"。
 
 async function mountUpdater() {
   const { makeDomStub } = await import('./helpers/dom-stub.js');

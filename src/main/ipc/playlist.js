@@ -55,7 +55,7 @@ function register() {
   const { trash: alive, purged } = purgeExpired(trashNow, Date.now());
   if (purged.length) prefs.set(TRASH_KEY, alive);
 
-  // 获取所有用户歌单；增量157 起支持 opts.trash —— 带 {trash:true} 返回回收站视图
+  // 获取所有用户歌单；71b3f75 起支持 opts.trash —— 带 {trash:true} 返回回收站视图
   // （含剩余天数，主进程算好，TTL 默认值不给渲染层抄第二份）。
   // 本频道契约无 args 规格（normalizeArgs 原样放行），零新通道、契约零改动。
   handle('get-user-playlists', (_, opts) => {
@@ -107,14 +107,14 @@ function register() {
     return { success: true, playlist: newPlaylist };
   });
 
-  // 删除歌单（增量156：硬删改挪回收站，5 秒内可撤销、30 天内可恢复）
+  // 删除歌单（硬删改挪回收站，5 秒内可撤销、30 天内可恢复）
   handle('delete-user-playlist', (_, playlistId) => {
     if (!playlistId) return { success: false, error: '缺少歌单ID' };
     const playlists = ensureFavorites();
     const pl = playlists.find(p => p.id === playlistId);
     if (pl && pl.system) return { success: false, error: '收藏歌单不能删除' };
     // 列表里没有、回收站里倒是有 ⇒ 这次"再删一次"就是回收站的彻底删除
-    // （增量157；同一频道同一 args 形状，不另开 purge 通道）
+    // （同一频道同一 args 形状，不另开 purge 通道）
     if (!pl) {
       const pr = trashPurge(_trash(), playlistId);
       if (!pr.purged) return { success: false, error: '歌单不存在' };

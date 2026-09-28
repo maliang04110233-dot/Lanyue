@@ -1,5 +1,5 @@
 /**
- * 增量176（起工时记 174，落库时让号两次后为 176）：不可逆操作确认弹层 confirmDialog 的契约测试。
+ * （起工时记 174，落库时让号两次后为 176）：不可逆操作确认弹层 confirmDialog 的契约测试。
  *
  * 现状缺口：全渲染层 15 处不可逆操作用的是浏览器原生 confirm()——
  *   ① 外观是操作系统的灰白小窗，与霓虹深色主题当面割裂（QA 维度"组件使用"）；
@@ -8,11 +8,11 @@
  *      原生对话框会把换行压平成一行——诚实点名的 F2 纪律文案被浏览器吃掉。
  * 立法（沿用 168「同一个规则只许有一个家」）：确认弹层只有 confirmDialog.js 一个家；
  *   反向钉按形状扫，新代码再写原生弹窗即红。
- * 增量178 修法升级：钉从"裸 confirm("泛化为原生弹窗全族（alert/prompt/confirm 裸调用
+ * 修法升级：钉从"裸 confirm("泛化为原生弹窗全族（alert/prompt/confirm 裸调用
  *   + window/self/globalThis 前缀变体，堵旧钉排除类漏掉 window.confirm 的点前缀洞），
  *   扫描面从 src/renderer/js 扩到 index.html 内联脚本。现网全族零命中，钉下即绿，
  *   非空转由三枚变异验证 + 族钉自测（命中/不误伤各一组）背书。
- * 增量182 行为层：domStub 驱动真 askConfirm 的键盘/焦点契约——Enter 归聚焦钮、
+ * 行为层：domStub 驱动真 askConfirm 的键盘/焦点契约——Enter 归聚焦钮、
  *   Tab 两钮循环、Esc 取消且不外漏、关闭后焦点归还 opener、空格不漏背景。
  *   五测先红（对着 176 的旧实现各验过失败原因）后绿，非事后补测。
  */
@@ -189,7 +189,7 @@ test('无障碍钉：确认/取消按钮都可被键盘触发，弹层带 role=d
   assert.ok(/Escape/.test(src) && /keydown/.test(src), 'Esc 必须等同取消');
 });
 
-// ── 行为层：domStub 驱动真 askConfirm（增量182，补 176 的行为级欠账）──
+// ── 行为层：domStub 驱动真 askConfirm（补 176 的行为级欠账）──
 // 181 把"窄窗溢出"钉成几何契约后，剩下的欠账全是行为级：Enter 劫持、
 // 焦点陷阱、焦点归还、键盘围堵。askConfirm 的 DOM 依赖只有
 // createElement/body.appendChild/addEventListener(capture)/focus/remove，

@@ -35,7 +35,7 @@
  *   · 现在：绿。且「开关开着但不生效」这件事被写进代码，不再只活在注释里；
  *   · 任何人加了证书：测试红，提示把 codeSigningConfigured 改为 true，
  *     顺带逼他回来清理文档里「尚未生效」的措辞；
- *   · 任何人把开关改成 false：测试红（P0 回归，与增量 209 的结论冲突）；
+ * · 任何人把开关改成 false：测试红（P0 回归，与674634a 的结论冲突）；
  *   · 任何人删掉证书配置：测试红。
  *
  * 也就是说，风险状态**不可能被静默改变**。这正是「防止将来再误判」的落点。
@@ -93,7 +93,7 @@ function detectCodeSigning(cfg) {
  *    docs/CODE_REVIEW_2026-09-28.md 的 P1-1 结论与 build/config.cjs 的注释。
  */
 const RECORDED_STATE = {
-  /** build/config.cjs 里这一项当前是开着的（增量 209 的 P0 加固，不得回退） */
+  /** build/config.cjs 里这一项当前是开着的（674634a 的 P0 加固，不得回退） */
   verifyUpdateCodeSignature: true,
   /** 当前仓库**没有**配置代码签名证书 */
   codeSigningConfigured: false,

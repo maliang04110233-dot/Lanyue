@@ -1,5 +1,5 @@
 /**
- * 增量121：下载队列「🧩 按平台分组」——queueGroup 纯函数 + 过滤第四维 + 接线钉
+ * 下载队列「🧩 按平台分组」——queueGroup 纯函数 + 过滤第四维 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

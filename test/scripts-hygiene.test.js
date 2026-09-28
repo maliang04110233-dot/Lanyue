@@ -1,5 +1,5 @@
 /**
- * scripts-hygiene.test.js — 增量223：scripts/ 不许留一次性重放脚本，判据模块必须可测
+ * scripts-hygiene.test.js — scripts/ 不许留一次性重放脚本，判据模块必须可测
  *
  * 背景：scripts/ 长期是「什么都往里扔」的地带，而它同时是**没人看**的地带 ——
  * `npm run lint` 只扫 `src/ test/`，.github/workflows 里也没有任何一条针对 scripts/
@@ -53,7 +53,7 @@ test('scripts/*.js|cjs 头注释不许自述「跑一次 / 调试用 / 用完即
 
 test('门禁判据模块必须被某个测试 require（否则「有判据但没人能测」）', () => {
   // 判据住在顶层就 process.exit() 的脚本里 = 永远没有自测。这条已在本批栽过两次：
-  // smoke-asar.js（增量192 抽出 smoke-checks.cjs）与 check-dead-deps.cjs（增量223 加
+  // smoke-asar.js（抽出 smoke-checks.cjs）与 check-dead-deps.cjs（加
   // require.main 守卫 + 导出）。名单写死是刻意的：判据模块就这两个，全仓扫描式地
   // 猜「哪个算判据」只会把 gen-icon.js 这类纯入口脚本也拖进来（它导出的是被主流程
   // 直接调的绘图函数，不经任何断言），而它们不在本批的管辖范围内。

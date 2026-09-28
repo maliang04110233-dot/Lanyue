@@ -1,5 +1,5 @@
 /**
- * 增量106：命令面板「🕘 最近使用」—— paletteRecents.js 纯函数 + 接线钉
+ * 命令面板「🕘 最近使用」—— paletteRecents.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -51,7 +51,7 @@ test('接线钉：import/localStorage 键/记录点/空查询置顶合并全部�
   assert.match(PALETTE_JS, /function _saveRecents\(list\) \{\n\s*try \{ localStorage\.setItem\(RECENTS_KEY, JSON\.stringify\(list\)\); \} catch/, '存储异常静默');
   assert.match(PALETTE_JS, /_saveRecents\(recordRecent\(_loadRecents\(\), cmd && cmd\.id\)\);\n {2}closeCommandPalette\(\);/, '执行即记录');
   assert.match(PALETTE_JS, /if \(!String\(query \|\| ''\)\.trim\(\)\) \{/, '仅空查询置顶');
-  // 增量214：投影的是按总开关过滤后的那张表，不是原始 COMMANDS（否则关掉的命令会被"最近使用"复活）
+  // 投影的是按总开关过滤后的那张表，不是原始 COMMANDS（否则关掉的命令会被"最近使用"复活）
   assert.match(PALETTE_JS, /const rec = pickRecents\(_loadRecents\(\), PALETTE_COMMANDS\);/);
   assert.match(PALETTE_JS, /_items = rec\.concat\(_items\.filter\(c => !taken\.has\(c\.id\)\)\)\.slice\(0, 30\);/, '去重合并保截断');
   // rankCommands 函数体保持纯净（合并只发生在 _refresh，不动打分排序语义）

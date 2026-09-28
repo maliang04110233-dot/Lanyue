@@ -1,5 +1,5 @@
 /**
- * 睡眠定时器 —— N 分钟后自动暂停播放，或「播完当前歌曲再停」（增量120）
+ * 睡眠定时器 —— N 分钟后自动暂停播放，或「播完当前歌曲再停」
  *
  * 核心是 createSleepTimer 纯工厂（定时器/时钟全部可注入，node 可单测）；
  * UI 侧把播放器「更多」菜单项接上预设档位弹层：
@@ -16,7 +16,7 @@ const PRESETS = [15, 30, 45, 60, 90];
 const MAX_SLEEP_MIN = 1440; // 自定义上限：一天
 
 /**
- * 自定义分钟解析（增量111）：只收 1..1440 的整数字符串，其余一律 null。
+ * 自定义分钟解析：只收 1..1440 的整数字符串，其余一律 null。
  * @returns {number|null}
  */
 function parseSleepMinutes(raw) {
@@ -67,7 +67,7 @@ function createSleepTimer({ setTimeoutFn, clearTimeoutFn, nowFn = Date.now, onFi
 // ── UI 单例 ──────────────────────────────────────────
 let _st = null;
 let _armedPreset = 0; // 仅用于菜单里给当前档位打 ✓（剩余分钟随时间漂移，档位不变）
-let _endStop = null; // 「播完当前歌曲再停」一次性闩（增量120）
+let _endStop = null; // 「播完当前歌曲再停」一次性闩
 
 function _timer() {
   if (!_st) _st = createSleepTimer({ setTimeoutFn: setTimeout, clearTimeoutFn: clearTimeout, onFire: _fire });
@@ -180,7 +180,7 @@ function _closeCustomDialog() {
   if (el && el.parentNode) el.parentNode.removeChild(el);
 }
 
-/** 自定义分钟弹层（增量111）：edit-overlay 模式，Enter 即确认，复用 _arm 落档 */
+/** 自定义分钟弹层：edit-overlay 模式，Enter 即确认，复用 _arm 落档 */
 function openSleepCustomDialog() {
   try { if (typeof window.closePlayerMore === 'function') window.closePlayerMore(); } catch (_e) { /* 收起失败不挡弹层 */ }
   _closeCustomDialog();

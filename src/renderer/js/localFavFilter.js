@@ -1,5 +1,5 @@
 /**
- * 本地曲库「仅看收藏」过滤（增量89）
+ * 本地曲库「仅看收藏」过滤
  *
  * 纯函数：收藏键沿用 state.favoriteKeys 的 "id:source" 约定，本地歌键即
  * filePath:local（见 favorites.js localFavSong）。不碰 DOM，便于单测。

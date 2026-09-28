@@ -1,5 +1,5 @@
 /**
- * 增量108：「📋 复制曲单」—— songListText.js 纯函数 + 双表面接线钉
+ * 「📋 复制曲单」—— songListText.js 纯函数 + 双表面接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 /**
- * dead-deps-scanner.test.js — 增量223：check-dead-deps 的源码扫描器自带自测
+ * dead-deps-scanner.test.js — check-dead-deps 的源码扫描器自带自测
  *
  * 为什么必须补：scripts/check-dead-deps.cjs 的判据此前**一条自测都没有**，而它是
  * 「asar 排除项还能不能继续排除」的唯一守门人。判据自己坏掉时的症状极其恶劣 ——
@@ -46,7 +46,7 @@ test('自检：jade 确实在 build/config.cjs 的排除清单里（误报它 = 
 
 test('codeMask：注释与字面量正文不是代码，定界符与真代码是', () => {
   // String.raw：正则里的反斜杠必须原样进样本，写成普通字符串就得数四层转义，
-  // 数错一层这条测试就在测另一个字符串（增量223 第一版就是这么自己瞎绿的）。
+  // 数错一层这条测试就在测另一个字符串（第一版就是这么自己瞎绿的）。
   const reLine = String.raw`const re = /\/\/require\('jade'\)/;`;
   const src = [
     "const a = require('jade'); // 注释里的 require('jade')",

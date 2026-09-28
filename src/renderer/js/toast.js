@@ -1,8 +1,8 @@
 /**
  * MusicDL Toast 通知系统
  *
- * 多级类型、自动消失。错误码文案不住这里：唯一住处是 diagnose.js 的码表（增量162）
- * 反馈文案的住处是语言包（增量191）：这里不写中文字面量，也不做句子拼接。
+ * 多级类型、自动消失。错误码文案不住这里：唯一住处是 diagnose.js 的码表
+ * 反馈文案的住处是语言包：这里不写中文字面量，也不做句子拼接。
  *
  * ES Module — export 供其他模块 import，同时保留 window 全局供 HTML onclick
  */
@@ -46,14 +46,14 @@ function showToast(msg, type = 'info', duration) {
  * 显示下载错误（根据 fatal 区分样式）
  *
  * 整句进词典而不是"前缀 + 内容"拼接：拼接出来的半截中文躲得过任何按实参扫的巡扫，
- * 且中文的「：」分隔形状会渗进英文界面（增量191）。
- * 两个分支各写一次 translate('字面量')：键名必须是带引号的字面量，守护测试才认得出它的消费方（增量189 同律）。
+ * 且中文的「：」分隔形状会渗进英文界面。
+ * 两个分支各写一次 translate('字面量')：键名必须是带引号的字面量，守护测试才认得出它的消费方（974fe2f 同律）。
  *
  * 取词函数按参数注入而不是 `import { t } from './i18n.js'`：本文件要被 node 的测试直接
  * import（toast-timing.test.js），而 i18n.js 静态导入语言包 JSON —— node 要求那种写法带
  * import attribute，本仓 eslint 的 espree 又解析不了 attribute（两条路都堵，见 toast-i18n.test.js）。
  * 约定与 listAccess.js / home.js 的 term 参数同源：**可测文件不拖 JSON 进图**。
- * translate 不给默认值：漏传时当场炸，比悄悄把键名印在界面上好（增量188 的"静默空值"同一课）。
+ * translate 不给默认值：漏传时当场炸，比悄悄把键名印在界面上好（c65a888 的"静默空值"同一课）。
  */
 function showDownloadError(title, error, fatal, translate) {
   if (fatal) {

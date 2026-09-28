@@ -1,5 +1,5 @@
 /**
- * playlist-merge.test.js — 增量81 歌单合并纯函数
+ * playlist-merge.test.js — 歌单合并纯函数
  *
  * 手法同 playlist-export.test.js：CJS + ?ck 缓存爆破 fresh import，
  * 纯函数无 DOM 依赖。

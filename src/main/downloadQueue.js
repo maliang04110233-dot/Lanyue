@@ -39,7 +39,7 @@ const speedMeter = require('./speedMeter');
 const diskSpace = require('./diskSpace');
 const { atomicWriteJson, safeReadJson } = require('../utils/atomicFile');
 const { sidecarPathFor } = require('../utils/relinkRefs');
-// 传输失败的判据与码表家在 src/shared/netClass.js（增量219）：这里只是消费方，
+// 传输失败的判据与码表家在 src/shared/netClass.js：这里只是消费方，
 // 本地不再抄一份"什么算网络问题"——那份在更新器和传输层各有一份，三份必然漂。
 const { transportCode } = require('../shared/netClass');
 
@@ -528,7 +528,7 @@ function createDownloadQueueEngine({
         notifyQueueChanged(true);
         return;
       }
-      // 增量219：传输层失败（断网/超时）在这里补上码。改造前 errorCode 只有
+      // 传输层失败（断网/超时）在这里补上码。改造前 errorCode 只有
       // 「取流返回 fatal」那一条路会写，于是断网跑完的任务是个无码红条 —— 队列与
       // 历史都不戴徽标（徽标只认码）、诊断只会说「未分类的失败」、渲染层也无从知道
       // 「这些红条是在等网络恢复」。码补齐后这三件事同时成立。
@@ -552,7 +552,7 @@ function createDownloadQueueEngine({
           duration: song.duration || 0,
           status: 'error',
           error: lastError.message,
-          // 增量158：取流侧的分类码一起落盘，历史行的 🆘 才不必退回关键词去猜。
+          // 取流侧的分类码一起落盘，历史行的 🆘 才不必退回关键词去猜。
           // 无码留 undefined（JSON 直接丢键，不写空串伪码）；history.add 是
           // {...existing, ...entry} 合并写，所以"这次没码"会覆盖"上次的码"，不留陈旧值。
           errorCode: song.errorCode || undefined,

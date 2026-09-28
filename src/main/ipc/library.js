@@ -88,7 +88,7 @@ function register() {
         readAudioMetadata,
       );
 
-      // 增量152：用户在 app 外面改过文件名时，下载历史指向的旧路径已经失联。
+      // 用户在 app 外面改过文件名时，下载历史指向的旧路径已经失联。
       // 刚扫到的文件清单就是磁盘真相，拿它对账一次并接回（失败不影响扫描本身）。
       let relinked = { fixed: 0, ambiguous: 0 };
       try {

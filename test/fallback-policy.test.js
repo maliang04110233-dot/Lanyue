@@ -1,5 +1,5 @@
 /**
- * 单元测试：api/services/fallbackPolicy.js + resolveTrackService 换源排除接线（增量126-B）
+ * 单元测试：api/services/fallbackPolicy.js + resolveTrackService 换源排除接线
  *
  * 语义边界（逐条钉死）：
  *   - 排除清单只砍**跨源路径**：候选过滤 + _altSource 记忆跳过；
@@ -150,7 +150,7 @@ test('两次 resolve 之间改清单：第二次即刻生效（缓存不跨调�
   assert.notEqual((await svc.resolve(SONG)).url, okResult.url, '勾选后应不再出 kuwo 流');
 });
 
-// ── 增量207：跨源换源总开关（产品决策）──────────────────────
+// ── 跨源换源总开关（产品决策）──────────────────────
 // 用户诉求：「根据搜索结果播放就是正常播放，没有音乐源就无法正常展示内容，也不用换音乐源」。
 // 决策落在 fallbackPolicy 一处，机制保留在 resolveTrackService —— 想恢复换源改这里即可。
 

@@ -1,5 +1,5 @@
 /**
- * visualizer.test.js — 增量82 频谱可视化守卫
+ * visualizer.test.js — 频谱可视化守卫
  *
  * computeBars 运行时真测（模块顶层零 DOM，node 可直接 import；
  * 其 eq.js 依赖也是 node-safe 的）+ 接线/所有权静态钉。

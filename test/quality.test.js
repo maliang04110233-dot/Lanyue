@@ -143,7 +143,7 @@ test('saveQualityBySource: 清洗 + 落盘 + 拒绝时仍回写内存态', async
   assert.deepEqual(seen[0][1], { netease: 'lossless' });
 });
 
-// ── 播放音质徽标标签（增量38） ─────────────────────────
+// ── 播放音质徽标标签 ─────────────────────────
 test('playedQualityLabel: 三档短标签，未知/空值返回空串', () => {
   const { playedQualityLabel } = qmod;
   assert.equal(playedQualityLabel('standard'), '128k');

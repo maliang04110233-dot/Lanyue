@@ -1,7 +1,7 @@
 /**
  * converterFilter 纯函数单测 + 转换页过滤管线回归钉
  *
- * 背景（增量128）：views/converter.js 里三条「换库」路径
+ * 背景：views/converter.js 里三条「换库」路径
  * （scanLocalForConvert / loadLocalSongsForConvert 的两条分支）原先只调
  * renderConverterSongs()，而它读的是 state.convFiltered —— 于是新库配上一轮的
  * 过滤结果，列表、计数、全选三处一起陈旧；最典型的是首屏扫描还没回来时用户
@@ -9,7 +9,7 @@
  *
  * 修法：过滤逻辑抽成本模块的纯函数（可真实单测），三条路径一律改调
  * filterConverterSongs()（管线唯一入口）。本文件同时用「通用模式钉」守住它 ——
- * 不钉某个具体字面量（字面钉曾把 renderLocalSongs 的 bug 钉成「预期」，见增量126）。
+  * 不钉某个具体字面量（字面钉曾把 renderLocalSongs 的 bug 钉成「预期」）。
  */
 const test = require('node:test');
 const assert = require('node:assert');

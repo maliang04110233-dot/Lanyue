@@ -1,5 +1,5 @@
 /**
- * domStub 的一个家（增量193 收口，口径同 148/151/185「手抄清单必漏」）
+ * domStub 的一个家（收口，口径同 148/151/185「手抄清单必漏」）
  *
  * 来龙：182 → 186 → 193 三份测试各自手抄了一份"形状同前"的桩。193 给 welcome
  * 换掉内联 onclick（改 data-welcome + 事件委托）后，186 抄的那份立刻漏掉三件
@@ -13,11 +13,11 @@
  * ③ querySelectorAll('button') 递归收后代（焦点陷阱的寻焦面）；
  * ④ document 监听分 capture/bubble 两队列，removeEventListener 按 (type,fn,capture) 摘除；
  * ⑤ classList（add/remove/toggle(cls,force)/contains）骑在 className 字符串上，
- *    与真 DOM 同源——直接赋 className 也会反映进 classList（增量195：cmdk 用
+ * 与真 DOM 同源——直接赋 className 也会反映进 classList（cmdk 用
  *    classList.toggle 高亮行、classList.add('hidden') 关面板）；
- * ⑥ el.id 赋值即注册进 doc 的 getElementById 索引（增量195：cmdk 全靠 id 寻物，
+ * ⑥ el.id 赋值即注册进 doc 的 getElementById 索引（cmdk 全靠 id 寻物，
  *    模板里解析出的 id 同样入索）。
- * ⑦ 复合选择器（增量197：浮层注册表按形状扫描 DOM）：'button' | '#id' |
+ * ⑦ 复合选择器（浮层注册表按形状扫描 DOM）：'button' | '#id' |
  *    '[attr]' | '[attr]:not(.cls)' 四种形式，元素级只寻后代、document 级从 body
  *    起走；[attr] 认「属性存在」（值为空串也命中，与真 DOM 裸属性同义），
  *    :not(.cls) 按 class token 精确剔除；其余形式直接 throw——桩宁可炸也不静默
@@ -52,7 +52,7 @@ function findAll(root, sel) {
 
 function stubEl(tag, doc) {
   const el = {
-    // style 是承诺面（增量202⑭）：真实模块写 hint.style.cssText，桩缺 style 就 TypeError
+    // style 是承诺面（⑭）：真实模块写 hint.style.cssText，桩缺 style 就 TypeError
     tag, parent: null, children: [], className: '', textContent: '', attrs: {}, _l: {}, _html: '', style: {},
     setAttribute(k, v) {
       this.attrs[k] = String(v);
@@ -114,7 +114,7 @@ function stubEl(tag, doc) {
         const b = stubEl('button', doc);
         const cm = m[1].match(/class="([^"]*)"/);
         b.className = cm ? cm[1] : '';
-        // 任意 data-* 都收（增量216：委托认领钮靠的是 data-update-manual）。
+        // 任意 data-* 都收（委托认领钮靠的是 data-update-manual）。
         // 原先硬抄 ['data-welcome']，第二个被委托的模块一进来就得再改一次桩——
         // 口径同 193 的"手抄清单必漏"，属性面也一样。
         for (const am of m[1].matchAll(/(data-[\w-]+|id)="([^"]*)"/g)) {

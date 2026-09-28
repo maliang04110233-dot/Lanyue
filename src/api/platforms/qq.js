@@ -420,7 +420,7 @@ async function qqGetUrl(id, quality, cookie = '') {
     const result = await request(url, { method: 'POST', body: bodyStr, headers, timeout: 15000 });
     // 回包里连 req_0 都没有 = 服务端压根没解析这条请求（协议/接口级失败；2026-09-21
     // 实测的 {"code":500001} 就是这个形状）。它和「平台明确回了这首这档不给」是两回事：
-    // 一起算成 VIP_REQUIRED，用户就会拿着完全有效的 Cookie 反复重登（增量210）。
+    // 一起算成 VIP_REQUIRED，用户就会拿着完全有效的 Cookie 反复重登。
     if (!result || !result.req_0) {
       logger.warn('[qqGetUrl] 回包无 req_0，判为接口级失败, topCode=', result?.code);
       return AppError.platformChanged('QQ音乐');

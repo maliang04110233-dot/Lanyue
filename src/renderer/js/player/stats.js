@@ -79,7 +79,7 @@ const _playStats = {
   totalSongs: 0,         // 播放过多少首不同歌曲
   playCount: {},         // { 'title|||artist': count }
   lastPlayed: null,      // 最后播放的歌曲
-  daily: {},             // { 'YYYY-MM-DD': 秒 }（增量113，停表时归集）
+  daily: {},             // { 'YYYY-MM-DD': 秒 }（停表时归集）
   sessionStart: Date.now(),
 };
 
@@ -178,16 +178,16 @@ export function generatePlayReport() {
   const stats = getPlayStats();
   const mostPlayed = getMostPlayed(5);
 
-  // 最爱歌手（增量110 起与复制文本共用 playReportText 聚合）
+  // 最爱歌手（ee6d575 起与复制文本共用 playReportText 聚合）
   const artists = topArtistsFromPlayCount(stats.playCount);
   const topArtists = artists.slice(0, 3).map(a => [a.artist, a.count]);
 
-  // 每日听歌趋势（增量113）：桶与复制文本同源，柱高共用下载趋势的 barPct
+  // 每日听歌趋势：桶与复制文本同源，柱高共用下载趋势的 barPct
   const dailyBuckets = bucketDailySeconds(stats.daily, Date.now(), PLAY_TREND_DAYS);
   const dailyTotal = dailyBuckets.reduce((a, b) => a + b.secs, 0);
   const maxDaily = dailyBuckets.reduce((a, b) => Math.max(a, b.secs), 0);
   const activeDays = dailyBuckets.filter(b => b.secs > 0).length;
-  // 周/月聚合（增量116）：daily 桶只攒不清，窗口能看穿 14 天图
+  // 周/月聚合：daily 桶只攒不清，窗口能看穿 14 天图
   const wk = weekSummary(stats.daily);
   const mo = monthSummary(stats.daily);
 
@@ -277,7 +277,7 @@ export function generatePlayReport() {
   showReportModal(html);
 }
 
-/** 📋 复制听歌报告（增量110）：与弹层同一份统计投影成纯文本进剪贴板，零新通道 */
+/** 📋 复制听歌报告：与弹层同一份统计投影成纯文本进剪贴板，零新通道 */
 export async function copyPlayReportText() {
   const stats = getPlayStats();
   const artists = topArtistsFromPlayCount(stats.playCount);

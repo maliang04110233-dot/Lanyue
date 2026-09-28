@@ -1,5 +1,5 @@
 /**
- * 增量113 测试：每日听歌时长趋势
+ * 测试：每日听歌时长趋势
  * playDailyTrend 纯函数直调 + formatReportText 每日段 + stats.js 接线静态钉
  */
 const test = require('node:test');

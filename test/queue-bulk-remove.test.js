@@ -1,8 +1,8 @@
 /**
- * 增量101：播放队列「多选批量移除」
+ * 播放队列「多选批量移除」
  *
- * 队列此前只有单行 ✕（增量57）与整队清空；大队列做减法只能一下一下点。
- * 选态装「行对象引用」而不是下标：拖拽排序（增量41）、外部加歌/移除让
+ * 队列此前只有单行 ✕与整队清空；大队列做减法只能一下一下点。
+ * 选态装「行对象引用」而不是下标：拖拽排序、外部加歌/移除让
  * 下标漂移时，提交仍按当前队列现算命中行，消失的行自然跳过。
  * removeQueueItemsByIdentity 倒序合成既有 removeQueueItem，
  * playIdx 换算与「删当前播补位」语义零复制粘贴。
@@ -18,7 +18,7 @@ const APP_JS = fs.readFileSync(
 const HTML = fs.readFileSync(
   path.join(__dirname, '../src/renderer/index.html'), 'utf8'
 );
-// 增量191 起，用户反馈文案住在语言包里（源码只留键名），接线钉要两侧都看得见的东西才能钉稳
+// 45838e3 起，用户反馈文案住在语言包里（源码只留键名），接线钉要两侧都看得见的东西才能钉稳
 const ZH = JSON.parse(fs.readFileSync(
   path.join(__dirname, '../src/renderer/js/lang/zh.json'), 'utf8'
 ));
@@ -92,7 +92,7 @@ test('接线钉：pq-header 双按钮、行首勾选框与模式化 onclick/拖�
     '多选态点行=勾选，平时=切歌');
   assert.ok(APP_JS.includes("askConfirm(t('toast.confirmRemoveRows', { count: _pqSel.size }))") && APP_JS.includes('_pqSel.clear();'),
     '先确认后落账，提交即清选态');
-  // 增量191：这句确认文案从模板串搬进了语言包（英文界面要能翻）。判据跟着搬，但两侧都钉 ——
+  // 这句确认文案从模板串搬进了语言包（英文界面要能翻）。判据跟着搬，但两侧都钉 ——
   // 只钉源码，词典可以悄悄换词；只钉词典，源码可以悄悄换键。
   assert.ok(ZH['toast.confirmRemoveRows'].includes('移出播放队列'),
     '确认框仍说清移出去的是「播放队列」里的行');

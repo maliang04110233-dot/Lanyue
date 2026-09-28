@@ -1,13 +1,13 @@
 /**
- * 增量192 守护：打包冒烟门禁（scripts/smoke-asar.js）第 8a 项的判据本身
+ * 守护：打包冒烟门禁（scripts/smoke-asar.js）第 8a 项的判据本身
  *
- * 来龙去脉（实测，非推测）：`npm run smoke:asar` 从增量187 起恒红（11/12），
+ * 来龙去脉（实测，非推测）：`npm run smoke:asar` 从c664fdf 起恒红（11/12），
  * 而它是 `npm run verify` 的最后一环 —— 一个天天红的门禁等于没有门禁，
  * 更要紧的是它会训练人"跳过这条看下一条"，那正是假绿进来的通道。两个成因：
  *
  *   成因①「ESM-only 导出无人 import」这一支把消费方**只**数渲染层别的模块：
  *     `exportedNamesOf(eq.js)` 得到 12 个导出（11 函数 + PRESET_CUSTOM），减掉 player.js 桥接的 7 个 ⇒ 5 个
- *     ESM-only，其中 `matchPresetName`（增量187 为"高亮由曲线现推"而导出，
+ * ESM-only，其中 `matchPresetName`（为"高亮由曲线现推"而导出，
  *     实际调用点在 eq.js 内部 + node 测试）在别的渲染模块里一次都没出现 ⇒ 判成孤儿。
  *     可它不是死码：模块内部真在用，压缩器绝不会丢它。判据错在把"跨模块 import"
  *     当成"有人用"的唯一形态。189 的幽灵键口径是「哪都没人读」才算死 —— 同一把尺。
@@ -39,7 +39,7 @@ const path = require('node:path');
 const REPO = path.join(__dirname, '..');
 const CHECKS = require(path.join(REPO, 'scripts', 'smoke-checks.cjs'));
 
-/** 并发线会把整文件改成 CRLF，源码形状钉必须先归一（增量158 起的本仓惯例） */
+/** 并发线会把整文件改成 CRLF，源码形状钉必须先归一（372d675 起的本仓惯例） */
 function read(rel) {
   return fs.readFileSync(path.join(REPO, rel), 'utf8').replace(/\r\n/g, '\n');
 }
@@ -158,7 +158,7 @@ test('eq.js 的导出面含 export const（派生清单不许漏写法，PRESET_
   const eqSrc = read('src/renderer/js/player/eq.js');
   const names = CHECKS.exportedNamesOf(eqSrc);
   assert.ok(names.includes('PRESET_CUSTOM'), 'export const 也是导出面');
-  assert.ok(names.includes('matchPresetName'), '增量187 那个被误判的名字必须在派生清单里');
+  assert.ok(names.includes('matchPresetName'), ' 那个被误判的名字必须在派生清单里');
 });
 
 // ── 自测：陈旧度与断言源 ────────────────────────────────

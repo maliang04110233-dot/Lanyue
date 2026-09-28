@@ -16,7 +16,7 @@ const path = require('path');
 /**
  * 路径的"同一文件"判等写法：分隔符统一成 /、去掉 . 段、Windows 下压大小写。
  * 凡是要拿磁盘路径做对账/归并的地方都必须用它 —— 各模块自己抄一份
- * replace(/\\/g,'/') 必然漂移（增量148/151 的教训）。
+ * replace(/\\/g,'/'）必然漂移（/151 的教训）。
  */
 function canonPath(p) {
   if (typeof p !== 'string') return '';

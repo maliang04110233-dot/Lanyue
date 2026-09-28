@@ -1,5 +1,5 @@
 /**
- * 增量85：🎯 定位正在播放的歌（locatePlaying.js 纯匹配 + 两视图接线）
+ * 🎯 定位正在播放的歌（locatePlaying.js 纯匹配 + 两视图接线）
  */
 const test = require('node:test');
 const assert = require('node:assert');

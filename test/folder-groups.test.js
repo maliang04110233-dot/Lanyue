@@ -1,5 +1,5 @@
 /**
- * 增量109：本地曲库「🗂 文件夹分组」—— folderGroups.js 纯函数 + 接线钉
+ * 本地曲库「🗂 文件夹分组」—— folderGroups.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 /**
- * 增量91：歌单详情行内 ♥ 红心 + 收藏夹即时同步重渲染
+ * 歌单详情行内 ♥ 红心 + 收藏夹即时同步重渲染
  *
  * renderPlaylistDetailSongs 复用 heartBtnHtml（渲染即 registerFavSong，
  * 点击走 toggleFavoriteByKey 统一路）；收藏夹详情打开时经一次性

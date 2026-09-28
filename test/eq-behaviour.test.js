@@ -5,7 +5,7 @@
  * 渲染层无法在 node --test 里实例化。故沿用 platform-contract.test.js /
  * renderer-contract.test.js 的同款手法——扫描源码文本断言结构。
  *
- * 增量77 起 EQ 真实接入音频链路，原「现状钉」按其文件头预案**反转成正向钉**：
+ * 37a57af 起 EQ 真实接入音频链路，原「现状钉」按其文件头预案**反转成正向钉**：
  *   A. eqFilters 必有填充点、音频图创建点恰好只在 eq.js（回退即红）
  *   B. restoreEqPresetSetting 三键齐读（eqPreset/eqBypass/eqGains），
  *      手调增益跨重启存活；_gains 是增益唯一真身（图未建也记账）
@@ -51,13 +51,13 @@ const EQ_PUBLIC = [
   'applyEqPreset', 'cycleEqPreset', 'resetEq', 'restoreEqPresetSetting',
   'saveEqSettings', 'setEqBand', 'toggleEqBypass',
 ];
-// 增量82：eq.js 另有两个仅供频谱可视化模块 import 的图访问器（不走 onclick/window）
-// 增量187：matchPresetName 纯函数（同上，不经 player 中转）
-// 增量223：preampTrimDb 输出级 trim 纯函数（ESM-only，链首 preamp 增益与单测消费；
+// eq.js 另有两个仅供频谱可视化模块 import 的图访问器（不走 onclick/window）
+// matchPresetName 纯函数（同上，不经 player 中转）
+// preampTrimDb 输出级 trim 纯函数（ESM-only，链首 preamp 增益与单测消费；
 //          原名 clipGuardDb —— 名字承诺了「削波保护」而它只是听感取向的固定 trim）
 const EQ_ALL = [...EQ_PUBLIC, 'ensureAudioGraph', 'getAnalyser', 'matchPresetName', 'preampTrimDb'].sort();
 
-// ── A. 音频图已接通（正向钉，增量77）────────────────────────
+// ── A. 音频图已接通（正向钉）────────────────────────
 test('eq.js: eqFilters 存在填充点（EQ 已接入音频图，回退即红）', () => {
   const fills = [...EQ_CODE.matchAll(/eqFilters\s*(?:\.push\s*\(|\[[^\]]*\]\s*=(?!=))/g)];
   assert.ok(
@@ -102,7 +102,7 @@ test('eq.js: saveEqSettings 写入 prefs.eqGains，且值来自 _gains 真身（
   );
   assert.ok(
     /_gains\.slice\(\)/.test(EQ_CODE),
-    'getEqGains 不以 _gains 为真身 —— 图未建时会存回空数组（增量77 前的老 bug 复现）'
+    'getEqGains 不以 _gains 为真身 —— 图未建时会存回空数组（前的老 bug 复现）'
   );
 });
 
@@ -133,7 +133,7 @@ test('eq.js: 公开面恰为 11 个函数（7 个 UI 面 + 2 个图访问器 + 2
   );
 });
 
-// 增量223：preampTrimDb 是 ESM-only 导出（player.js 的 import/再导出面里没有它），
+// preampTrimDb 是 ESM-only 导出（player.js 的 import/再导出面里没有它），
 // 但它**不是**没人用 —— _mirrorToGraph 逐次曲线变化都在调它。这条钉的是「不许有人
 // 顺手把它挪进 player.js 的桥接面」：那是 7 个 HTML onclick 认的面，多一个名字就多
 // 一处 window 挂载与 re-export 的同步负担，而它对 onclick 毫无用处。

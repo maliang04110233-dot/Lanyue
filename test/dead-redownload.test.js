@@ -1,5 +1,5 @@
 /**
- * 增量154：失效历史项「⬇ 批量重新下载」
+ * 失效历史项「⬇ 批量重新下载」
  *
  * 153 给的是"这些歌我不想要了 ⇒ 把死账删干净"；本增量给另一半：
  * "歌我还想听，只是文件被我删了 ⇒ 一次把它们重新下回来"。
@@ -21,7 +21,7 @@ const { pickDeadEntries } = require('../src/utils/deadRefs');
 const read = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 const loadFilters = async () => import(`../src/renderer/js/historyFilters.js?ck=${Math.random()}`);
 
-// 载荷构造（deadRetryPayload）在增量155 挪进了中性的 enqueuePayload.js（第二个消费方 =
+// 载荷构造（deadRetryPayload）在9fb2b05 挪进了中性的 enqueuePayload.js（第二个消费方 =
 // 播放失败就地重下）。它的行为测试跟着模块搬去 test/play-failure-retry.test.js，
 // 本文件只留历史页这一侧的汇总文案 / 确认文案 / 接线。
 

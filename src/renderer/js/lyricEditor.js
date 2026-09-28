@@ -118,7 +118,7 @@ function openLyricEditor() {
 }
 
 window.openLyricEditor = openLyricEditor;
-// 浮层注册表具名出口（增量202）：收起=隐藏+摘身份，非摘除本体，故不走 '-' 哨兵
+// 浮层注册表具名出口：收起=隐藏+摘身份，非摘除本体，故不走 '-' 哨兵
 window.closeLyricEditor = _close;
 
 export { getLyricOverride, saveLyricText, openLyricEditor };

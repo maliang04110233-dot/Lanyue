@@ -1,5 +1,5 @@
 /**
- * 订阅新歌行「逐首下载」纯函数（增量104）
+ * 订阅新歌行「逐首下载」纯函数
  *
  * 入队语义与 playlist.js downloadPlaylistSong 对齐：payload = 歌曲原字段
  * + saveDir + quality（qualityOf 由调用方注入 resolveQuality，纯函数零依赖）。

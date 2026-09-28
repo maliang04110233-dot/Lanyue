@@ -86,7 +86,7 @@
 .dl-sel-count { font-size: 12.5px; color: var(--neon-blue); white-space: nowrap; }
 .dl-sel-count b { color: var(--neon-blue); font-weight: 700; }
 
-/* ── 下载页断网横幅（增量219）────────────────────────── */
+/* ── 下载页断网横幅────────────────────────── */
 .net-banner {
   flex-shrink: 0;
   padding: 7px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5;
@@ -127,7 +127,7 @@
   to   { opacity: 1; max-height: 400px; }
 }
 
-/* 下载队列「按平台分组」组头（增量121） */
+/* 下载队列「按平台分组」组头 */
 .queue-group-header {
   display: flex; align-items: center; gap: 8px;
   margin: 8px 0 4px 0; padding: 4px 8px;
@@ -571,7 +571,7 @@
   text-align: center;
   transition: color var(--dur-2) var(--ease), font-size var(--dur-2) var(--ease);
 }
-/* 带时间戳的行可点击跳播（增量60），静态/占位行无此属性 */
+/* 带时间戳的行可点击跳播，静态/占位行无此属性 */
 .lyric-line[data-t-line] {
   cursor: pointer;
 }
@@ -860,7 +860,7 @@ audio { display: none; }
   text-overflow: ellipsis; margin-top: 2px;
 }
 
-/* ── 本地库封面墙（增量212）── 复用 .local-grid/.grid-* 布局 ── */
+/* ── 本地库封面墙── 复用 .local-grid/.grid-* 布局 ── */
 .local-album-wall .grid-cover { aspect-ratio: 1; }
 .local-album-wall .grid-title { font-size: 12px; }
 
@@ -1283,7 +1283,7 @@ audio { display: none; }
   color: var(--fg-3);
   font-variant-numeric: tabular-nums;
 }
-/* 队列行内 ♥（增量92）：自带按钮复位，颜色走全局 .heart-btn 规则 */
+/* 队列行内 ♥：自带按钮复位，颜色走全局 .heart-btn 规则 */
 .pq-item .heart-btn.pq-fav {
   flex-shrink: 0;
   background: none;
@@ -1353,7 +1353,7 @@ audio { display: none; }
 }
 .pq-ctx-item:hover { background: var(--elev-1); color: var(--accent-ui); }
 .pq-ctx-item.danger:hover { color: var(--c-danger); }
-/* ── 频谱可视化（增量82）────────────────────────────── */
+/* ── 频谱可视化────────────────────────────── */
 .viz-canvas {
   display: block;
   width: 100%;

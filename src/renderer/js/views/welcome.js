@@ -5,12 +5,12 @@
  * 三条核心用法（剪贴板识别 / 登录解锁音质 / 目录与命名）+ 快捷键提示。
  * 「开始使用」永久关闭；「稍后再说」仅本次关闭，下次启动仍会提示。
  *
- * 键盘叠层纪律（增量186）：本层的 Esc 是 document-capture 监听、注册早于
+ * 键盘叠层纪律：本层的 Esc 是 document-capture 监听、注册早于
  * confirmDialog——capture 队列按注册序执行，182 的围堵罩不到它，所以处理前
  * 必须问 hasOpenConfirm()：确认框开着时这一次 Esc 归最上层，本层让位。
  * 不让位的后果是双抢——按"取消"关个对话框，连没读完的引导被顺手永久关闭。
  *
- * 键盘契约（增量193，182 三件套推广到第二个模态）：
+ * 键盘契约（182 三件套推广到第二个模态）：
  * ① 打开即把焦点送进浮层，落「稍后再说」——回车即走的路径必须指向保守出口，
  *    不能是那颗顺手写 welcomeSeen 的「开始使用」；
  * ② Tab/Shift+Tab 只在浮层 4 颗钮间循环且 preventDefault（焦点陷阱）；
@@ -52,7 +52,7 @@ function showWelcome() {
   _overlay.id = 'welcomeOverlay';
   _overlay.setAttribute('role', 'dialog');
   _overlay.setAttribute('aria-modal', 'true');
-  // 浮层注册表（增量197）：legacy 的 _anyModalOpen 靠 '.welcome-overlay' 类名暗号
+  // 浮层注册表：legacy 的 _anyModalOpen 靠 '.welcome-overlay' 类名暗号
   // 认引导层，如今换成属性；Esc 语义住自家 capture 监听（193），不授关闭契约。
   _overlay.setAttribute('data-modal', '');
   _overlay.innerHTML = `

@@ -1,5 +1,5 @@
 /**
- * 增量143：下载历史排序
+ * 下载历史排序
  *   - src/shared/historySort.js —— 主进程 ORDER BY 白名单（注入面由构造消除）
  *   - src/renderer/js/historySort.js —— 档位循环与文案，键必须与白名单逐一对应
  *   - utils/history.query({sort}) —— 真 SQLite 验跨页排序语义

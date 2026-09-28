@@ -1,5 +1,5 @@
 /**
- * 增量102：设置页搜索 —— settingsSearch.js 纯函数 + 接线钉
+ * 设置页搜索 —— settingsSearch.js 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -106,7 +106,7 @@ test('接线钉：设置面板搜索框/空态/桥接/CSS/双语键/命令面板
 
   assert.match(CSS, /\.settings-page \.srch-hide \{ display: none !important; \}/);
 
-  // 增量93 教训：data-i18n 键必须 zh/en 双文件同增
+  // 教训：data-i18n 键必须 zh/en 双文件同增
   for (const k of ['settings.searchPh', 'settings.searchEmpty']) {
     assert.ok(typeof ZH[k] === 'string' && ZH[k], 'zh missing ' + k);
     assert.ok(typeof EN[k] === 'string' && EN[k], 'en missing ' + k);

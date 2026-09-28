@@ -21,7 +21,7 @@ export function pickDroppedText(dt) {
   return trimmed ? trimmed.slice(0, MAX_DROP_CHARS) : null;
 }
 
-// ── 歌词文件拖入（增量56）──────────────────────────────
+// ── 歌词文件拖入──────────────────────────────
 export const MAX_LRC_BYTES = 512 * 1024;
 
 /** .lrc 直接认；.txt 只是候选（内容须过 looksLikeLrc），其余不接管 */

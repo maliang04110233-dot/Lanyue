@@ -7,7 +7,7 @@ import { buildUpdateFailure } from './updateManual.js';
 
 const _updateState = { checking: false, available: false, downloading: false, percent: 0 };
 
-// 本轮失败弹层交回来的手动下载地址（增量216）。它**只**活在这里，绝不进 HTML ——
+// 本轮失败弹层交回来的手动下载地址。它**只**活在这里，绝不进 HTML ——
 // 按钮上只有一颗无值标记，点击时由委托从这里取，注入面因此不存在而非"被转义了"。
 let _manualUrl = null;
 

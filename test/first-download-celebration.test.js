@@ -1,5 +1,5 @@
 /**
- * 增量177：首个下载成功的 moment-of-truth 庆祝（check 回写）。
+ * 首个下载成功的 moment-of-truth 庆祝（check 回写）。
  *
  * 覆盖两层：
  *  1) createFirstDownloadMachine —— 纯状态机，判"这真是用户史上第一次下载成功"的门槛逻辑，

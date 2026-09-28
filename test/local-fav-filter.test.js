@@ -1,5 +1,5 @@
 /**
- * 增量89：本地曲库「♥ 仅看收藏」过滤（localFavFilter 纯函数 + 管线/按钮接线）
+ * 本地曲库「♥ 仅看收藏」过滤（localFavFilter 纯函数 + 管线/按钮接线）
  */
 const test = require('node:test');
 const assert = require('node:assert');

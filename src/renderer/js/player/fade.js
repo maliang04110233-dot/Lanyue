@@ -82,7 +82,7 @@ function _cancelFadeOut() {
 }
 
 /**
- * 缓停入口（增量119）：该淡出则接管本次暂停，音量降到 0 才真 pause()。
+ * 缓停入口：该淡出则接管本次暂停，音量降到 0 才真 pause()。
  * @returns {boolean} true = 暂停交给淡出收尾了，调用方不要再 pause()
  */
 export function fadeOutPause(audio) {
@@ -145,7 +145,7 @@ export function cycleFadeIn() {
   showToast('淡入：' + fadeStageLabel(_fadeMs), 'info', 1800);
 }
 
-/** 淡出档位入口（增量119）：与淡入共用档位表 */
+/** 淡出档位入口：与淡入共用档位表 */
 export function cycleFadeOut() {
   _fadeOutMs = nextFadeMs(_fadeOutMs);
   _setOutBadge();
@@ -154,7 +154,7 @@ export function cycleFadeOut() {
 }
 
 /**
- * 淡入/淡出的「默认态」（增量184）：设置页「恢复所有设置」叫这一家，
+ * 淡入/淡出的「默认态」：设置页「恢复所有设置」叫这一家，
  * 而不是把 fadeInMs/fadeOutMs 抄进重置清单（158 的规矩：替别人写默认值必然漏项或漂移）。
  * 档位表第一档就是「关」，默认值取 FADE_STEPS[0] —— 不再抄一份 0。
  */

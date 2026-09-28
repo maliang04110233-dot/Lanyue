@@ -1,5 +1,5 @@
 /**
- * 本地曲库行右键菜单构建（增量83）
+ * 本地曲库行右键菜单构建
  *
  * 纯函数：给定歌曲行与动作回调，返回 contextMenu 条目数组（形状见
  * contextMenu.js：{icon,label,onClick} / {sep:true}）。local.js 负责

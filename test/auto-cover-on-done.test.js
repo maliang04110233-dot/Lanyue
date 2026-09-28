@@ -1,5 +1,5 @@
 /**
- * 增量94：下载完成自动嵌封面（把死开关 autoCover 做实）
+ * 下载完成自动嵌封面（把死开关 autoCover 做实）
  *
  * 观察 queue-updated 的新完成行：read-local-metadata 探测文件已有封面则跳过
  * （零盲写），否则 fetch-online-cover 取 data URL → update-id3-cover 嵌入。
@@ -127,7 +127,7 @@ test('开关行为 + 失败静默 + 接线钉桩：pref=false 全程零调用；
   assert.match(APP_JS, /import '\.\/autoCoverOnDone\.js';/);
   assert.match(APP_JS, /if \(typeof window\.autoCoverObserve === 'function'\) window\.autoCoverObserve\(queue\);/);
   assert.match(HTML, /下载完成后自动获取封面嵌入音频文件（已有封面不覆盖）/);
-  // 语言包同步（增量93 曾漏改词典，切语言会把旧文案盖回来）
+  // 语言包同步（曾漏改词典，切语言会把旧文案盖回来）
   const ZH = fs.readFileSync(path.join(__dirname, '../src/renderer/js/lang/zh.json'), 'utf8');
   assert.match(ZH, /"settings\.general\.autoLyric": "下载完成后自动获取歌词存为同目录 \.lrc（已有歌词不覆盖）"/);
   assert.match(ZH, /"settings\.general\.autoCover": "下载完成后自动获取封面嵌入音频文件（已有封面不覆盖）"/);

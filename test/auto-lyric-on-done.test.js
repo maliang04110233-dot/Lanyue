@@ -1,5 +1,5 @@
 /**
- * 增量93：下载完成自动补歌词存 .lrc（把死开关 autoLyric 做实）
+ * 下载完成自动补歌词存 .lrc（把死开关 autoLyric 做实）
  *
  * 观察 queue-updated 的新完成行：已有歌词（sidecar/嵌入）跳过，
  * 否则 get-lyrics 取词 write-local-lrc 落盘。全程复用现有通道。

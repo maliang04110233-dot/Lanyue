@@ -46,7 +46,7 @@ function register() {
     if (!safePath) {
       return { success: false, error: '路径不在允许的下载目录内' };
     }
-    // 存下「相对下载目录」的片段：下载时按它建子目录（增量169 之前模板只存不用，
+    // 存下「相对下载目录」的片段：下载时按它建子目录（f5f5a08 之前模板只存不用，
     // 设置页的「使用中」是句空话）。相对而不是绝对，用户换下载目录时模板才跟得上。
     const subpath = subpathFromAbsolute(safePath, root);
     template = { ...template, path: safePath, subpath: subpath === null ? '' : subpath };

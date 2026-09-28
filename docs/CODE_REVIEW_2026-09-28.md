@@ -70,7 +70,7 @@
 
 这是本次复审最需要决策的一项。
 
-`build/config.cjs:117` 设置了 `verifyUpdateCodeSignature: true`，注释也写明了理由之重：「配合第三方镜像兜底（ghproxy / gh.ddlc），等于把更新包由谁提供」的信任根交给中间人。增量 209 的提交信息把这一项列为 **P0**。**但实测这条防线目前是空转的**：
+`build/config.cjs:117` 设置了 `verifyUpdateCodeSignature: true`，注释也写明了理由之重：「配合第三方镜像兜底（ghproxy / gh.ddlc），等于把更新包由谁提供」的信任根交给中间人。674634a 的提交信息把这一项列为 **P0**。**但实测这条防线目前是空转的**：
 
 证据链三条，互相印证：
 
@@ -84,7 +84,7 @@
 
 根因：`build/config.cjs` 与 `package.json` 中均无 `certificateFile` / `certificateSubjectName` / `signtool` 等签名配置，安装包未做代码签名，因此 electron-builder 不会写入 `publisherName`，`verifyUpdateCodeSignature` 这个开关就没有可校验的对象。
 
-**影响**：当前状态下，即便开关为 `true`，镜像 feed 或链路被劫持仍可让应用静默接受并安装未签名的更新包 —— 增量 209 声称已关闭的 P0 风险实际仍然敞开。同时「未签名安装包」本身也会触发 SmartScreen 警告，影响分发体验。
+**影响**：当前状态下，即便开关为 `true`，镜像 feed 或链路被劫持仍可让应用静默接受并安装未签名的更新包 —— 该 P0 风险（674634a 声称已关闭）实际仍然敞开。同时「未签名安装包」本身也会触发 SmartScreen 警告，影响分发体验。
 
 **处置建议（三选一，需明确记录结论）**：
 - **A（推荐，若长期分发）**：购置代码签名证书，配置 `win.certificateFile`/`certificateSubjectName`。签名后 `publisherName` 会自动进入 `app-update.yml`，开关才真正生效。

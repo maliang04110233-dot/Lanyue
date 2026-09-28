@@ -17,7 +17,7 @@
  *
  * 退出码：0 = 排除项仍安全；1 = 发现某个排除项被实际 require 了（必须处理）
  *
- * 为什么本文件能被 require（增量223）：顶层原本就 `process.exit(main())`，测试
+ * 为什么本文件能被 require：顶层原本就 `process.exit(main())`，测试
  * require 它会把自己一起干掉 —— 于是判据永远没有自测。191 立的那条律
  * 「扫描器必须自带自测」到本文件为止都没兑现过。现在退出码只在
  * `require.main === module` 时才交出去，纯函数照常导出给
@@ -161,7 +161,7 @@ function pkgOf(request, parent) {
   if (typeof request !== 'string' || request === '\0electron-stub') return null;
   // node: 前缀必须先摘掉再查内建表：Module.builtinModules 里只有 'path'，
   // 没有 'node:path'，漏了这一步会把 node:http / node:fs 之类的内建模块
-  // 原样当成第三方包报进「源码静态引用」清单（增量223 自测时实测到）。
+  // 原样当成第三方包报进「源码静态引用」清单（自测时实测到）。
   if (Module.builtinModules.includes(request)
     || Module.builtinModules.includes(request.replace(/^node:/, ''))) return null;
   if (request.startsWith('.')) {
@@ -348,7 +348,7 @@ function main() {
 }
 
 // 判据以纯函数形态导出给 test/dead-deps-scanner.test.js；退出码只在「被当脚本跑」
-// 时交出去（增量223，见文件头）—— 否则测试 require 本文件会把自己一起 process.exit 掉。
+// 时交出去（见文件头）—— 否则测试 require 本文件会把自己一起 process.exit 掉。
 module.exports = { codeMask, pkgOf, staticRefsIn, excludedPackages, runtimePackages };
 
 if (require.main === module) process.exit(main());

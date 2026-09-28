@@ -1,5 +1,5 @@
 /**
- * 增量122：本地曲库行「音质徽标」—— qualityBadge 纯函数 + 接线钉
+ * 本地曲库行「音质徽标」—— qualityBadge 纯函数 + 接线钉
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

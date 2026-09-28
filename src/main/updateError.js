@@ -19,7 +19,7 @@
  */
 'use strict';
 
-// 两支正则的家在 src/shared/netClass.js（增量219）：同一判据在更新器、传输层、
+// 两支正则的家在 src/shared/netClass.js：同一判据在更新器、传输层、
 // 队列终态三处各写一遍必然漂，这里只是消费方 —— 迁移前后 isNetworkFailure 的口径一字未动。
 const { isTlsFailure, isTransportFailure, messageOf } = require('../shared/netClass');
 

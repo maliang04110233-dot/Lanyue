@@ -453,7 +453,7 @@ function normalizeLyrics(lyrics) {
 }
 
 /**
- * 组装 music_generation 请求体（增量213）
+ * 组装 music_generation 请求体
  *
  * 文档里的 GenerateMusicReq 只有：model / prompt / lyrics / stream /
  * output_format / audio_setting / aigc_watermark / lyrics_optimizer /
@@ -515,7 +515,7 @@ function buildMusicRequestBody(params = {}) {
 async function generateMusic(params, callOptions = {}) {
   const { apiKey, onProgress } = params;
 
-  // 请求体口径全在 buildMusicRequestBody（增量213 收口，便于离线断言）
+  // 请求体口径全在 buildMusicRequestBody（收口，便于离线断言）
   const body = buildMusicRequestBody(params);
 
   if (onProgress) onProgress({ status: 'submitting', percent: 10 });

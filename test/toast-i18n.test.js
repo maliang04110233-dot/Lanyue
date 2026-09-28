@@ -1,5 +1,5 @@
 /**
- * 增量191 守护：用户反馈文案必须走词典（英文界面不再整片漏中文）
+ * 守护：用户反馈文案必须走词典（英文界面不再整片漏中文）
  *
  * 来龙去脉（实测数据，非推测）：
  *   渲染层此前 **没有任何一处** 直接调用 t('…')（grep 实锤：src/renderer/js/**.js 里
@@ -19,7 +19,7 @@
  *      首个实参里，剥掉 t(...) 之后仍含 CJK 字符串字面量"。台账与实际逐字相等 ——
  *      多一处新欠账要改台账，少一处欠账也要改台账，进度与倒退都藏不住。
  *      本轮落地时实跑 43 个文件 / 494 处。
- *   D3 词典侧双向对账（增量189 的教训：单向子集钉等于没守）：
+ * D3 词典侧双向对账（974fe2f 的教训：单向子集钉等于没守）：
  *      用到的 toast.* 键必须中英齐备、译文不得照抄中文、{占位符} 两边必须同集合；
  *      反过来词典里的 toast.* 键必须真有人按键读，没读的逐条记进 ORPHANS 台账。
  *   D4 透传文案台账（PASSTHROUGH）：判据⑤那一类"中文不在 toast 调用的实参里、而是别处
@@ -27,7 +27,7 @@
  *      追到的三个（queueCopy.js / playError.js / fallbackNotice.js）单独记台账并逐字对账 ——
  *      LEDGER 看不见它们（那里没有反馈调用），不另立一张表就是"台账清零、界面照旧漏中文"。
  *
- * 扫描器口径（与增量189 同律）：
+ * 扫描器口径（与974fe2f 同律）：
  *   ① 先 stripComments —— 说明文字里举例提到 showToast('中文') 不算欠账（否则自己的
  *      注释会把自己打红，本文件头部就是一例）；
  *   ② 只有**字符串字面量**里的 CJK 算硬编码，`showToast(t('toast.x'))`、
@@ -361,13 +361,13 @@ test('扫描器覆盖面：被纳管的文件确实在渲染层', () => {
 const CONQUERED = [
   'src/renderer/js/app.js',
   'src/renderer/js/toast.js',
-  // 增量194 按 LEDGER 收编的第一个文件（43 处 → 0，同时接上 17 条早就为它写好的词条）
+  // 按 LEDGER 收编的第一个文件（43 处 → 0，同时接上 17 条早就为它写好的词条）
   'src/renderer/js/views/settings.js',
-  // 增量203 按 LEDGER 收编的第二个视图文件（30 处 → 0）：一次还完整文件，不留半截
+  // 按 LEDGER 收编的第二个视图文件（30 处 → 0）：一次还完整文件，不留半截
   'src/renderer/js/views/download.js',
-  // 增量211 按 LEDGER 收编的第三个视图文件（38 处 → 0）
+  // 按 LEDGER 收编的第三个视图文件（38 处 → 0）
   'src/renderer/js/views/ai-music.js',
-  // 增量217 按 LEDGER 收编的第四个视图文件（22 处 → 0）
+  // 按 LEDGER 收编的第四个视图文件（22 处 → 0）
   'src/renderer/js/views/subscriptions.js',
 ];
 
@@ -423,7 +423,7 @@ const T_SHADOW_PATTERNS = [
 ];
 
 /**
- * 收编过的视图文件（都在 views/ 下，`'../i18n.js'` 相对路径同形）。增量203 起把上面那枚
+ * 收编过的视图文件（都在 views/ 下，`'../i18n.js'` 相对路径同形）。ed2fad6 起把上面那枚
  * settings.js 专用钉改成按表循环：同一判据不许为第二个文件抄一份（192 口径，一条规则一个门禁），
  * 否则收编到第五个文件时就有五条会各自腐烂的近似测。
  */
@@ -440,7 +440,7 @@ test('已收编视图文件的取词走 i18n.js 的 t，且文件内没有名为
     const code = stripComments(src);
     assert.match(src, /import\s*\{[^}]*\bt\b[^}]*\}\s*from\s*'\.\.\/i18n\.js'/,
       `${rel} 应静态 import { t } from '../i18n.js'（视图层不许自己攒词典）`);
-    assert.ok(!/window\.t\s*\(/.test(code), `${rel} 不许留 window.t 的旁路（同一事实两个家，见增量191）`);
+    assert.ok(!/window\.t\s*\(/.test(code),       `${rel} 不许留 window.t 的旁路（同一事实两个家）`);
     const shadows = [];
     for (const [re, what] of T_SHADOW_PATTERNS) {
       let m;
@@ -505,7 +505,7 @@ const WIRING_194 = {
 };
 
 /**
- * 增量203（download.js 收编）的接线对账，家法同 WIRING_194：值抄在这里当锚，
+ * （download.js 收编）的接线对账，家法同 WIRING_194：值抄在这里当锚，
  * 键值配错（把「移动失败」挂到 dlMoveBlocked 上）会在这一枚红，而不是红到用户屏幕上。
  * 表里既有新建的 toast.dl*，也有**复用**的三条老词条 —— 复用同样需要钉：
  * 那三条的值是不是这句中文，只有抄下来才知道接没接错线。
@@ -546,7 +546,7 @@ const WIRING_203 = {
 };
 
 /**
- * 增量217（subscriptions.js 收编）的接线对账，家法同 WIRING_194 / 203。
+ * （subscriptions.js 收编）的接线对账，家法同 WIRING_194 / 203。
  *
  * 复用一栏这次格外长（7 条），因为订阅页的"入队结果"本来就是全应用同一件事：
  * 「已加入 N 首 + 跳过段」的家在 app.js（批量入队出口），逐首入队的家在
@@ -588,7 +588,7 @@ const WIRING_217 = {
  *      同一件事的两句近义，收成一家；
  *   ③ 批量加入失败那句与 toast.batchAddFailed 逐字相等，本来就该按键读。
  */
-test('增量217 订阅页不再自造入队结果的第二套说法', () => {
+test(' 订阅页不再自造入队结果的第二套说法', () => {
   const code = stripComments(read('src/renderer/js/views/subscriptions.js'));
   const gone = [
     ['已在队列中', '逐首入队预检应读 toast.queueDup（②）'],
@@ -607,14 +607,14 @@ test('增量217 订阅页不再自造入队结果的第二套说法', () => {
  * 接错线照样一路绿灯（实测：把 'toast.enqueueFailed' 从表里删掉，前面所有钉都还绿）。
  * 反向也钉：表里留着文件已经不读的键，说明表和代码脱钩了。
  */
-test('增量217 的对账表与订阅页读到的键恰好一一对应（漏钉＝那条句子没锚，多钉＝表已脱钩）', () => {
+test('88d387e 的对账表与订阅页读到的键恰好一一对应（漏钉＝那条句子没锚，多钉＝表已脱钩）', () => {
   const used = keysUsedIn('src/renderer/js/views/subscriptions.js').sort();
   assert.deepStrictEqual(used, Object.keys(WIRING_217).sort(),
     '订阅页按键读的句子与 WIRING_217 不等。实读=' + JSON.stringify(used));
 });
 
 /**
- * 增量220（批量加歌汇总三段）的接线对账，家法同 WIRING_194 / 203 / 217：值抄在这里当锚。
+ * （批量加歌汇总三段）的接线对账，家法同 WIRING_194 / 203 / 217：值抄在这里当锚。
  *
  * 为什么不并进 WIRING_194 那张表、也不直接并进 CONQUERED：views/playlist.js 只是
  * **局部**收编（只收了这一处汇总串的三段），整个文件还剩 47 处 CJK 字面量（见 PASSTHROUGH）。
@@ -622,7 +622,7 @@ test('增量217 的对账表与订阅页读到的键恰好一一对应（漏钉�
  * 键值配错（把「失败 N 首」挂到 plBatchSkipped 上）一路绿灯到用户屏幕上。
  *
  * 三条里的第一条是**复用**不是新建：toast.batchQueued 的家在 app.js 的批量入队出口
- * （增量217 已记过这个复用），歌单页是第二个消费方 —— 同一事实只许一个家。
+ * （已记过这个复用），歌单页是第二个消费方 —— 同一事实只许一个家。
  */
 const WIRING_220 = {
   'toast.batchQueued': '已加入 {count} 首{extra}',
@@ -889,7 +889,7 @@ test('views/playlist.js 归零 LEDGER 后仍如实进 PASSTHROUGH（"还剩多�
  * 于是这五个键一度谁都不管：新写一个 zh 键忘了 en，英文界面上就印出键名 `toast.plBatchSkipped`。
  * 局部收编必须自带一枚"这几个键两边齐"的钉，否则就是覆盖盲区。
  */
-test('增量220 批量加歌汇总的五个键中英齐备、占位符对齐、译文是真英文', () => {
+test(' 批量加歌汇总的五个键中英齐备、占位符对齐、译文是真英文', () => {
   const bad = [];
   for (const k of Object.keys(WIRING_220)) {
     if (!(k in zh)) { bad.push(`${k}: zh 缺键（英文界面会印出键名）`); continue; }
@@ -925,7 +925,7 @@ function keysUsedInApp() {
 /**
  * 取词调用的名字清单。
  *
- * 增量191 之前"取词只有一个拼法 `t('键')`"，判据可以硬到只认 t(。
+ * 45838e3 之前"取词只有一个拼法 `t('键')`"，判据可以硬到只认 t(。
  * 之后取词函数可以按参数注入（toast.js 收到的就叫 translate，与 listAccess.js / home.js 的
  * term 同一约定），静态签名不再是编译期保证，判据只能退回名字清单：
  * 新引入一个注入名就必须同时进这里 —— 漏了的那一条接线会被词典侧当成孤儿（本轮实测就是这么炸出来的：
@@ -965,19 +965,19 @@ test('用到的每个键都中英齐备', () => {
 });
 
 /**
- * 词典侧的"没人按键读"台账（增量189 的幽灵键病，这次长在语言包上）。
+ * 词典侧的"没人按键读"台账（974fe2f 的幽灵键病，这次长在语言包上）。
  *
  * 实测发现：zh/en 里早就挂着 34 条 `toast.*` 词条（某次 i18n 迁移写了一半就停了），
  * 而渲染层对 t() 的调用数是 **0** —— 全部没人按键读，只能靠 translateMessage 的
  * 值匹配撞运气。本轮 app.js + toast.js 消费掉 47 条（含新增），剩下的记在这里。
  *
- * 增量194 把 settings.js 接上线，吃掉了这张表里的 17 条（probeDone / cookieSaved /
+ * 把 settings.js 接上线，吃掉了这张表里的 17 条（probeDone / cookieSaved /
  * clearFailed / cookieCleared / template* / cache* / reset* / export* / importFailed ——
- * 它们本来就是从 settings.js 抄进词典的，只是那次抄完没接线）。增量196 接上 importConfirm +
- * importSuccess（破坏性覆盖加确认守卫顺带消孤儿）。增量197 接上 search.js handleLinkInput 的
+ * 它们本来就是从 settings.js 抄进词典的，只是那次抄完没接线）。 接上 importConfirm +
+ * importSuccess（破坏性覆盖加确认守卫顺带消孤儿）。 接上 search.js handleLinkInput 的
  * linkShort / linkRecognized / linkUnsupported / linkFailed（链接识别四处反馈）。
  *
- * 增量200 清零收官：alreadyDownloaded / alreadyDownloadedAt / redownload 接上 utils.js 的
+ * 清零收官：alreadyDownloaded / alreadyDownloadedAt / redownload 接上 utils.js 的
  * showRedownloadToast（一句"已下载过 + 仍要下载"就吃掉三条），queueRestored 接上
  * player-sync.js（顺带给两边补 {count} —— 原值不含首数，接上去会说谎），
  * loading / saved 全仓零消费方（既无按键调用也无 data-i18n，grep 只命中本测试名单）
@@ -995,7 +995,7 @@ test('toast.* 孤儿词条与实际逐字相等（接线一个少一个，新写
   const actualEn = Object.keys(en).filter((k) => k.startsWith('toast.') && !used.has(k)).sort();
   assert.deepStrictEqual(actual, ORPHANS,
     'zh 侧孤儿不符，实跑=' + JSON.stringify(actual)
-    + '\n新增词条必须同时有消费方（增量189：白名单键须与消费方同一次落地）；接上线的把名字从表里删掉。');
+    + '\n新增词条必须同时有消费方（白名单键须与消费方同一次落地）；接上线的把名字从表里删掉。');
   assert.deepStrictEqual(actualEn, ORPHANS, 'en 侧孤儿与 zh 侧不一致：' + JSON.stringify(actualEn));
 });
 
@@ -1071,7 +1071,7 @@ test('app.js 的取词走 i18n.js 的 t（不许自己攒一份词典或走 wind
 });
 
 /**
- * 增量191 踩出来的坑，必须留哨兵：**能被 node 测试 import 的文件，图里不许有 JSON import**。
+ * 45838e3 踩出来的坑，必须留哨兵：**能被 node 测试 import 的文件，图里不许有 JSON import**。
  *
  * 来龙去脉：给 toast.js 加了一行 `import { t } from './i18n.js'` 之后，i18n.js 的语言包
  * JSON import 就进了所有依赖 toast.js 的测试图（实跑里 toast-timing.test.js 整个文件连坐炸红：
@@ -1132,7 +1132,7 @@ test('showDownloadError 的形参与唯一调用方实参数量对齐（取词�
 
 /**
  * 零新 IPC：翻译是渲染层-local。
- * ⚠️ i18n.js 本来就调 api.getPref/setPref 来**记住语言选择**（增量177 那条线），
+ * ⚠️ i18n.js 本来就调 api.getPref/setPref 来**记住语言选择**（66ac646 那条线），
  *    那是既有通道、既有职责，不是本钉要防的东西 —— 防的是"多一个通道"，
  *    所以判据取用过的 api 方法名集合，与今日快照逐字相等。
  */
@@ -1160,7 +1160,7 @@ test('translateMessage 仍作为存量兜底在位（本轮没把它抽走）', 
   assert.match(code, /translateMessage/, 'toast.js 仍应对未接词典的存量文案保留值匹配兜底');
 });
 
-test('importConfig 是破坏性覆盖，IPC 前必须有 askConfirm（增量196）', () => {
+test('importConfig 是破坏性覆盖，IPC 前必须有 askConfirm', () => {
   const src = read('src/renderer/js/views/settings.js');
   const fn = src.slice(src.indexOf('async function importConfig()'));
   const confirmIdx = fn.indexOf('askConfirm');
@@ -1170,19 +1170,19 @@ test('importConfig 是破坏性覆盖，IPC 前必须有 askConfirm（增量196�
   assert.ok(confirmIdx < invokeIdx, '确认必须在 IPC 调用之前');
 });
 
-test('importConfig 的成功/失败 toast 走词典不透传中文（增量196 消 importSuccess 孤儿）', () => {
+test('importConfig 的成功/失败 toast 走词典不透传中文（消 importSuccess 孤儿）', () => {
   const src = read('src/renderer/js/views/settings.js');
   const fn = src.slice(src.indexOf('async function importConfig()'));
   assert.ok(!/['"`]\u2705\s*['"`]\s*\+/.test(fn) && !/["'`]\u274c\s*["'`]\s*\+/.test(fn),
     'importConfig 内不应再拼 emoji + 主进程中文字面量（走 t() 取词典整句）');
 });
 
-test('toast.importConfirm 与 toast.importSuccess 不再是孤儿（增量196 接线兑现）', () => {
+test('toast.importConfirm 与 toast.importSuccess 不再是孤儿（接线兑现）', () => {
   assert.ok(!ORPHANS.includes('toast.importConfirm'), 'importConfirm 已被 settings.js 接线，应从 ORPHANS 删除');
   assert.ok(!ORPHANS.includes('toast.importSuccess'), 'importSuccess 已被 settings.js 接线，应从 ORPHANS 删除');
 });
 
-test('search.js 的 handleLinkInput 四处链接反馈全走词典（增量197 收编）', () => {
+test('search.js 的 handleLinkInput 四处链接反馈全走词典（919c187 收编）', () => {
   const src = read('src/renderer/js/views/search.js');
   const fn = src.slice(src.indexOf('async function handleLinkInput('));
   assert.ok(fn.length > 50, 'handleLinkInput 锚还在');
@@ -1197,13 +1197,13 @@ test('search.js 的 handleLinkInput 四处链接反馈全走词典（增量197 �
   assert.ok(!/showToast\('链接识别：'/.test(fn), '失败 toast 应走 t() 只把主进程 error 当变量透传');
 });
 
-test('toast.link* 四条不再是孤儿（增量197 接线兑现）', () => {
+test('toast.link* 四条不再是孤儿（接线兑现）', () => {
   for (const k of ['toast.linkShort', 'toast.linkRecognized', 'toast.linkUnsupported', 'toast.linkFailed']) {
     assert.ok(!ORPHANS.includes(k), `${k} 已被 search.js 接线，应从 ORPHANS 删除`);
   }
 });
 
-test('两条无人消费的死词条已删除：toast.loading / toast.saved 不该还躺在词典里（增量200）', () => {
+test('两条无人消费的死词条已删除：toast.loading / toast.saved 不该还躺在词典里', () => {
   // 实测（改动前）：src/ 与 index.html 里没有任何 showToast('加载中…')/showToast('已保存')，
   // 也没有 data-i18n="toast.loading"/"toast.saved" —— 全仓 grep 只命中本测试的名单。
   // 留着它们等于让「已保存」这种短值去抢「已保存歌单…」的长句前缀（值匹配的雷，191 记过）。
@@ -1213,7 +1213,7 @@ test('两条无人消费的死词条已删除：toast.loading / toast.saved 不�
   }
 });
 
-test('utils.js 的「已下载过 / 仍要下载」三句走词典，反馈点不留中文字面量（增量200）', () => {
+test('utils.js 的「已下载过 / 仍要下载」三句走词典，反馈点不留中文字面量', () => {
   const src = read('src/renderer/js/utils.js');
   const fn = src.slice(src.indexOf('function showRedownloadToast('));
   assert.ok(fn.length > 50, 'showRedownloadToast 锚还在');
@@ -1230,7 +1230,7 @@ test('utils.js 的「已下载过 / 仍要下载」三句走词典，反馈点�
     'showRedownloadToast 内不应再拼中文整句（值只许留在词典一家）');
 });
 
-test('player-sync.js 恢复队列 toast 走词典并带上首数（增量200）', () => {
+test('player-sync.js 恢复队列 toast 走词典并带上首数', () => {
   const src = read('src/renderer/js/player-sync.js');
   assert.ok(/t\(\s*'toast\.queueRestored'\s*,\s*\{[^}]*\bcount\b/.test(src),
     '恢复队列 toast 应走 t(\'toast.queueRestored\', { count }) —— 原模板串英文界面必漏中文');
@@ -1240,7 +1240,7 @@ test('player-sync.js 恢复队列 toast 走词典并带上首数（增量200）'
   assert.ok(!/^\s*import\s/m.test(src), 'player-sync.js 仍必须零 import（桥走 window.t 的本模块别名）');
 });
 
-test('toast.queueRestored 两边都得有 {count}（把首数说实，不是"恢复了"含糊带过）（增量200）', () => {
+test('toast.queueRestored 两边都得有 {count}（把首数说实，不是"恢复了"含糊带过）', () => {
   assert.ok(/\{count\}/.test(zh['toast.queueRestored']), 'zh 值缺 {count} 占位符');
   assert.ok(/\{count\}/.test(en['toast.queueRestored']), 'en 值缺 {count} 占位符');
 });

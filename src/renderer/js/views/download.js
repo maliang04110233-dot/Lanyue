@@ -21,7 +21,7 @@ import { netFailedTasks } from '../netRecovery.js';
 // 展开/折叠与队列重排住在同一行工具条上，up/down 画的是「带竖杆 + 箭头 + 底横线」的
 // 上下移箭头，语义是「挪动」；折叠三角没有竖杆也没有底横线，只有一个角，语义是
 // 「显隐」。两者混用时用户看到的是「第 3 个箭头」，而按钮点下去干的是完全另一件事
-// （增量223 修的就是这个：展开态曾错用 up，折叠态曾错用 down，与「点它会做什么」
+// （修的就是这个：展开态曾错用 up，折叠态曾错用 down，与「点它会做什么」
 // 正好相反，撞车的是同行的上移/下移/置顶三枚按钮）。test/dl-fold-chevron.test.js 钉住。
 const DL_ICONS = {
   play:    '<path d="M6 4.5l12 7.5-12 7.5z" fill="currentColor"/>',
@@ -69,7 +69,7 @@ function _cacheDlDom() {
 
 let _dlFilter = 'all';         // 'all' | 'active' | 'done' | 'error'
 let _dlKeyword = '';           // 队列关键词过滤（与状态筛选 AND 叠加）
-let _dlGroupMode = false;      // 按平台分组显示（增量121）
+let _dlGroupMode = false;      // 按平台分组显示
 let _dlPlatform = '';          // 只看单个平台（空=全部，与状态/关键词 AND 叠加）
 let _dlCollapsed = new Set();  // 分组模式下已折叠的平台键
 let _dlSelectionMode = false;
@@ -543,7 +543,7 @@ async function toggleQueuePause() {
   }
 }
 
-// ── 网络状态：断网横幅 + 复网自动续跑（增量219）────────────
+// ── 网络状态：断网横幅 + 复网自动续跑────────────
 // 引擎给断网/超时的失败回了码（NETWORK_ERROR / NETWORK_TIMEOUT），这一页才第一次问得出
 // 「哪些红条是在等网络的」。断网时说出来，复网时替用户把它们重新排队 —— 那几行不必
 // 再一条条手点。非网络类失败（需 VIP / 版权受限 / 磁盘满）一条都不碰：再跑一遍还是同样失败。

@@ -5,7 +5,7 @@
  * node --test 也起不动 BrowserWindow。沿用 eq-behaviour/platform-contract 的手法：
  * 扫描源码文本断言结构（所有扫描前 stripComments，注释里的说明不算代码证据）。
  *
- * 被守卫的三个窗口（增量209 安全审计引入的 M1/M3 守卫）：
+ * 被守卫的三个窗口（安全审计引入的 M1/M3 守卫）：
  *   1. 主窗口 index.js    —— will-navigate 白名单（包内 file: 或同源 http）+ setWindowOpenHandler 一律 deny
  *   2. 登录子窗口 loginWindow.js —— will-navigate 限 cookieDomains 域 + setWindowOpenHandler 限域
  *   3. 二级窗口 ipc/window.js（桌面歌词 / 迷你播放器）—— will-navigate 一律 preventDefault + setWindowOpenHandler 一律 deny

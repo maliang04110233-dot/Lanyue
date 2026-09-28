@@ -1,5 +1,5 @@
 /**
- * 本地曲库「按歌手/专辑分组」弹层（增量68/72）
+ * 本地曲库「按歌手/专辑分组」弹层（/72）
  *
  * groupArtists / groupAlbums 为纯函数（node 直测）；弹层沿用 historyTrend 的
  * edit-overlay + createElement 模式（textContent 填行，无 innerHTML 注入面）。
@@ -52,7 +52,7 @@ export function groupAlbums(songs) {
 }
 
 /**
- * 封面墙卡片分组（增量212）：按专辑聚合，取组内第一张非空封面，
+ * 封面墙卡片分组：按专辑聚合，取组内第一张非空封面，
  * 收集去重后的歌手名。纯函数，node 直测。
  * @param {Array} songs 本地曲库歌曲（{album, artist, cover} 宽松取数）
  * @returns {Array<{album:string,count:number,artists:string,cover:string|null}>}
