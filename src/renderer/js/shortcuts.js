@@ -4,6 +4,8 @@
  * ES Module — export 供其他模块 import，同时保留 window 全局供 HTML onclick
  */
 
+import { pickDeleteScope } from './deleteScope.js';
+
 (function setupGlobalShortcuts() {
   document.addEventListener('keydown', handleKey);
 })();
@@ -60,6 +62,23 @@ function handleKey(e) {
       && window.isTabPageVisible?.('searchPage')
       && !_anyModalOpen()) {
     if (window.searchListKey(e)) return;
+  }
+
+  // ── Delete：对「当前在场且确有勾选」的列表执行它自己的批量移除 ──
+  // 与点该列表「🗑 移除」按钮走的是同一个函数（确认弹窗/toast/选态清理一律不另写）。
+  // 三道拦截缺一不可：
+  //   ① 上面的 inInput 早退 + 此处 !ctrlOrCmd —— 输入框里的 Delete 是删字符不是删行；
+  //   ② 作用域判据（deleteScope.js）—— 列表得处于多选模式且确有勾选，否则这键不该有动作；
+  //   ③ _anyModalOpenExcept —— 压在本列表之上的弹窗（确认框/命令面板/编辑器）开着时，
+  //      不动底下的行。第 ③ 道是 Delete 独有的：快捷键帮助与搜索页导航本来就要求
+  //      「无任何浮层」，而歌单详情弹层本身就是列表的容器，照抄那条判据等于永远失灵。
+  if ((e.key === 'Delete' || e.key === 'Del') && !ctrlOrCmd) {
+    const scope = pickDeleteScope();
+    if (scope && !_anyModalOpenExcept(scope.modalId)) {
+      e.preventDefault();
+      scope.run();
+    }
+    return;
   }
 
   // ── Ctrl/Cmd 组合快捷键 ──
@@ -162,6 +181,18 @@ function _anyModalOpen() {
   return !!document.querySelector('[data-modal]:not(.hidden)');
 }
 
+/**
+ * 除了「本列表自己所在的那个浮层」之外，是否还压着别的浮层。
+ *
+ * Delete 需要的是这个问法：歌单详情就是一个 data-modal，拿 _anyModalOpen 一票否决
+ * 会让 Delete 在唯一该起作用的地方永远失灵；而「确认框/命令面板盖在上面时还能删底下的行」
+ * 同样是错的。故按 id 排除自己，其余浮层一律拦。
+ */
+function _anyModalOpenExcept(id) {
+  const mine = typeof id === 'string' ? id : '';
+  return [...document.querySelectorAll('[data-modal]:not(.hidden)')].some((m) => m.id !== mine);
+}
+
 function closeActiveModal() {
   // 稳定排序：pri 降序；querySelectorAll 已按 DOM 序返回，同优先级保持模板序
   const closables = [...document.querySelectorAll('[data-modal-close]:not(.hidden)')].sort(
@@ -247,6 +278,11 @@ export function showShortcutsHelp() {
           <div class="shortcut-row"><span>下载高亮歌曲</span><kbd>Enter</kbd></div>
         </div>
         <div class="shortcut-group">
+          <div class="shortcut-group-title">列表多选</div>
+          <div class="shortcut-row"><span>连选：从上次单点的行到本次点击（歌单/播放队列/下载队列/本地曲库）</span><kbd>Shift</kbd>+<kbd>点击</kbd></div>
+          <div class="shortcut-row"><span>批量移出勾选行（等同于点该列表的「🗑 移除」，确认照常弹）</span><kbd>Delete</kbd></div>
+        </div>
+        <div class="shortcut-group">
           <div class="shortcut-group-title">播放控制</div>
           <div class="shortcut-row"><span>播放/暂停</span><kbd>Space</kbd></div>
           <div class="shortcut-row"><span>下一首</span><kbd>Ctrl</kbd>+<kbd>→</kbd></div>
@@ -270,4 +306,6 @@ export function showShortcutsHelp() {
 window.showShortcutsHelp = showShortcutsHelp;
 
 // 浮层注册表契约的测试面：只暴露、不改行为——行为契约见 test/modal-registry.test.js
-export { _anyModalOpen, closeActiveModal };
+// _anyModalOpenExcept 一并暴露：Delete 的「上层浮层拦截」判据就长在这上面，
+// 没有测试面的浮层形状守卫等于没守（见 test/bulk-selection.test.js）。
+export { _anyModalOpen, _anyModalOpenExcept, closeActiveModal };

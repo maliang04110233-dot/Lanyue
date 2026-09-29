@@ -88,7 +88,9 @@ test('接线钉：pq-header 双按钮、行首勾选框与模式化 onclick/拖�
   assert.ok(APP_JS.includes("import { removeQueueItem, removeQueueItemsByIdentity, dedupeQueue } from './playQueueEdit.js';"));
   assert.ok(APP_JS.includes('class="pq-sel-chk"') && APP_JS.includes('_pqSel.has(s)'), '行首勾选框按引用回显');
   assert.ok(APP_JS.includes("draggable=\"' + (_pqSelMode ? 'false' : 'true')"), '多选态禁拖拽防误合');
-  assert.ok(APP_JS.includes("_pqSelMode ? 'togglePqSel(' + i + ')' : 'window._playQueueIdx(' + i + ')'"),
+  // ', event' 是 Shift 连选的命门：change 事件带不出 shiftKey，只有 click 传得回键盘状态，
+  // 接线详情与负向钉（禁止再退回 onchange）见 bulk-selection.test.js
+  assert.ok(APP_JS.includes("_pqSelMode ? 'togglePqSel(' + i + ', event)' : 'window._playQueueIdx(' + i + ')'"),
     '多选态点行=勾选，平时=切歌');
   assert.ok(APP_JS.includes("askConfirm(t('toast.confirmRemoveRows', { count: _pqSel.size }))") && APP_JS.includes('_pqSel.clear();'),
     '先确认后落账，提交即清选态');

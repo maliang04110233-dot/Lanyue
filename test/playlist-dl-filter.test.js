@@ -65,8 +65,9 @@ test('接线钉：详情过滤行按钮、统一视图管线、开弹层复位�
   assert.match(PL_JS, /dlBadgeHtml, dlEnsureHistoryLoaded, addDlChangeListener, dlStatusFor/);
   // 渲染与全选共用一个管线（两旧字面量都退役）
   assert.match(PL_JS, /function _plVisiblePairs\(songs\) \{/);
-  // 渲染/全选/复制曲单三处读视图都走同一管线
-  assert.equal((PL_JS.match(/_plVisiblePairs\(/g) || []).length, 4); // 定义外三处调用
+  // 渲染/全选/复制曲单/Shift 连选四处读视图都走同一管线
+  // （连选是第四个读者：区间必须按屏幕上的行序算，另写一遍筛选迟早漂出"连到没显示的行"）
+  assert.equal((PL_JS.match(/_plVisiblePairs\(/g) || []).length, 5); // 定义外四处调用
   assert.ok(!/const pairs = sortPlaylistPairs\(filterPlaylistSongs\(/.test(PL_JS), '仍有未走统一管线的 pairs 计算');
   assert.match(PL_JS, /sortPlaylistPairs\(dlFiltered, _plSortMode\)/);
   // 打开弹层复位三件套之一

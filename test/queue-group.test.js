@@ -118,8 +118,11 @@ test('applyQueueFilter 第四维 platform：与状态/关键词 AND 叠加，大
 test('接线钉：download.js 行模板只有一份，分组路径复用它', () => {
   assert.equal((DL_JS.match(/class="queue-item queue-status-/g) || []).length, 1, '行模板被复制成两份是这类重构最常见的坑');
   assert.equal((DL_JS.match(/_queueRowHtml\(s\)/g) || []).length, 3, '定义 + 平铺 + 分组三处');
-  assert.match(DL_JS, /const filtered = applyQueueFilter\(queue, _dlFilter, _dlKeyword, _dlPlatform\);/);
-  assert.match(DL_JS, /const shown = filtered\.slice\(-50\)\.reverse\(\);/);
+  // 筛选管线收进 _dlShownTasks：renderQueue 与 Shift 连选读同一个视图序，
+  // 这里钉的是"仍在筛选 + 只有一条管线"，具体收口见 bulk-selection.test.js
+  assert.match(DL_JS, /function _dlShownTasks\(queue\) \{/);
+  assert.match(DL_JS, /return applyQueueFilter\(queue, _dlFilter, _dlKeyword, _dlPlatform\)/);
+  assert.match(DL_JS, /const shown = _dlShownTasks\(queue\);/);
   // 分组分支三行钉（逐行钉 + 顺序钉，比多行 verbatim 稳）
   assert.match(DL_JS, /if \(_dlGroupMode\) \{/);
   assert.match(DL_JS, /el\.innerHTML = groupTasksByPlatform\(shown, platformLabel\)\.map\(g => _queueGroupHeaderHtml\(g\)/);

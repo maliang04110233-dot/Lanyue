@@ -33,6 +33,8 @@ import { filterByDlMode, nextPlDlMode, plDlModeLabel } from '../plDlFilter.js';
 import { dupPlaylistName, dupPlaylistPayload } from '../plDuplicate.js';
 import { toTrackLines } from '../songListText.js';
 import { copyText } from '../songShare.js';
+import { isRangeClick, rangeKeys } from '../selectionRange.js';
+import { registerDeleteScope } from '../deleteScope.js';
 
 // ── 状态 ─────────────────────────────────────────────
 let _currentPlaylistId = null;
@@ -47,6 +49,9 @@ let _playlistPlayRequestId = 0;
 // 详情弹层多选移除（会话级）。键是歌的身份（id:source），过滤/排序/重渲染不丢选中
 let _plSelMode = false;
 let _plSelKeys = new Set();
+// Shift 连选的锚点：存的也是键（理由同上）。只在单点时移动，
+// 连续 Shift 点不同行 = 从同一个锚点逐段延伸，与资源管理器一致。
+let _plSelAnchor = null;
 
 // ── 加载歌单列表 ──────────────────────────────────────
 async function loadUserPlaylists() {
@@ -260,7 +265,7 @@ function renderPlaylistDetailSongs(songs) {
   }
   const rows = pairs.map(({ song, i: idx }) => `
     <div class="song-row" data-pidx="${idx}" ondblclick="playPlaylistSong(${idx})">
-      ${_plSelMode ? `<input type="checkbox" class="pl-sel-chk" ${_plSelKeys.has(plSongKey(song)) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="togglePlSongSel(${idx})" title="勾选后可一键移出歌单" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;margin-right:6px;">` : ''}
+      ${_plSelMode ? `<input type="checkbox" class="pl-sel-chk" ${_plSelKeys.has(plSongKey(song)) ? 'checked' : ''} onclick="event.stopPropagation();togglePlSongSel(${idx}, event)" title="勾选后可一键移出歌单（Shift 连选）" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;margin-right:6px;">` : ''}
       ${reorderable ? '<span class="pl-drag-handle" draggable="true" title="按住拖动排序">⠿</span>' : ''}
       <span class="song-num" style="color:var(--neon-dim);font-size:12px;width:22px;text-align:right;flex-shrink:0;">${idx + 1}</span>
       <div class="song-info">
@@ -555,6 +560,7 @@ async function removeSongFromPlaylist(songId, source) {
 function _resetPlSel() {
   _plSelMode = false;
   _plSelKeys = new Set();
+  _plSelAnchor = null; // 换歌单/关弹层后锚点属于上一张单，留着会连出跨单的区间
   _syncPlSelBtns();
 }
 
@@ -582,16 +588,35 @@ function _syncPlSelBtns() {
 
 function togglePlBulkMode() {
   _plSelMode = !_plSelMode;
-  if (!_plSelMode) _plSelKeys = new Set();
+  if (!_plSelMode) { _plSelKeys = new Set(); _plSelAnchor = null; }
   renderPlaylistDetailSongs(_currentDetailSongs);
 }
 
-function togglePlSongSel(idx) {
+/**
+ * 勾选/取消一行；按住 Shift 时把「锚点 → 本次点击」整段并入选中态。
+ *
+ * idx 是**存储序**下标（行号显示与 playPlaylistSong 都用它），连选要的是
+ * **视图序**区间，所以先按 pairs 里的 i 找回该行在视图里的位置再算区间 ——
+ * 排序模式下两者不一致，直接拿 idx 当视图下标会连错行。
+ */
+function togglePlSongSel(idx, e) {
   const song = _currentDetailSongs[idx];
   if (!song) return;
   const k = plSongKey(song);
+  if (isRangeClick(e)) {
+    const pairs = _plVisiblePairs(_currentDetailSongs);
+    const at = pairs.findIndex((p) => p.i === idx);
+    if (at >= 0) {
+      for (const key of rangeKeys(pairs.map((p) => plSongKey(p.song)), _plSelAnchor, at)) {
+        _plSelKeys.add(key);
+      }
+      renderPlaylistDetailSongs(_currentDetailSongs);
+      return;
+    }
+  }
   if (_plSelKeys.has(k)) _plSelKeys.delete(k);
   else _plSelKeys.add(k);
+  _plSelAnchor = k;
   renderPlaylistDetailSongs(_currentDetailSongs);
 }
 
@@ -1553,3 +1578,16 @@ window.scanCrossPlaylistDupes = scanCrossPlaylistDupes;
 window.closeDedupeScanModal = closeDedupeScanModal;
 window.copyDedupeScanReport = copyDedupeScanReport;
 window.consolidateDup = consolidateDup;
+
+// ── Delete 键作用域 ────────────────────────────────────
+// run 走的就是「🗑 移除」按钮那个函数：确认弹窗、toast、选中态清理一律不另写一份。
+// modalId 声明自己属于哪个浮层，shortcuts.js 用它排除「上层还压着别的弹窗」的情况。
+registerDeleteScope({
+  id: 'playlist-detail',
+  order: 10,
+  active: () => _plSelMode
+    && !document.getElementById('playlistDetailModal')?.classList.contains('hidden'),
+  count: () => _plSelKeys.size,
+  run: () => removeCheckedFromPlaylist(),
+  modalId: 'playlistDetailModal',
+});

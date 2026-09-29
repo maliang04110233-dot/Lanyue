@@ -38,6 +38,7 @@ import { copyText } from '../songShare.js';
 import { indexOfPlaying, flashRow } from '../locatePlaying.js';
 import { groupSongsForAlbumWall, normalizeGroupKey, UNKNOWN_ALBUM } from '../artistGroups.js';
 import { t } from '../i18n.js';
+import { isRangeClick, rangeKeys } from '../selectionRange.js';
 
 // 统计/查重已拆到 local-stats.js（回调在文件末尾注入）
 import {
@@ -49,6 +50,7 @@ import {
 // ── 状态 ─────────────────────────────────────────────
 let _localSelectionMode = false;
 const _selectedLocal = new Set(); // 存 filePath
+let _localSelAnchor = null;       // Shift 连选锚点（存 filePath，与选态同身份）
 let _localVirtualScroller = null; // 虚拟滚动实例
 
 // ── 批量补封面 ────────────────────────────────────────
@@ -307,6 +309,7 @@ async function refreshLocalLibrary() {
 function enterLocalSelectionMode() {
   _localSelectionMode = true;
   _selectedLocal.clear();
+  _localSelAnchor = null;
   renderLocalSongs();
   updateLocalSelectionBar();
 }
@@ -314,20 +317,38 @@ function enterLocalSelectionMode() {
 function exitLocalSelectionMode() {
   _localSelectionMode = false;
   _selectedLocal.clear();
+  _localSelAnchor = null;
   renderLocalSongs();
   updateLocalSelectionBar();
 }
 
-function toggleLocalSelect(filePathOrEncoded, idx) {
+/**
+ * 勾选/取消一行；按住 Shift 把「锚点 → 本次点击」整段并进来。
+ *
+ * 视图序取 state.localFiltered —— 它就是渲染与「全选」用的那一份（过滤+排序后），
+ * 所以连选不可能连到没显示的行。i 传进来正是它在该视图里的下标。
+ * filePath 从编码态解出来再比对：选中态存的是明文路径。
+ */
+function toggleLocalSelect(filePathOrEncoded, idx, e) {
   // 兼容处理：新版传入 base64 编码路径，旧版传入明文路径
   const filePath = filePathOrEncoded.length > 200
     ? decodeFilePath(filePathOrEncoded) // 新版：base64 编码的路径
     : filePathOrEncoded; // 旧版：明文路径（向后兼容）
+  if (isRangeClick(e)) {
+    const order = (getState('localFiltered') || []).map((s) => s.filePath);
+    if (order.includes(filePath)) {
+      for (const p of rangeKeys(order, _localSelAnchor, idx)) _selectedLocal.add(p);
+      renderLocalSongs(); // 重新高亮
+      updateLocalSelectionBar();
+      return;
+    }
+  }
   if (_selectedLocal.has(filePath)) {
     _selectedLocal.delete(filePath);
   } else {
     _selectedLocal.add(filePath);
   }
+  _localSelAnchor = filePath;
   // 更新 checkbox 状态
   const cb = document.getElementById('localcb_' + idx);
   if (cb) cb.checked = _selectedLocal.has(filePath);
@@ -344,6 +365,7 @@ function selectAllLocal() {
 
 function deselectAllLocal() {
   _selectedLocal.clear();
+  _localSelAnchor = null; // 清空整批后，锚点指向的行已不在选态里
   renderLocalSongs();
   updateLocalSelectionBar();
 }
@@ -389,8 +411,8 @@ function _renderLocalRow(s, i) {
   return `
   <div class="${rowClass}" data-idx="${i}" tabindex="0" role="button" onclick="playLocalSong(${i})" oncontextmenu="event.preventDefault();event.stopPropagation();showLocalRowMenu(event,${i})" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border-subtle);cursor:pointer;">
     ${_localSelectionMode ? `
-    <div class="local-row-cb" onclick="event.stopPropagation();toggleLocalSelect('${encodedPath}',${i})">
-      <input type="checkbox" id="localcb_${i}" ${selected ? 'checked' : ''} onchange="event.stopPropagation();toggleLocalSelect('${encodedPath}',${i})">
+    <div class="local-row-cb" onclick="event.stopPropagation();toggleLocalSelect('${encodedPath}',${i}, event)">
+      <input type="checkbox" id="localcb_${i}" ${selected ? 'checked' : ''}>
     </div>` : ''}
     ${s.cover
       ? `<img class="local-row-cover" src="${escAttr(s.cover)}" alt="" style="width:40px;height:40px;border-radius:4px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
@@ -1607,3 +1629,20 @@ window.executeBatchRename = executeBatchRename;
 window.batchDownloadCovers = batchDownloadCovers;
 window.localCleanup = localCleanup;
 window.showLocalRowMenu = showLocalRowMenu;
+
+/* ── 工具栏下拉(分组/工具):精简常驻按钮 ─────────────── */
+function toggleTbDropdown(_evt, menuId) {
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+  const wasOpen = !menu.hidden;
+  closeTbMenus();
+  menu.hidden = wasOpen; // 原来开着→关;关着→开
+}
+function closeTbMenus() {
+  document.querySelectorAll('.tb-menu').forEach((m) => { m.hidden = true; });
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.tb-dropdown')) closeTbMenus();
+});
+window.toggleTbDropdown = toggleTbDropdown;
+window.closeTbMenus = closeTbMenus;

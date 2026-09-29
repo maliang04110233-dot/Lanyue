@@ -22,6 +22,8 @@ import { pickQueueCopyRows, queueCopyToastText } from './queueCopy.js';
 import { toTrackLines } from './songListText.js';
 import { listAccessHint, term } from './listAccess.js';
 import { copyText } from './songShare.js';
+import { isRangeClick, rangeKeys } from './selectionRange.js';
+import { registerDeleteScope } from './deleteScope.js';
 import { skeletonHtml, SKEL_ROWS } from './skeleton.js';
 import './router.js';
 
@@ -1293,9 +1295,9 @@ function renderPlayQueueUI() {
         : '<span class="pq-thumb-ph">' + NOTE_SVG + '</span>';
       const cb = _pqSelMode
         ? '<input type="checkbox" class="pq-sel-chk" ' + (_pqSel.has(s) ? 'checked ' : '')
-          + 'onclick="event.stopPropagation()" onchange="togglePqSel(' + i + ')" title="勾选后批量移出队列" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;margin:0 4px 0 2px;">'
+          + 'onclick="event.stopPropagation();togglePqSel(' + i + ', event)" title="勾选后批量移出队列（Shift 连选）" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;margin:0 4px 0 2px;">'
         : '';
-      return '<div class="pq-item' + (isCur ? ' playing' : '') + '" tabindex="0" role="button" draggable="' + (_pqSelMode ? 'false' : 'true') + '" data-pqidx="' + i + '" onclick="' + (_pqSelMode ? 'togglePqSel(' + i + ')' : 'window._playQueueIdx(' + i + ')') + '">'
+      return '<div class="pq-item' + (isCur ? ' playing' : '') + '" tabindex="0" role="button" draggable="' + (_pqSelMode ? 'false' : 'true') + '" data-pqidx="' + i + '" onclick="' + (_pqSelMode ? 'togglePqSel(' + i + ', event)' : 'window._playQueueIdx(' + i + ')') + '">'
         + cb
         + '<span class="pq-idx">' + (i + 1) + '</span>'
         + cover
@@ -1365,6 +1367,8 @@ window.dedupePlayQueue = () => {
 // ── 队列多选批量移除：选态装行对象引用，下标漂移不误伤 ──
 let _pqSelMode = false;
 const _pqSel = new Set();
+// Shift 连选的锚点：同样存行对象引用（队列无过滤视图，视图序==存储序）
+let _pqSelAnchor = null;
 
 function _syncPqSelBtns() {
   const btn = document.getElementById('pqSelBtn');
@@ -1383,15 +1387,26 @@ function _syncPqSelBtns() {
 
 window.togglePqSelMode = () => {
   _pqSelMode = !_pqSelMode;
-  if (!_pqSelMode) _pqSel.clear();
+  if (!_pqSelMode) { _pqSel.clear(); _pqSelAnchor = null; }
   renderPlayQueueUI();
 };
 
-window.togglePqSel = (idx) => {
-  const item = (getState('playQueue') || [])[idx];
+/**
+ * 勾选/取消一行；按住 Shift 把「锚点 → 本次点击」整段并进来。
+ * 队列没有过滤/排序视图，渲染序==getState('playQueue') 序，直接把队列当视图序用。
+ */
+window.togglePqSel = (idx, e) => {
+  const queue = getState('playQueue') || [];
+  const item = queue[idx];
   if (!item) return;
+  if (isRangeClick(e)) {
+    for (const it of rangeKeys(queue, _pqSelAnchor, idx)) _pqSel.add(it);
+    renderPlayQueueUI();
+    return;
+  }
   if (_pqSel.has(item)) _pqSel.delete(item);
   else _pqSel.add(item);
+  _pqSelAnchor = item;
   renderPlayQueueUI();
 };
 
@@ -1400,6 +1415,7 @@ window.removeCheckedFromQueue = async () => {
   if (!await askConfirm(t('toast.confirmRemoveRows', { count: _pqSel.size }))) return;
   const r = removeQueueItemsByIdentity(getState('playQueue') || [], getState('playIdx') || 0, _pqSel);
   _pqSel.clear();
+  _pqSelAnchor = null;
   if (!r.removed) { renderPlayQueueUI(); return; }
   setState('playQueue', r.queue);
   if (r.removedCurrent) {
@@ -1418,6 +1434,19 @@ window.removeCheckedFromQueue = async () => {
   }
   showToast(t('toast.rowsRemoved', { count: r.removed }), 'success');
 };
+
+// ── Delete 键作用域：播放队列 ─────────────────────────
+// 队列面板是浮在页面右侧的抽屉，不是 data-modal 浮层 ⇒ modalId 留空，
+// 于是「上层压着任何弹窗」时 shortcuts.js 会拦住 Delete（不给看不见的列表做批量移除）。
+// order=20：歌单详情弹层（10）开着时归它，弹层没开才轮到队列。
+registerDeleteScope({
+  id: 'play-queue',
+  order: 20,
+  active: () => _pqSelMode && _pqVisible,
+  count: () => _pqSel.size,
+  run: () => window.removeCheckedFromQueue(),
+  modalId: '',
+});
 
 // 队列多选「🎼 加歌单」：勾选行按队列原序投影成可持久行，
 // 喂 quickAddToPlaylist 既有批量链（引擎端 id+source 去重）。drop 行是

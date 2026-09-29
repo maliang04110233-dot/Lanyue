@@ -411,7 +411,8 @@ test('接线钉：queueSnapshot 的唯一写入点是队列事件回调（app.js
 
 test('接线钉：renderQueue 必须只读 queueSnapshot，不得回写', () => {
   const body = fnBodyL(stripComments(read('js', 'views', 'download.js')), 'renderQueue');
-  assert.ok(body.includes('applyQueueFilter('),
+  // 筛选收进 _dlShownTasks（连选要读同一个视图序），renderQueue 仍是它的读者
+  assert.ok(body.includes('_dlShownTasks('),
     'renderQueue 需按筛选条件渲染（哨兵缺失，钉可能已失效）');
   assert.ok(!body.includes("state.set('queueSnapshot'"),
     'renderQueue 不得写 queueSnapshot：唯一写入点是队列事件（app.js:309）。'

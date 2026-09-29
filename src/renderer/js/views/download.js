@@ -14,6 +14,8 @@ import {
   toggleGroupCollapsed, nextPlatformFilter,
 } from '../queueGroup.js';
 import { failureTagHtml, isAuthFailure } from '../diagnose.js';
+import { isRangeClick, rangeKeys } from '../selectionRange.js';
+import { registerDeleteScope } from '../deleteScope.js';
 import { netFailedTasks } from '../netRecovery.js';
 
 // ── 行内 SVG 图标（与 home.js ROW_ICONS 同范式：16px、stroke 1.7、currentColor）──
@@ -74,6 +76,7 @@ let _dlPlatform = '';          // 只看单个平台（空=全部，与状态/�
 let _dlCollapsed = new Set();  // 分组模式下已折叠的平台键
 let _dlSelectionMode = false;
 const _selectedDl = new Set(); // 存 taskId
+let _dlSelAnchor = null;       // Shift 连选锚点（存 taskId，与选态同身份）
 const _expandedDlDetails = new Set(); // 存已展开详情的 taskId
 
 // ── 筛选 ──────────────────────────────────────────────
@@ -92,6 +95,7 @@ function setDownloadFilter(f) {
 function enterDlSelectionMode() {
   _dlSelectionMode = true;
   _selectedDl.clear();
+  _dlSelAnchor = null;
   const queue = getState('queueSnapshot') || [];
   renderQueue(queue);
   updateDlSelectionBar();
@@ -100,14 +104,51 @@ function enterDlSelectionMode() {
 function exitDlSelectionMode() {
   _dlSelectionMode = false;
   _selectedDl.clear();
+  _dlSelAnchor = null;
   const queue = getState('queueSnapshot') || [];
   renderQueue(queue);
   updateDlSelectionBar();
 }
 
-function toggleDlSelect(taskId) {
+/**
+ * 视图序的**唯一**计算处：状态 × 关键词 × 平台过滤 → 最新在上、封顶 50。
+ *
+ * renderQueue 与 Shift 连选都读它。分两处各写一遍筛选是 playlist.js 头注点名过的病
+ * （「渲染/全选/任何读视图序的地方都走它」），漂出去的第一个症状就是
+ * Shift 连到了一行根本没显示的任务。
+ */
+function _dlShownTasks(queue) {
+  return applyQueueFilter(queue, _dlFilter, _dlKeyword, _dlPlatform)
+    .slice(-50).reverse();
+}
+
+/**
+ * 连选用的「当前视图序」（taskId 序列，与屏幕上看到的行序逐字一致）。
+ * 分组模式还要跟上折叠：折叠起来的组不在 DOM 里，区间不该跨过它。
+ */
+function _dlViewOrder() {
+  const shown = _dlShownTasks(getState('queueSnapshot') || []);
+  if (!_dlGroupMode) return shown.map((s) => s.taskId);
+  return groupTasksByPlatform(shown, platformLabel)
+    .filter((g) => !_dlCollapsed.has(g.key))
+    .reduce((acc, g) => acc.concat(g.tasks.map((s) => s.taskId)), []);
+}
+
+function toggleDlSelect(taskId, e) {
+  if (isRangeClick(e)) {
+    const order = _dlViewOrder();
+    const at = order.indexOf(taskId);
+    if (at >= 0) {
+      for (const id of rangeKeys(order, _dlSelAnchor, at)) _selectedDl.add(id);
+      const queue = getState('queueSnapshot') || [];
+      renderQueue(queue);
+      updateDlSelectionBar();
+      return;
+    }
+  }
   if (_selectedDl.has(taskId)) _selectedDl.delete(taskId);
   else _selectedDl.add(taskId);
+  _dlSelAnchor = taskId;
   const queue = getState('queueSnapshot') || [];
   renderQueue(queue);
   updateDlSelectionBar();
@@ -122,6 +163,7 @@ function selectAllDl() {
 
 function deselectAllDl() {
   _selectedDl.clear();
+  _dlSelAnchor = null; // 整批清空后锚点已不在选态里，留着会连出用户没要的区间
   const queue = getState('queueSnapshot') || [];
   renderQueue(queue);
   updateDlSelectionBar();
@@ -190,10 +232,11 @@ function renderQueue(queue) {
   badge.textContent = active.length;
   if (typeof window.refreshQueueSummary === 'function') window.refreshQueueSummary();
 
-  // 按筛选过滤（状态 × 关键词 × 平台，组合逻辑在 queueFilter.js 纯函数）
-  const filtered = applyQueueFilter(queue, _dlFilter, _dlKeyword, _dlPlatform);
+  // 按筛选过滤（状态 × 关键词 × 平台，组合逻辑在 queueFilter.js 纯函数）。
+  // 封顶 50 与反转都在 _dlShownTasks 里 —— 连选读的是同一个函数，见它的注释。
+  const shown = _dlShownTasks(queue);
 
-  if (!filtered.length) {
+  if (!shown.length) {
     if (_dlKeyword) {
       const modeLabel = { active: '下载中', done: '已完成', error: '失败' }[_dlFilter] || '';
       el.innerHTML = `<div class="queue-empty">没有匹配「${esc(_dlKeyword)}」的${modeLabel ? '「' + modeLabel + '」' : ''}任务</div>`;
@@ -215,8 +258,7 @@ function renderQueue(queue) {
     return;
   }
 
-  // 最新在上（可见 50 行的封顶不变，分组只是换种摆法）
-  const shown = filtered.slice(-50).reverse();
+  // 最新在上（可见 50 行的封顶在 _dlShownTasks 里，分组只是换种摆法）
   if (_dlGroupMode) {
     el.innerHTML = groupTasksByPlatform(shown, platformLabel).map(g => _queueGroupHeaderHtml(g)
       + (_dlCollapsed.has(g.key) ? '' : g.tasks.map(s => _queueRowHtml(s)).join(''))).join('');
@@ -238,7 +280,7 @@ function _queueRowHtml(s) {
     return `
     <div class="queue-item queue-status-${s.status}${selected && _dlSelectionMode ? ' selected' : ''}" data-taskid="${escAttr(s.taskId)}">
       ${_dlSelectionMode ? `
-      <div class="queue-item-cb" onclick="event.stopPropagation();toggleDlSelect('${escQ(s.taskId)}')">
+      <div class="queue-item-cb" onclick="event.stopPropagation();toggleDlSelect('${escQ(s.taskId)}', event)">
         <input type="checkbox" id="dlcb_${escAttr(s.taskId)}" ${selected ? 'checked' : ''} >
       </div>` : ''}
       ${s.cover
@@ -732,6 +774,18 @@ window.clearFinishedDownloads = clearFinishedDownloads;
 window.clearAllDownloads = clearAllDownloads;
 window.openSaveDir = openSaveDir;
 window.exportCurrentPlaylist = exportCurrentPlaylist;
+
+// ── Delete 键作用域：下载队列 ─────────────────────────
+// run 走「🗑 移除」按钮同一个函数（它自己清选态、发 toast，这里不另写一份）。
+// order=30：歌单详情弹层与播放队列面板都盖在下载页之上，只有它俩都不在场时才轮到本列表。
+registerDeleteScope({
+  id: 'download-queue',
+  order: 30,
+  active: () => _dlSelectionMode && !!window.isTabPageVisible?.('downloadPage'),
+  count: () => _selectedDl.size,
+  run: () => batchRemoveDl(),
+  modalId: '',
+});
 
 // ── DOM 缓存初始化 ──────────────────────────────────
 _cacheDlDom();
