@@ -76,6 +76,9 @@
     <button class="nav-item" data-tab="playlist" onclick="switchTab('playlist',this)">
       <span class="icon">🎼</span> 歌单
     </button>
+    <button class="nav-item" data-tab="aggregate" onclick="switchTab('aggregate',this)">
+      <span class="icon">&#128202;</span> <span data-i18n="nav.aggregate">跨源聚合</span>
+    </button>
     <button class="nav-item" data-tab="subscription" onclick="switchTab('subscription',this)">
       <span class="icon">📡</span> 订阅更新 <span class="nav-badge" id="subBadge" style="display:none;"></span>
     </button>
@@ -484,6 +487,14 @@
       </div>
       <div id="userPlaylistGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;"></div>
     </div>
+
+<!-- 3-B 跨源聚合视图：把多份来源合并成一份，并标出跨源同曲 -->
+<div id="aggregatePage" style="display:none;flex-direction:column;gap:12px;height:100%;overflow-y:auto;padding:16px;">
+  <div class="agg-toolbar" id="aggregateBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"></div>
+  <div class="setting-hint" data-i18n="aggregate.hint">合并本地红心与平台歌单，并标出多个平台都有的同曲条目。</div>
+  <div id="aggregateList" style="display:flex;flex-direction:column;gap:4px;"></div>
+</div>
+
 
     <!-- 订阅更新 -->
     <div id="subscriptionPage" style="display:none;flex-direction:column;gap:14px;height:100%;overflow-y:auto;padding:16px;">

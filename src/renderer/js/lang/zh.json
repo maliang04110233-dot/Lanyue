@@ -523,5 +523,22 @@
   "settings.policy.rule.min_quality": "目标音质低于门槛则跳过",
   "settings.policy.rule.max_size": "体积超上限则降档",
   "settings.policy.rule.already_have": "本地已有则跳过",
-  "settings.policy.rule.exclude_names": "命中名单则跳过"
+  "settings.policy.rule.exclude_names": "命中名单则跳过",
+  "nav.aggregate": "跨源聚合",
+  "aggregate.hint": "合并本地红心与平台歌单，并标出多个平台都有的同曲条目。",
+  "aggregate.allSources": "全部来源",
+  "aggregate.onlyDup": "仅跨源重复",
+  "aggregate.filterPh": "过滤歌名或歌手…",
+  "aggregate.refresh": "刷新",
+  "aggregate.loading": "正在聚合…",
+  "aggregate.empty": "没有可聚合的曲目。先收藏几首，或在设置里登录平台账号。",
+  "aggregate.noMatch": "没有符合筛选条件的曲目。",
+  "aggregate.statTotal": "共 {count} 首",
+  "aggregate.statSources": "{count} 个来源",
+  "aggregate.statDupGroups": "{count} 组跨源同曲",
+  "aggregate.dupBadge": "{count} 源",
+  "aggregate.dupBadgeTitle": "该曲在 {count} 个平台上都有",
+  "aggregate.preferPrimary": "同曲首选条目，建议从它下载",
+  "aggregate.failedSome": "部分来源不可用：{names}",
+  "aggregate.failedHint": "这些来源拉取失败，已按空列表计入；可检查对应平台的登录状态"
 }

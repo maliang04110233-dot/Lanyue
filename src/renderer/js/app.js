@@ -51,6 +51,7 @@ import './views/ai-music.js';
 import './converter-core.js';
 import './views/converter.js';
 import './views/playlist.js';
+import './views/aggregate.js';
 import './views/subscriptions.js';
 import './views/clipboard.js';
 import './views/batchImport.js';
@@ -620,6 +621,8 @@ async function init() {
 // 高亮归属集中在 NAV_ALIAS 一处映射（默认值只许有一个家），
 // 调用方一律 switchTab(tab) 即可，不再各自摸 .nav-item[data-tab=...] 是否存在。
 const NAV_ALIAS = { search: 'home', history: 'download' };
+// 3-B：聚合视图首次进入才拉数据，避免反复切页反复打 IPC
+let _aggLoaded = false;
 
 // 「用户当前看着哪个视图」的唯一真相源：switchTab 用行内 display 控制显隐，
 // 隐藏页 style 已写上 none，未访问过的初始态由 index.html 行内样式给出。
@@ -651,6 +654,7 @@ function switchTab(tab, btn) {
   const converterPage = document.getElementById('converterPage');
   const playlistPage = document.getElementById('playlistPage');
   const subscriptionPage = document.getElementById('subscriptionPage');
+  const aggregatePage = document.getElementById('aggregatePage');
 
   homePage.style.display = 'none';
   searchPage.style.display = 'none';
@@ -662,6 +666,7 @@ function switchTab(tab, btn) {
   if (converterPage) converterPage.style.display = 'none';
   if (playlistPage) playlistPage.style.display = 'none';
   if (subscriptionPage) subscriptionPage.style.display = 'none';
+  if (aggregatePage) aggregatePage.style.display = 'none';
 
   if (tab === 'home') {
     homePage.style.display = 'flex';
@@ -684,6 +689,10 @@ function switchTab(tab, btn) {
   } else if (tab === 'subscription') {
     if (subscriptionPage) {
       subscriptionPage.style.display = 'flex';
+  } else if (tab === 'aggregate' && aggregatePage) {
+    aggregatePage.style.display = 'flex';
+    // 首次进入才拉数据：反复切页不该反复打 IPC
+    if (!_aggLoaded) { _aggLoaded = true; loadAggregated(); }
       if (typeof initSubscriptionView === 'function') initSubscriptionView();
     }
   } else if (tab === 'ai-music') {
@@ -1215,6 +1224,11 @@ Object.defineProperty(window, 'api', {
   configurable: true,
 });
 window.init = init;
+window.loadAggregated = loadAggregated;
+window.renderAggregated = renderAggregated;
+window.onAggFilter = onAggFilter;
+window.onAggKeyword = onAggKeyword;
+window.getAggregatedState = getAggregatedState;
 window.switchTab = switchTab;
 window.isTabPageVisible = isTabPageVisible;
 window.switchDlSubTab = switchDlSubTab;

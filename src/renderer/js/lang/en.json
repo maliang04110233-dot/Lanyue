@@ -523,5 +523,22 @@
   "settings.policy.rule.min_quality": "Skip if target quality is below the threshold",
   "settings.policy.rule.max_size": "Downgrade if size exceeds the cap",
   "settings.policy.rule.already_have": "Skip if already in the library",
-  "settings.policy.rule.exclude_names": "Skip if on the exclusion list"
+  "settings.policy.rule.exclude_names": "Skip if on the exclusion list",
+  "nav.aggregate": "Cross-source",
+  "aggregate.hint": "Merge local favorites and platform playlists, flagging tracks available on multiple platforms.",
+  "aggregate.allSources": "All sources",
+  "aggregate.onlyDup": "Cross-source only",
+  "aggregate.filterPh": "Filter by title or artist…",
+  "aggregate.refresh": "Refresh",
+  "aggregate.loading": "Aggregating…",
+  "aggregate.empty": "Nothing to aggregate. Favorite a few tracks, or sign in to a platform first.",
+  "aggregate.noMatch": "No tracks match the current filter.",
+  "aggregate.statTotal": "{count} tracks",
+  "aggregate.statSources": "{count} sources",
+  "aggregate.statDupGroups": "{count} cross-source groups",
+  "aggregate.dupBadge": "{count} src",
+  "aggregate.dupBadgeTitle": "Available on {count} platforms",
+  "aggregate.preferPrimary": "Preferred copy of a cross-source duplicate",
+  "aggregate.failedSome": "Unavailable sources: {names}",
+  "aggregate.failedHint": "These sources failed to load and were counted as empty; check their sign-in state"
 }
