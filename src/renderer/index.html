@@ -814,6 +814,28 @@
             </div>
             <div id="fallbackDisabledList" class="quality-map"></div>
 
+            <!-- 3-C 下载质量策略：有序规则队列，命中即跳过/降档 -->
+            <div class="setting-row" style="display:block;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+                <label class="setting-label" data-i18n="settings.policy.title">下载质量策略</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <select class="setting-select" style="width:auto" onchange="addQualityPolicy(this.value);this.value=''">
+                    <option value="">+ 添加规则</option>
+                    <option value="min_quality">目标音质低于门槛则跳过</option>
+                    <option value="max_size">体积超上限则降档</option>
+                    <option value="already_have">本地已有则跳过</option>
+                    <option value="exclude_names">命中名单则跳过</option>
+                  </select>
+                  <button class="action-btn" style="width:auto;height:auto;padding:3px 10px;font-size:11px;"
+                    onclick="resetQualityPolicy()" title="清空全部规则（恢复默认：不做任何限制）">恢复默认</button>
+                </div>
+              </div>
+              <span class="setting-hint" data-i18n="settings.policy.hint">规则自上而下依次求值，第一条命中即生效。命中「跳过」的任务不会发起任何网络请求。</span>
+            </div>
+            <div id="qualityPolicyList" class="quality-map"></div>
+
+            <!-- /3-C -->
+
             <div class="setting-row">
               <label class="setting-label" data-i18n="settings.general.concurrency">最大并发下载数</label>
               <input class="setting-input setting-input--num" id="settingConcurrency" type="number" min="1" max="10" value="3">

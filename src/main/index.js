@@ -18,6 +18,7 @@ const approvedDirs = require('./approvedDirs');
 const history = require('../utils/history');
 const prefs = require('../utils/prefs');
 const { atomicWriteJson, safeReadJson } = require('../utils/atomicFile');
+const { getPolicyFactsForQueue } = require('./qualityPolicyFacts');
 // 主进程即 UI 线程：文件 IO 走异步封装（见 utils/fsAsync.js）
 const fsa = require('../utils/fsAsync');
 const ipcWindow  = require('./ipc/window');
@@ -523,6 +524,9 @@ app.whenReady().then(async () => {
     getLyrics,
     // C1: 渲染层传入的 saveDir 必须在用户批准目录内，否则回落默认目录
     isSaveDirAllowed: (p) => approvedDirs.isApprovedDir(p),
+    // 3-C: already_have 规则的判据来源（本地曲库索引）。取数失败已在模块内降级，
+    // 这里不必再包 try；未注入时 downloadQueue 会让该规则自然不命中。
+    getPolicyFacts: getPolicyFactsForQueue,
     onQueueChanged: () => {
       // 队列变更时同步托盘菜单（下载进度/数量展示）
       try { updateTrayMenu(); } catch (_e) { /* 托盘未就绪可忽略 */ }

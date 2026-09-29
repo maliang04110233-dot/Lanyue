@@ -39,6 +39,7 @@ const speedMeter = require('./speedMeter');
 const diskSpace = require('./diskSpace');
 const { atomicWriteJson, safeReadJson } = require('../utils/atomicFile');
 const { sidecarPathFor } = require('../utils/relinkRefs');
+const { evaluateQualityPolicy, normalizeQuality } = require('../utils/qualityPolicy');
 // 传输失败的判据与码表家在 src/shared/netClass.js：这里只是消费方，
 // 本地不再抄一份"什么算网络问题"——那份在更新器和传输层各有一份，三份必然漂。
 const { transportCode } = require('../shared/netClass');
@@ -124,6 +125,7 @@ function createDownloadQueueEngine({
   history = historyDefault,
   fsa = fsaDefault,
   downloader = downloaderDefault,
+  getPolicyFacts,
 } = {}) {
   if (typeof userDataDir !== 'function') throw new Error('[DownloadQueue] 必须注入 userDataDir');
   if (typeof safeSend !== 'function') throw new Error('[DownloadQueue] 必须注入 safeSend');
@@ -144,6 +146,40 @@ function createDownloadQueueEngine({
   const QUEUE_FILE = () => path.join(userDataDir(), 'queue.json');
 
   /** 读取并发数（1..10，越界回落 3；设置变更实时生效） */
+  /**
+   * Quality-policy evaluation (3-C) -- pure function + injected external facts.
+   *
+   * Why facts are injected: the evaluator is a pure function, so "which artists/albums
+   * already exist locally" must come from the caller, keeping unit tests free of
+   * Electron and disk. With no getPolicyFacts injected, ctx is empty => already_have
+   * simply does not match (prefer not acting over acting wrongly); other rules still apply.
+   *
+   * prefs read failure degrades to "no rules": one bad rule must never stall the queue.
+   */
+  async function evaluatePolicy(song) {
+    const keep = { action: 'keep', quality: normalizeQuality(song.quality), ruleId: null, reason: '' };
+    let rules = null;
+    try {
+      rules = prefs.get('qualityPolicyRules');
+    } catch (e) {
+      logger.warn('[qualityPolicy] read rules failed, treat as none:', e && e.message);
+      return keep;
+    }
+    if (!rules) return keep;
+
+    let facts = {};
+    if (typeof getPolicyFacts === 'function') {
+      try {
+        facts = (await getPolicyFacts(song)) || {};
+      } catch (e) {
+        // fact-source failure is not a rule failure: only already_have opts out this run
+        logger.warn('[qualityPolicy] read local facts failed, that rule opts out:', e && e.message);
+        facts = {};
+      }
+    }
+    return evaluateQualityPolicy(rules, song, facts);
+  }
+
   function getConcurrency() {
     try {
       const v = prefs.get('concurrency');
@@ -328,6 +364,27 @@ function createDownloadQueueEngine({
       }
       try {
         logger.log(`[processOneSong] ▶ ${song.source} "${song.title}" - "${song.artist}" id=${song.id} quality=${song.quality || 'standard'}`);
+        const policy = await evaluatePolicy(song);
+        if (policy.action === 'skip') {
+          // Reuse status 'done' rather than inventing one: QUEUE_STATUSES is a closed
+          // set validated by sanitizeRestoredTask on queue.json restore, and the
+          // renderer branches on done/error/pending/downloading in ~20 places.
+          // skipReason lets the UI say 'skipped by policy' instead of 'downloaded'.
+          song.status = 'done';
+          song.progress = 0;
+          song.error = null;
+          song.skipReason = policy.reason;
+          song.skipRule = policy.ruleId;
+          logger.log(`[processOneSong] policy skip (${policy.ruleId}): ${policy.reason}`);
+          notifyQueueChanged(true);
+          return { skipped: true, reason: policy.reason, ruleId: policy.ruleId };
+        }
+        if (policy.action === 'demote') {
+          logger.log(`[processOneSong] policy demote: ${song.quality} -> ${policy.quality} (${policy.reason})`);
+          song.demoteReason = policy.reason;
+          song.quality = policy.quality;
+        }
+
         const urlInfo = await getDownloadUrlSmart(song, song.quality || 'standard');
         logger.log('[processOneSong]   urlInfo keys =', urlInfo ? Object.keys(urlInfo).join(',') : 'null', 'hasUrl =', !!(urlInfo && urlInfo.url));
         if (!urlInfo || !urlInfo.url) {

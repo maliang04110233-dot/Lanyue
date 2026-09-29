@@ -30,6 +30,9 @@ const ALLOWED_PREF_KEYS = new Set([
   'namingTemplate',
   // 分平台音质覆盖表：平台 id → standard/hq/lossless，未列出的平台沿用 quality
   'qualityBySource',
+  // 3-C quality policy rules: ordered [{id, enabled, params}]; downloadQueue reads it
+  // before taking a stream; settings page writes it.
+  'qualityPolicyRules',
   // 换源排除平台清单（设置页写，主进程 resolveTrackService 每次解析时读）
   'fallbackDisabledPlatforms',
   // 单平台并发上限 / 单曲失败尝试次数（设置页 GENERAL_PREFS 写，主进程 downloadQueue 读）
