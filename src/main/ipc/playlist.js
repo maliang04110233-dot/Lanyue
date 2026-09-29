@@ -8,6 +8,8 @@
  */
 
 const prefs = require('../../utils/prefs');
+const logger = require('../../utils/logger');
+const { aggregateAcrossSources, pickRepresentative } = require('../../utils/crossSourceAggregate');
 const { handle } = require('./register');
 const { trashRemove, trashRestore, purgeExpired, trashView, trashPurge } = require('../../utils/playlistTrash');
 
@@ -47,6 +49,105 @@ function ensureFavorites() {
     prefs.set('userPlaylists', playlists);
   }
   return playlists;
+}
+
+/**
+ * 3-B 跨源聚合：把多份来源的曲目合并，并标记跨源同曲
+ *
+ * 数据来源说明（重要）：
+ *   平台歌单走 get-playlist-songs（需要 Cookie，一次网络请求/平台）；
+ *   本地红心走 userPlaylists 里的 FAVORITES_ID —— 它是**本地**收藏，
+ *   每首歌自带 source，所以「我的收藏」天然就是跨源的，聚合它最有价值。
+ *
+ * 只读：聚合不新增/修改任何数据。单个来源失败按空列表降级，
+ * 并在 failed 里回报——一个源挂了不该让整个聚合白屏。
+ *
+ * opts:
+ *   sources: string[]        参与的平台 id；不给则取所有本地红心里的 source
+ *   playlists: {source,id}[] 指定歌单；不给则聚合本地红心
+ *   markDuplicates: boolean  是否标记跨源同曲（默认 true）
+ */
+handle('aggregate-cross-source', async (_, opts) => {
+  const o = (opts && typeof opts === 'object' && !Array.isArray(opts)) ? opts : {};
+  const mark = o.markDuplicates !== false;
+
+  // 只读：直接读 prefs，不用 ensureFavorites()——后者会在红心单缺失时
+  // prefs.set 建单，那是写操作，与「聚合不改数据」相悖。
+  const playlists = prefs.get('userPlaylists') || [];
+  const fav = playlists.find((p) => p && p.id === FAVORITES_ID);
+
+  // ── 组装来源分组 ──
+  const groups = [];
+  const failed = [];
+
+  const wantSources = Array.isArray(o.sources) && o.sources.length
+    ? o.sources.map((x) => String(x || '').trim()).filter(Boolean)
+    : null;
+
+  if (Array.isArray(o.playlists) && o.playlists.length) {
+    // 显式指定歌单：逐个拉取（可能打网络）
+    for (const t of o.playlists) {
+      const src = String((t && t.source) || '').trim();
+      const pid = String((t && t.id) || '').trim();
+      if (!src || !pid) continue;
+      if (wantSources && !wantSources.includes(src)) continue;
+      try {
+        const songs = await getPlatformPlaylistSongs(src, pid);
+        groups.push({ source: src, songs: Array.isArray(songs) ? songs : [] });
+      } catch (e) {
+        logger.warn('[aggregate] 拉取歌单失败，降级为空:', src, e && e.message);
+        groups.push({ source: src, songs: [] });
+        failed.push(src);
+      }
+    }
+  } else {
+    // 默认：聚合本地红心（零网络请求）
+    const bySource = new Map();
+    for (const s of (fav && Array.isArray(fav.songs) ? fav.songs : [])) {
+      if (!s || !s.source) continue;
+      if (wantSources && !wantSources.includes(s.source)) continue;
+      let arr = bySource.get(s.source);
+      if (!arr) { arr = []; bySource.set(s.source, arr); }
+      arr.push(s);
+    }
+    for (const [src, songs] of bySource) groups.push({ source: src, songs });
+  }
+
+  const merged = aggregateAcrossSources(groups, { markDuplicates: mark });
+
+  // 给每个跨源簇算出「下载优先选哪一条」
+  const clusters = new Map();
+  for (const s of merged.songs) {
+    if (!s._crossSource || !Array.isArray(s._dupOf)) continue;
+    const k = [...s._dupOf, require('../../utils/crossSourceAggregate').songKey(s)].sort().join('|');
+    if (!clusters.has(k)) clusters.set(k, []);
+    clusters.get(k).push(s);
+  }
+  for (const members of clusters.values()) {
+    const rep = pickRepresentative(members);
+    if (!rep) continue;
+    for (const s of members) {
+      s._primary = songKey(s) === require('../../utils/crossSourceAggregate').songKey(rep);
+    }
+  }
+
+  return { ...merged, failed };
+});
+
+/**
+ * 拉取平台歌单（3-B 聚合用）
+ *
+ * 走 gateway 的公开能力，失败向上抛——调用方负责降级。
+ */
+async function getPlatformPlaylistSongs(source, playlistId) {
+  const { getPlaylistSongs } = require('../../api');
+  const r = await getPlaylistSongs(platformIdOf(source), playlistId, 2000);
+  return (r && (r.songs || r.list)) || [];
+}
+
+/** 平台 id 归一（QQ 歌单有时带 mid 前缀，这里只做去空白与小写） */
+function platformIdOf(s) {
+  return String(s || '').trim();
 }
 
 function register() {

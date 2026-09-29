@@ -158,6 +158,9 @@ const CHANNELS = {
   'remove-from-user-playlist': { invoke: MAIN, args: [['playlistId', t.str(64)], ['songId', t.any()], ['source', t.str(32)]] },
   'toggle-favorite':           { invoke: MAIN, args: [['source', t.str(32)], ['songId', t.any()], ['song', t.any()]] },
 
+  // 3-B 跨源聚合：合并多份来源的曲目并标记跨源同曲（只读聚合层，不新增/修改数据）
+  'aggregate-cross-source':   { invoke: MAIN, args: [['opts', t.obj()]] },
+
   // ── 云同步 / 更新（invoke） ───────────────────────
   'export-all-data':    { invoke: MAIN },
   'import-all-data':    { invoke: MAIN },
@@ -325,6 +328,7 @@ const METHODS = {
   addToUserPlaylist: 'add-to-user-playlist',
   removeFromUserPlaylist: 'remove-from-user-playlist',
   toggleFavorite: 'toggle-favorite',
+  aggregateCrossSource: 'aggregate-cross-source',
   // 云
   exportAllData: 'export-all-data',
   importAllData: 'import-all-data',
