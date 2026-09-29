@@ -34,9 +34,12 @@ function nextFmtMode(mode, formats) {
   return i + 1 < list.length ? list[i + 1] : 'all';
 }
 
-/** 按钮文案（mode 来自扩展名白名单，无注入面） */
+/**
+ * 按钮文案（mode 来自扩展名白名单，无注入面）：默认态报轴名「🎞 格式」= 不按格式筛，
+ * 切到某一格式后只报扩展名；"有没有在筛"由 .active 高亮表示（views/local.js cycleLocalFmt）。
+ */
 function fmtModeLabel(mode) {
-  return (!mode || mode === 'all') ? '🎞 全部格式' : `🎞 ${mode.toUpperCase()}`;
+  return (!mode || mode === 'all') ? '🎞 格式' : `🎞 ${mode.toUpperCase()}`;
 }
 
 /** 按扩展名过滤视图歌曲；all/空/非法值原样返回（顺序不动） */

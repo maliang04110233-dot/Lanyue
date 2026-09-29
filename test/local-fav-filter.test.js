@@ -46,7 +46,7 @@ test('local.js 管线：开关先收藏后关键词串接，按钮文案/active 
   assert.match(LOCAL_JS, /import \{ favOnlyFilter \} from '\.\.\/localFavFilter\.js';/);
   assert.match(LOCAL_JS, /let _localFavOnly = false;/);
   assert.match(LOCAL_JS, /if \(_localFavOnly\) songs = favOnlyFilter\(songs, getState\('favoriteKeys'\)\);/);
-  assert.match(LOCAL_JS, /btn\.textContent = _localFavOnly \? '♥ 仅收藏' : '♥ 全部';/);
+  assert.match(LOCAL_JS, /btn\.textContent = _localFavOnly \? '♥ 仅收藏' : '♥ 收藏';/);
   assert.match(LOCAL_JS, /btn\.classList\.toggle\('active', _localFavOnly\)/);
   // 90 起：即时重过滤收敛到 favorites.js 钩子回调（行内红心/行菜单共用）
   assert.match(LOCAL_JS, /window\.onLocalFavToggle = \(\) => \{ if \(_localFavOnly\) filterLocalSongs\(\); \}/);
@@ -54,6 +54,6 @@ test('local.js 管线：开关先收藏后关键词串接，按钮文案/active 
 });
 
 test('工具栏按钮与命令面板入口齐备', () => {
-  assert.match(HTML, /id="localFavBtn" onclick="toggleLocalFavOnly\(\)"[^>]*>♥ 全部<\/button>/);
+  assert.match(HTML, /id="localFavBtn" onclick="toggleLocalFavOnly\(\)"[^>]*>♥ 收藏<\/button>/);
   assert.match(PALETTE, /id: 'lc-favonly'[\s\S]*?_call\('toggleLocalFavOnly'\)/);
 });

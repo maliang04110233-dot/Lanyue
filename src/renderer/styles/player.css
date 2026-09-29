@@ -656,10 +656,31 @@ audio { display: none; }
 .local-page.active { display: flex; }
 .local-toolbar {
   display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  /* 窄窗口下换行，而不是把每枚按钮压到一列一个字（旧版症状：整条工具栏竖成一排
+     "扫描/目录"式的竖排文字）。行距比列距紧，两行看着仍是一组。 */
+  flex-wrap: wrap; row-gap: 8px;
 }
-.local-toolbar .search-input-wrap { flex: 1; }
+/* 标签是按钮的身份：宁可换行也不许在词中间断开 */
+.local-toolbar .tab { white-space: nowrap; flex-shrink: 0; }
+.local-toolbar .search-input-wrap { flex: 1; min-width: 160px; }
 .local-toolbar .search-input { padding: 9px 16px; }
 .local-info { font-size: 12px; color: var(--neon-dim); }
+/* ── 工具栏下拉(分组/工具)──────────────────────────── */
+.tb-dropdown { position: relative; }
+.tb-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 300;
+  min-width: 200px; max-height: 70vh; overflow-y: auto;
+  background: var(--bg-panel, rgba(16, 20, 26, 0.98));
+  border: 1px solid var(--neon-cyan-dim); border-radius: 10px;
+  padding: 6px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.tb-menu-label { font-size: 11px; color: var(--neon-dim); padding: 6px 10px 2px; }
+.tb-menu-item {
+  display: block; width: 100%; text-align: left; padding: 8px 10px;
+  background: none; border: none; color: inherit;
+  font-size: 13px; border-radius: 6px; cursor: pointer;
+}
+.tb-menu-item:hover { background: var(--bg-hover); color: var(--neon-cyan); }
 .local-list {
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
   padding-right: 4px;

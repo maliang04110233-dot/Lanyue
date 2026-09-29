@@ -97,9 +97,9 @@ test('all / 未知模式原样浅拷贝；脏输入不炸', async () => {
 
 test('文案：每个 mode 一句话，未知 mode 回落全部（按钮文字来自函数，不散落字面量）', async () => {
   const { metaModeLabel, META_MODES } = await fresh();
-  assert.equal(metaModeLabel('all'), '🏷 完整度: 全部');
-  assert.equal(metaModeLabel('no-lyric'), '🏷 完整度: 缺内嵌歌词');
-  assert.equal(metaModeLabel('weird'), '🏷 完整度: 全部');
+  assert.equal(metaModeLabel('all'), '🏷 完整度');
+  assert.equal(metaModeLabel('no-lyric'), '🏷 缺内嵌歌词');
+  assert.equal(metaModeLabel('weird'), '🏷 完整度');
   for (const m of META_MODES) assert.ok(metaModeLabel(m).startsWith('🏷 '), m);
 });
 
@@ -109,11 +109,10 @@ test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + �
   assert.ok(LOCAL_JS.includes([
     'function cycleLocalMeta() {',
     '  _localMetaMode = nextMetaMode(_localMetaMode);',
-    "  const btn = document.getElementById('localMetaBtn');",
-    '  if (btn) btn.textContent = metaModeLabel(_localMetaMode);',
+    "  _syncFilterBtn('localMetaBtn', metaModeLabel(_localMetaMode), _localMetaMode !== 'all');",
     '  filterLocalSongs();',
     '}',
-  ].join('\n')), '循环函数：换态 → 刷按钮字样 → 重过筛');
+  ].join('\n')), '循环函数：换态 → 刷按钮字样+高亮 → 重过筛');
   assert.ok(LOCAL_JS.indexOf("if (_localQualMode !== ") < LOCAL_JS.indexOf("if (_localMetaMode !== "),
     '音质轴先于完整度轴（完整度按已过滤的视图再切，与其余轴同为 AND 叠加）');
   assert.equal((LOCAL_JS.match(/window\.cycleLocalMeta = cycleLocalMeta;/g) || []).length, 1);

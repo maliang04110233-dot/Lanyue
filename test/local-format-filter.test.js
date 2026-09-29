@@ -50,8 +50,8 @@ test('nextFmtMode：all→格式逐个循环回 all；空曲库钉 all；失效�
 
 test('fmtModeLabel/filterByFmt：文案大写；all 原序拷贝；按扩展名精确匹配', async () => {
   const { fmtModeLabel, filterByFmt } = await fresh();
-  assert.equal(fmtModeLabel('all'), '🎞 全部格式');
-  assert.equal(fmtModeLabel(undefined), '🎞 全部格式');
+  assert.equal(fmtModeLabel('all'), '🎞 格式');
+  assert.equal(fmtModeLabel(undefined), '🎞 格式');
   assert.equal(fmtModeLabel('flac'), '🎞 FLAC');
   assert.equal(fmtModeLabel('mp3'), '🎞 MP3');
   const songs = [
@@ -71,7 +71,7 @@ test('接线钉：local.js 管线+循环入口、index.html 按钮、命令面�
   assert.match(LOCAL_JS, /import \{ listFormats, nextFmtMode, fmtModeLabel, filterByFmt \} from '\.\.\/localFormatFilter\.js';/);
   assert.match(LOCAL_JS, /if \(_localFmtMode !== 'all'\) songs = filterByFmt\(songs, _localFmtMode\);/, 'fav→fmt→kw 管线');
   assert.match(LOCAL_JS, /function cycleLocalFmt\(\) \{\n {2}_localFmtMode = nextFmtMode\(_localFmtMode, listFormats\(getState\('localSongs'\) \|\| \[\]\)\);/);
-  assert.match(LOCAL_JS, /const btn = document\.getElementById\('localFmtBtn'\);\n {2}if \(btn\) btn\.textContent = fmtModeLabel\(_localFmtMode\);\n {2}filterLocalSongs\(\);/);
+  assert.match(LOCAL_JS, /_syncFilterBtn\('localFmtBtn', fmtModeLabel\(_localFmtMode\), _localFmtMode !== 'all'\);\n {2}filterLocalSongs\(\);/);
   assert.match(LOCAL_JS, /window\.cycleLocalFmt = cycleLocalFmt;/);
   assert.match(HTML, /id="localFmtBtn" onclick="cycleLocalFmt\(\)"/);
   assert.match(PALETTE_JS, /\{ id: 'loc-fmt',.*_goto\('local'\); _call\('cycleLocalFmt'\); \}/, '面板先跳页再循环');

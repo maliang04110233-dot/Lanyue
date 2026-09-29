@@ -50,7 +50,8 @@ test('接线钉：详情走 _plVisiblePairs 视图 + 本地走 localFiltered 视
   assert.match(LOCAL_JS, /const lines = toTrackLines\(getState\('localFiltered'\) \|\| \[\]\);/, '本地复制当前过滤视图');
   assert.match(LOCAL_JS, /window\.copyLocalListText = copyLocalListText;/);
   assert.match(HTML, /onclick="copyPlaylistListText\(\)">📋 复制曲单</);
-  assert.match(HTML, /onclick="copyLocalListText\(\)"[^>]*>📋 复制曲单</);
+  // 本地入口已折进「🧰 工具 」，连菜单项形状一起钉（同 locate-playing 的理由）
+  assert.match(HTML, /class="tb-menu-item" onclick="copyLocalListText\(\);closeTbMenus\(\)"[^>]*>📋 复制曲单</);
   assert.match(PALETTE_JS, /\{ id: 'pl-copylist',.*run: \(\) => _call\('copyPlaylistListText'\) \}/);
   assert.match(PALETTE_JS, /\{ id: 'loc-copylist',.*_goto\('local'\); _call\('copyLocalListText'\); \}/);
 });

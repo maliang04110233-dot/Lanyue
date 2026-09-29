@@ -15,12 +15,18 @@
 /** 循环顺序（'all' 回到起点） */
 const META_MODES = ['all', 'no-cover', 'no-album', 'no-artist', 'no-lyric'];
 
+/**
+ * 按钮文案：默认态报轴名（🏷 完整度 = 不按完整度筛），切态后只报值，
+ * "有没有在筛"由 .active 高亮表示（views/local.js cycleLocalMeta）。
+ * 旧写法「🏷 完整度: 缺歌手或标题」是常驻按钮被挤成逐字竖排的根因，
+ * 完整口径挪进按钮 title。
+ */
 const MODE_LABEL = {
-  all: '🏷 完整度: 全部',
-  'no-cover': '🏷 完整度: 缺封面',
-  'no-album': '🏷 完整度: 缺专辑',
-  'no-artist': '🏷 完整度: 缺歌手或标题',
-  'no-lyric': '🏷 完整度: 缺内嵌歌词',
+  all: '🏷 完整度',
+  'no-cover': '🏷 缺封面',
+  'no-album': '🏷 缺专辑',
+  'no-artist': '🏷 缺歌手/标题',
+  'no-lyric': '🏷 缺内嵌歌词',
 };
 
 /** 非空字符串（去首尾空白）才算「有」 */

@@ -70,9 +70,9 @@ test('探测失败当「未测」处理（不让失败行混进 verified），�
 
 test('文案：每个 mode 一句话，未知 mode 回落全部（按钮文字来自函数，不散落字面量）', async () => {
   const { qualModeLabel, QUALITY_MODES } = await fresh();
-  assert.equal(qualModeLabel('all'), '🧪 音质: 全部');
-  assert.equal(qualModeLabel('unprobed'), '🧪 音质: 仅待验（无损容器未实测）');
-  assert.equal(qualModeLabel('weird'), '🧪 音质: 全部');
+  assert.equal(qualModeLabel('all'), '🧪 音质');
+  assert.equal(qualModeLabel('unprobed'), '🧪 待验');
+  assert.equal(qualModeLabel('weird'), '🧪 音质');
   for (const m of QUALITY_MODES) assert.ok(qualModeLabel(m).startsWith('🧪 '), m);
 });
 
@@ -82,11 +82,13 @@ test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + �
   assert.ok(LOCAL_JS.includes([
     'function cycleLocalQual() {',
     "  _localQualMode = nextQualMode(_localQualMode);",
-    "  const btn = document.getElementById('localQualBtn');",
-    '  if (btn) btn.textContent = qualModeLabel(_localQualMode);',
+    "  _syncFilterBtn('localQualBtn', qualModeLabel(_localQualMode), _localQualMode !== 'all');",
     '  filterLocalSongs();',
     '}',
-  ].join('\n')), '循环函数：换态 → 刷按钮字样 → 重过筛（必须 filterLocalSongs，renderLocalSongs 只重画旧数组，等于点了没用）');
+  ].join('\n')), '循环函数：换态 → 刷按钮字样+高亮 → 重过筛（必须 filterLocalSongs，renderLocalSongs 只重画旧数组，等于点了没用）');
+  // 标签精简成「🧪 + 值」后，"有没有在筛"只剩 .active 一个载体：文案与高亮必须同源
+  assert.ok(LOCAL_JS.includes("btn.classList.toggle('active', !!on);"),
+    '_syncFilterBtn 要把高亮与文案一次算完（分两处写迟早漂成"按钮亮着但视图没筛"）');
   assert.ok(LOCAL_JS.indexOf('if (_localFmtMode !== ') < LOCAL_JS.indexOf('if (_localQualMode !== '),
     '格式轴先于音质轴（音质按已过滤的视图再切，与收藏/关键词同为 AND 叠加）');
   assert.equal((LOCAL_JS.match(/window\.cycleLocalQual = cycleLocalQual;/g) || []).length, 1);

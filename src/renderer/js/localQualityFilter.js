@@ -18,12 +18,18 @@ const LOSSLESS_EXT = new Set(['flac', 'wav', 'aiff', 'aif', 'alac', 'ape', 'wv',
 /** 循环顺序（'all' 回到起点） */
 const QUALITY_MODES = ['all', 'nominal', 'verified', 'suspect', 'unprobed'];
 
+/**
+ * 按钮文案：默认态报「这条轴叫什么」（🧪 音质 = 不按音质筛），
+ * 切到某一态后只报值（🧪 真无损），"有没有在筛"由 .active 高亮表示
+ * （见 views/local.js 的 cycleLocalQual）。旧写法「🧪 音质: 仅实测真无损」
+ * 十枚常驻按钮挤在一行里会被压成逐字竖排，完整口径挪进按钮 title。
+ */
 const MODE_LABEL = {
-  all: '🧪 音质: 全部',
-  nominal: '🧪 音质: 仅标称无损',
-  verified: '🧪 音质: 仅实测真无损',
-  suspect: '🧪 音质: 仅存疑/伪无损',
-  unprobed: '🧪 音质: 仅待验（无损容器未实测）',
+  all: '🧪 音质',
+  nominal: '🧪 标称无损',
+  verified: '🧪 真无损',
+  suspect: '🧪 存疑/伪',
+  unprobed: '🧪 待验',
 };
 
 /** 该曲是否属于「无损容器」（只看扩展名，不碰文件） */

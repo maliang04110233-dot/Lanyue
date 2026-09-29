@@ -227,7 +227,7 @@ function toggleLocalFavOnly() {
   _localFavOnly = !_localFavOnly;
   const btn = document.getElementById('localFavBtn');
   if (btn) {
-    btn.textContent = _localFavOnly ? '♥ 仅收藏' : '♥ 全部';
+    btn.textContent = _localFavOnly ? '♥ 仅收藏' : '♥ 收藏';
     btn.classList.toggle('active', _localFavOnly);
   }
   filterLocalSongs();
@@ -237,29 +237,40 @@ function toggleLocalFavOnly() {
 window.onLocalFavToggle = () => { if (_localFavOnly) filterLocalSongs(); };
 
 /**
+ * 三枚循环过滤按钮（🧪 音质 / 🏷 完整度 / 🎞 格式）的文案与高亮同步。
+ *
+ * 标签精简成「emoji + 值」后，"这条轴有没有在筛"不再由「全部」二字说明，
+ * 改由 .active 高亮表示（与 ♥ 收藏轴同一套视觉）。文案与高亮必须一处算：
+ * 分两处写迟早漂成"按钮亮着但视图没筛"或反之。
+ */
+function _syncFilterBtn(id, label, on) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.textContent = label;
+  btn.classList.toggle('active', !!on);
+}
+
+/**
  * 音质过滤循环：五态走一格，按钮文案同步。
  * 必须走 filterLocalSongs()（而非 renderLocalSongs()）——后者只重画
  * 已算好的 localFiltered，换态不会重新过筛，等于按钮点了没用（修复）。
  */
 function cycleLocalQual() {
   _localQualMode = nextQualMode(_localQualMode);
-  const btn = document.getElementById('localQualBtn');
-  if (btn) btn.textContent = qualModeLabel(_localQualMode);
+  _syncFilterBtn('localQualBtn', qualModeLabel(_localQualMode), _localQualMode !== 'all');
   filterLocalSongs();
 }
 
 /** 元数据完整度过滤循环：五态走一格，按钮文案同步 */
 function cycleLocalMeta() {
   _localMetaMode = nextMetaMode(_localMetaMode);
-  const btn = document.getElementById('localMetaBtn');
-  if (btn) btn.textContent = metaModeLabel(_localMetaMode);
+  _syncFilterBtn('localMetaBtn', metaModeLabel(_localMetaMode), _localMetaMode !== 'all');
   filterLocalSongs();
 }
 
 function cycleLocalFmt() {
   _localFmtMode = nextFmtMode(_localFmtMode, listFormats(getState('localSongs') || []));
-  const btn = document.getElementById('localFmtBtn');
-  if (btn) btn.textContent = fmtModeLabel(_localFmtMode);
+  _syncFilterBtn('localFmtBtn', fmtModeLabel(_localFmtMode), _localFmtMode !== 'all');
   filterLocalSongs();
 }
 

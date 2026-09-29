@@ -94,6 +94,8 @@ test('接线钉：local.js 链首注入、folderGroups 窗桥、index.html 按�
   assert.match(FG_JS, /if \(typeof document !== 'undefined'\) \{\n {2}window\.showFolderGroups = showFolderGroups;/);
   assert.match(LOCAL_JS, /import \{ applyFolderToSongs \} from '\.\.\/folderGroups\.js';/);
   assert.match(LOCAL_JS, /songs = applyFolderToSongs\(songs\);[^\n]*\n {2}if \(_localFavOnly\) songs = favOnlyFilter\(/, '文件夹在过滤链首位（fav 之前）');
-  assert.match(HTML, /onclick="showFolderGroups\(\)"[^>]*>🗂 文件夹分组</);
+  // 低频动作折进「🗂 分组 ▾」下拉后，入口判据要连菜单形状一起钉：
+  // 只钉函数名的话，按钮被整段删出 DOM 也能靠命令面板这一路蒙过去。
+  assert.match(HTML, /class="tb-menu-item" onclick="showFolderGroups\(\);closeTbMenus\(\)"[^>]*>🗂 文件夹分组</);
   assert.match(PALETTE_JS, /\{ id: 'lc-folders',.*_call\('showFolderGroups'\) \},/);
 });

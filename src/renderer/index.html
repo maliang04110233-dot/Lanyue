@@ -250,30 +250,43 @@
           <div class="local-toolbar">
                       <button class="tab" onclick="scanLocalDir()" data-i18n="local.scanDir">📂 扫描目录</button>
                       <button class="tab tab-neon" onclick="batchAutoMeta()" style="background:linear-gradient(135deg,var(--neon-cyan),var(--neon-blue));color:#fff;border:none;" data-i18n="local.batchAutoMeta">⚡ 一键补全</button>
-                      <button class="tab tab-neon" onclick="batchFetchCovers()" data-i18n="local.batchCover">🖼️ 批量补封面</button>
                       <button class="tab tab-neon" id="localSelectBtn" onclick="enterLocalSelectionMode()" data-i18n="local.select">☑ 选择</button>
             <button class="tab tab-neon" id="localViewToggleBtn" onclick="toggleLocalView()" data-i18n="local.grid">▦ 网格</button>
-            <button class="tab tab-neon" onclick="batchFetchLyrics()" data-i18n="local.batchLyric">🎵 批量补歌词</button>
-                      <button class="tab" onclick="showLibraryStats()" data-i18n="local.stats">📊 统计</button>
-                      <button class="tab" onclick="detectDuplicateSongs()" data-i18n="local.dedup">🔍 查重</button>
-                      <button class="tab" onclick="detectContentDuplicates()" data-i18n="local.dedupContent" title="按文件字节哈希查找内容完全相同的副本（改名/换目录也能抓到）">🧬 内容查重</button>
-                      <button class="tab" onclick="batchProbeQuality()">🔬 音质扫描</button>
-                      <button class="tab" onclick="locatePlayingLocal()" title="滚动到正在播放的歌并闪烁标记">🎯 定位播放</button>
-                      <button class="tab" id="localFavBtn" onclick="toggleLocalFavOnly()" title="只看已收藏的本地歌（行右键 ♥ 收藏）">♥ 全部</button>
-                      <button class="tab" id="localFmtBtn" onclick="cycleLocalFmt()" title="按文件格式过滤：只在曲库实际存在的格式间循环">🎞 全部格式</button>
-                      <button class="tab" id="localQualBtn" onclick="cycleLocalQual()" title="按音质过滤视图：全部 / 仅标称无损 / 仅实测真无损 / 仅存疑或伪无损 / 仅待验（与格式、收藏、关键词叠加）">🧪 音质: 全部</button>
-                      <button class="tab" id="localMetaBtn" onclick="cycleLocalMeta()" title="按元数据完整度过滤：全部 / 缺封面 / 缺专辑 / 缺歌手或标题 / 缺内嵌歌词（与格式、音质、收藏、关键词叠加）">🏷 完整度: 全部</button>
-                      <button class="tab tab-neon" onclick="convertSelectedAudio()" data-i18n="local.convert">🔄 转码</button>
-                      <button class="tab" onclick="exportLocalM3u()" title="把当前过滤/排序视图导出为 m3u 歌单文件（选择模式下勾选优先）">⤴ 导出m3u</button>
-                      <button class="tab" onclick="copyLocalListText()" title="把当前过滤视图复制成一行一首的文本清单（歌名 - 歌手），发群聊直接贴">📋 复制曲单</button>
+                      <button class="tab" id="localFavBtn" onclick="toggleLocalFavOnly()" title="只看已收藏的本地歌（行右键 ♥ 收藏）">♥ 收藏</button>
+                      <button class="tab" id="localFmtBtn" onclick="cycleLocalFmt()" title="按文件格式过滤：只在曲库实际存在的格式间循环">🎞 格式</button>
+                      <button class="tab" id="localQualBtn" onclick="cycleLocalQual()" title="按音质过滤视图：全部 / 仅标称无损 / 仅实测真无损 / 仅存疑或伪无损 / 仅待验（无损容器未实测）。高亮=正在筛，与格式、收藏、关键词叠加">🧪 音质</button>
+                      <button class="tab" id="localMetaBtn" onclick="cycleLocalMeta()" title="按元数据完整度过滤：全部 / 缺封面 / 缺专辑 / 缺歌手或标题 / 缺内嵌歌词。高亮=正在筛，与格式、音质、收藏、关键词叠加">🏷 完整度</button>
                       <div class="search-input-wrap">
                         <input class="search-input" id="localFilter" placeholder="过滤本地歌曲..."
                           oninput="filterLocalSongs()" onkeydown="if(event.key==='Enter')filterLocalSongs()">
                       </div>
                       <button class="tab" id="localSortBtn" title="切换本地曲库排序：默认 / 标题 / 歌手 / 时长 / 大小 / 播放次数 / 最近添加" onclick="cycleLocalSort()">↕ 默认序</button>
-                      <button class="tab" onclick="showArtistGroups()" title="按歌手统计本地曲库（数量/体积），点击歌手即过滤">🎤 歌手分组</button>
-                      <button class="tab" onclick="showAlbumGroups()" title="按专辑统计本地曲库（数量/体积），点击专辑即过滤">💿 专辑分组</button>
-                      <button class="tab" onclick="showFolderGroups()" title="按所在文件夹聚合本地曲库（数量/体积），点击文件夹只看它——关键词过滤不到的路径维度">🗂 文件夹分组</button>
+                      <div class="tb-dropdown">
+                        <button class="tab" onclick="toggleTbDropdown(event, 'localGroupMenu')">🗂 分组 ▾</button>
+                        <div class="tb-menu" id="localGroupMenu" hidden>
+                          <button class="tb-menu-item" onclick="showArtistGroups();closeTbMenus()" title="按歌手统计本地曲库（数量/体积），点击歌手即过滤">🎤 歌手分组</button>
+                          <button class="tb-menu-item" onclick="showAlbumGroups();closeTbMenus()" title="按专辑统计本地曲库（数量/体积），点击专辑即过滤">💿 专辑分组</button>
+                          <button class="tb-menu-item" onclick="showFolderGroups();closeTbMenus()" title="按所在文件夹聚合本地曲库（数量/体积），点击文件夹只看它——关键词过滤不到的路径维度">🗂 文件夹分组</button>
+                        </div>
+                      </div>
+                      <div class="tb-dropdown">
+                        <button class="tab" onclick="toggleTbDropdown(event, 'localToolsMenu')">🧰 工具 ▾</button>
+                        <div class="tb-menu" id="localToolsMenu" hidden>
+                          <div class="tb-menu-label">批量工具</div>
+                          <button class="tb-menu-item" onclick="batchFetchCovers();closeTbMenus()" data-i18n="local.batchCover" title="为缺封面的歌批量拉取专辑封面">🖼️ 批量补封面</button>
+                          <button class="tb-menu-item" onclick="batchFetchLyrics();closeTbMenus()" data-i18n="local.batchLyric">🎵 批量补歌词</button>
+                          <button class="tb-menu-item" onclick="convertSelectedAudio();closeTbMenus()" data-i18n="local.convert">🔄 转码</button>
+                          <div class="tb-menu-label">曲库体检</div>
+                          <button class="tb-menu-item" onclick="showLibraryStats();closeTbMenus()" data-i18n="local.stats">📊 统计</button>
+                          <button class="tb-menu-item" onclick="detectDuplicateSongs();closeTbMenus()" data-i18n="local.dedup">🔍 查重</button>
+                          <button class="tb-menu-item" onclick="detectContentDuplicates();closeTbMenus()" data-i18n="local.dedupContent" title="按文件字节哈希查找内容完全相同的副本（改名/换目录也能抓到）">🧬 内容查重</button>
+                          <button class="tb-menu-item" onclick="batchProbeQuality();closeTbMenus()">🔬 音质扫描</button>
+                          <div class="tb-menu-label">播放与分享</div>
+                          <button class="tb-menu-item" onclick="locatePlayingLocal();closeTbMenus()" title="滚动到正在播放的歌并闪烁标记">🎯 定位播放</button>
+                          <button class="tb-menu-item" onclick="exportLocalM3u();closeTbMenus()" title="把当前过滤/排序视图导出为 m3u 歌单文件（选择模式下勾选优先）">⤴ 导出m3u</button>
+                          <button class="tb-menu-item" onclick="copyLocalListText();closeTbMenus()" title="把当前过滤视图复制成一行一首的文本清单（歌名 - 歌手），发群聊直接贴">📋 复制曲单</button>
+                        </div>
+                      </div>
                       <span class="local-info" id="localInfo" data-i18n="local.notScanned">未扫描</span>
                     </div>
                     <!-- 批量选择操作栏 -->

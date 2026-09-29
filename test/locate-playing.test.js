@@ -69,7 +69,9 @@ test('两视图接线：详情走 data-pidx+清过滤重试，本地走 scrollTo
   assert.match(LOCAL_JS, /setTimeout\(flash, 200\)/);
   assert.match(LOCAL_JS, /window\.locatePlayingLocal = locatePlayingLocal;/);
   assert.match(HTML, /onclick="locatePlayingInDetail\(\)">🎯 定位<\/button>/);
-  assert.match(HTML, /onclick="locatePlayingLocal\(\)"[^>]*>🎯 定位播放<\/button>/);
+  // 本地那枚已折进「🧰 工具 ▾」：入口判据连菜单项形状一起钉（只钉函数名，
+  // 按钮被整段删出工具栏也照样绿，而用户看到的症状是「定位播放不见了」）
+  assert.match(HTML, /class="tb-menu-item" onclick="locatePlayingLocal\(\);closeTbMenus\(\)"[^>]*>🎯 定位播放</);
   assert.match(PALETTE, /id: 'pl-locate'[\s\S]*?_call\('locatePlayingInDetail'\)/);
   assert.match(PALETTE, /id: 'lc-locate'[\s\S]*?_call\('locatePlayingLocal'\)/);
   const MOD = fs.readFileSync(
