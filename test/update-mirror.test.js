@@ -61,7 +61,13 @@ test('useMirrorFeed: 切 feed 同时关差分下载并固定 latest 通道', () 
 
 test('守卫：镜像模块不硬编码仓库名/账号名（真源只能是 app-update.yml）', () => {
   const src = fs.readFileSync(path.join(ROOT, 'src', 'main', 'updateMirror.js'), 'utf8');
-  assert.doesNotMatch(src, /maliang|MM-Music-Destop/i, '镜像模块出现硬编码仓库标识');
+  // 'Lanyue' 只按 feed 字面量形状判 —— 裸词是合法品牌名（导出文件名/文案都用它），
+  // 照裸词判会把品牌字符串一并禁掉。
+  assert.doesNotMatch(
+    src,
+    /maliang|MM-Music-Destop|repo\s*:\s*['"]?Lanyue|Lanyue\s*\/\s*releases|github\.com\/[^'"\s]*\/Lanyue/i,
+    '镜像模块出现硬编码仓库标识',
+  );
 });
 
 test('守卫：updater.js 的检查与下载都接了镜像兜底', () => {

@@ -149,7 +149,9 @@ function walk(dir, out) {
   return out;
 }
 
-const STALE_REPO = 'MusicDL';
+// 仓库改过两次名：MusicDL → MM-Music-Destop（2026-09-10）→ Lanyue（2026-09-29）。
+// 两个旧名一律算 stale —— 只该出现在历史说明里，不该出现在代码里。
+const STALE_REPOS = ['MusicDL', 'MM-Music-Destop'];
 
 /**
  * 守卫只查代码，不查散文。
@@ -185,23 +187,24 @@ test('守卫：src/ 与 build/ 里不再有旧仓库名字面量', () => {
  * 拼正则只能用 new RegExp。写成 /...['"]' + VAR + "['"]/ 会被解析成**一个**
  * 正则字面量（首个 ['"] 字符类提前闭合，VAR 被吞进 pattern），守卫静默失效。
  */
-const staleRepoPattern = new RegExp("repo\\s*:\\s*['\"]" + STALE_REPO + "['\"]");
+const staleRepoPattern = new RegExp("repo\\s*:\\s*['\"](?:" + STALE_REPOS.join('|') + ")['\"]");
 
 // 防止上面的正则自己失效（正则写坏了会静默变成永不匹配，守卫形同虚设）
 test('守卫自检：staleRepoPattern 真的能匹配', () => {
   assert.ok(staleRepoPattern.test("repo: 'MusicDL'"), '单引号');
   assert.ok(staleRepoPattern.test('repo: "MusicDL"'), '双引号');
   assert.ok(staleRepoPattern.test('repo:\t"MusicDL"'), '带空白');
-  assert.ok(!staleRepoPattern.test("repo: 'MM-Music-Destop'"), '新仓库名不应命中');
+  assert.ok(staleRepoPattern.test("repo: 'MM-Music-Destop'"), '上一个名字同样算 stale');
+  assert.ok(!staleRepoPattern.test("repo: 'Lanyue'"), '现用仓库名不应命中');
 });
 
 test('守卫：build/config.cjs 的 publish 指向真实仓库', () => {
   const cfg = read('build/config.cjs');
-  assert.match(cfg, /repo:\s*['"]MM-Music-Destop['"]/, 'publish.repo 应为 MM-Music-Destop');
+  assert.match(cfg, /repo:\s*['"]Lanyue['"]/, 'publish.repo 应为 Lanyue');
   assert.match(cfg, /owner:\s*['"]maliang04110233-dot['"]/, 'publish.owner 缺失');
   assert.ok(
     !staleRepoPattern.test(stripComments(cfg)),
-    'publish.repo 仍是旧仓库名 ' + STALE_REPO,
+    'publish.repo 仍是旧仓库名 ' + STALE_REPOS.join(' / '),
   );
 });
 

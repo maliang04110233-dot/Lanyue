@@ -19,7 +19,7 @@ const { describeUpdateError, shouldReportEventError, isNetworkFailure } = requir
 // 更新源固定为本仓库 GitHub Releases，但**不在这里写 URL**。
 //
 // electron-builder 打包时会按 build/config.cjs 的 publish 段生成
-// resources/app-update.yml（repo: 'MM-Music-Destop'），electron-updater 运行时
+// resources/app-update.yml（repo: 'Lanyue'），electron-updater 运行时
 // 自动读取它。曾经这里有一句按旧仓库名硬编码的 feedURL 覆盖调用（字面量形态
 // 被 test/retry.test.js 守卫禁止，此处刻意不复述）：
 //
@@ -29,6 +29,11 @@ const { describeUpdateError, shouldReportEventError, isNetworkFailure } = requir
 //     在 github.com 连接本就不稳的网络下（实测同一时刻约 80% 连接超时），
 //     这个多出来的 hop 是白白增加失败概率；
 //   · GitHub 的改名重定向可以随时撤销，到那时自动更新会直接 404 消失。
+//
+// 2026-09-29 又改了一次名（MM-Music-Destop → Lanyue）：只动了 build/config.cjs
+// 一处，本文件一行未改 —— 这正是上面那条结论的意义。已装客户端的 app-update.yml
+// 里仍是旧名，靠 GitHub 的重定向继续可达（实测 API 与资产下载均回 301），但它们
+// 每次检查更新都会多吃一个 hop，直到升级到本次改名之后构建的版本为止。
 //
 // 结论：删掉这一句，单一真源回到 build/config.cjs。
 // test/retry.test.js 里有守卫，不许这套字面量回来。

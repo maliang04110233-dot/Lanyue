@@ -173,7 +173,7 @@ module.exports = {
   publish: {
     provider: 'github',
     owner: 'maliang04110233-dot',
-    repo: 'MM-Music-Destop',
+    repo: 'Lanyue',
     private: false,
     releaseType: 'release',
   },

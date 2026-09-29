@@ -7,7 +7,8 @@
  * 于是这句话对 most users 等于没说。本增量把这句话变成一个可点的按钮。
  *
  * 三条不可让步的契约：
- *   A. URL 只有一个真源。仓库 2026-09-10 改过名（MusicDL → MM-Music-Destop），
+ *   A. URL 只有一个真源。仓库改过两次名（MusicDL → MM-Music-Destop 2026-09-10，
+ *      MM-Music-Destop → Lanyue 2026-09-29），
  *      updater.js 顶部整段注释讲的就是"硬编码 feedURL 覆盖 app-update.yml"
  *      造成的事故。所以 Releases 页地址必须**派生自 app-update.yml**，
  *      与镜像 feed 同源（updateMirror.js 已经在解析 owner/repo）。
@@ -52,9 +53,9 @@ test('getReleasesPageUrl：从 app-update.yml 一路派生（就是打包产物�
   // 逐字对齐 release/win-unpacked/resources/app-update.yml：无引号、无注释、provider 在前。
   // 注：parseGithubFeed 的值正则不吃行尾注释，这是既有口径，手动下载入口不打算改它——
   // electron-builder 生成的就是干净两行，加容错等于给"手工改过的 yml"开需求。
-  const yml = 'provider: github\nowner: maliang04110233-dot\nrepo: MM-Music-Destop\n';
+  const yml = 'provider: github\nowner: maliang04110233-dot\nrepo: Lanyue\n';
   assert.strictEqual(um.buildReleasesPageUrl(um.parseGithubFeed(yml)),
-    'https://github.com/maliang04110233-dot/MM-Music-Destop/releases/latest');
+    'https://github.com/maliang04110233-dot/Lanyue/releases/latest');
   // 带引号的写法解析器也吃（历史上手改过），派生结果一致
   assert.strictEqual(
     um.buildReleasesPageUrl(um.parseGithubFeed("provider: github\nowner: 'a'\nrepo: \"b\"\n")),
@@ -73,6 +74,15 @@ test('守卫：仓库名字面量只许活在 build/config.cjs 的 publish 段',
   // 5bf3fbc 之前那句 setFeedURL 硬编码就是这么把真源劈成两半的。旧名 MusicDL
   // 已有 retry.test.js 的守卫看着，这里补的是**现用名**——它一旦漏进 src，
   // 下次仓库改名又会重演一遍"每次检查先吃一个 301"。
+  //
+  // 锚点为什么不再是裸仓库名（2026-09-29 改名 Lanyue 时改的）：'Lanyue' 这个裸词
+  // 在 src 里本就合法遍布（m3u 默认歌单名、导出文件名前缀、关于页文案），
+  // 照裸词判会误报成一片红。故只认「第二真源」的两种形状：feed 字面量
+  // repo: 'X'，以及写死的 owner/releases 下载页地址。
+  const FEED_SHAPES = [
+    /repo\s*:\s*['"]?(?:Lanyue|MM-Music-Destop)['"]?/g,
+    /github\.com\/maliang04110233-dot\/(?:Lanyue|MM-Music-Destop)/g,
+  ];
   const offenders = [];
   const walk = (absDir, relDir) => {
     for (const ent of fs.readdirSync(absDir, { withFileTypes: true })) {
@@ -81,7 +91,7 @@ test('守卫：仓库名字面量只许活在 build/config.cjs 的 publish 段',
       if (ent.isDirectory()) { walk(p, rel); continue; }
       if (!/\.(js|cjs|json|html)$/.test(ent.name)) continue;
       const src = stripComments(read(rel));
-      const hits = (src.match(/MM-Music-Destop/g) || []).length;
+      const hits = FEED_SHAPES.reduce((n, re) => n + (src.match(re) || []).length, 0);
       if (hits) offenders.push(`${rel}: ${hits}`);
     }
   };
