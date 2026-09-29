@@ -17,6 +17,7 @@ import { failureTagHtml, isAuthFailure } from '../diagnose.js';
 import { isRangeClick, rangeKeys } from '../selectionRange.js';
 import { registerDeleteScope } from '../deleteScope.js';
 import { netFailedTasks } from '../netRecovery.js';
+import { explainSkip } from '../policySkipNotice.js';
 
 // ── 行内 SVG 图标（与 home.js ROW_ICONS 同范式：16px、stroke 1.7、currentColor）──
 // chevronDown / chevronRight 是**折叠/展开**专用的一对，刻意不复用 up/down：
@@ -277,6 +278,8 @@ function _queueRowHtml(s) {
     const fileSize = s.fileSize ? formatFileSize(s.fileSize) : '';
     // 格式化下载耗时
     const downloadTime = s.downloadTime ? formatDuration(s.downloadTime) : '';
+    // 策略跳过（status 复用 done，故必须显式还原，否则用户以为下完了）
+    const skip = explainSkip(s);
     return `
     <div class="queue-item queue-status-${s.status}${selected && _dlSelectionMode ? ' selected' : ''}" data-taskid="${escAttr(s.taskId)}">
       ${_dlSelectionMode ? `
@@ -289,7 +292,7 @@ function _queueRowHtml(s) {
       <div class="queue-cover-ph" ${s.cover ? 'style="display:none"' : ''}>${svgIcon('note')}</div>
       <div class="queue-info" tabindex="0" role="button" onclick="event.stopPropagation();toggleQueueDetail('${escQ(s.taskId)}')" style="cursor:pointer;">
         <div class="queue-title">${esc(s.title || '未知')}</div>
-        <div class="queue-status status-${s.status}">${statusLabel(s.status)}${s.error ? ': ' + esc(s.error) : ''}${failureTagHtml(s.errorCode, { fn: 'diagnoseFailure', arg: s.taskId })}</div>
+        <div class="queue-status status-${s.status}">${statusLabel(s.status)}${skip.summary ? '（已跳过）' : ''}${skip.summary ? '：' + esc(skip.summary) : ''}${!skip.skipped && s.error ? ': ' + esc(s.error) : ''}${failureTagHtml(s.errorCode, { fn: 'diagnoseFailure', arg: s.taskId })}</div>
         ${s.status === 'downloading' ? `
         <div class="progress-bar-wrap"><div class="progress-bar" id="prog-${escAttr(s.taskId)}" style="width:${s.progress||0}%"></div></div>
         <div class="queue-dl-meta" id="progmeta-${escAttr(s.taskId)}"></div>` : ''}
@@ -302,7 +305,7 @@ function _queueRowHtml(s) {
       ${(!_dlSelectionMode && s.status === 'downloading') ? `<button class="queue-cancel" onclick="event.stopPropagation();api.cancelDownload('${escQ(s.taskId)}')" title="取消下载（中断传输并清理临时文件）">${svgIcon('close')}</button>` : ''}
       ${(!_dlSelectionMode && s.status === 'done' && s.savePath) ? `<button class="queue-cancel" style="color:var(--neon-cyan)" title="本地播放（下载完直接听）" onclick="event.stopPropagation();playQueueItem('${escQ(s.taskId)}')">${svgIcon('play')}</button>` : ''}
       ${(!_dlSelectionMode && s.status === 'done' && s.savePath) ? `<button class="queue-cancel" style="color:var(--neon-green)" title="打开文件夹" onclick="event.stopPropagation();openFolderSafe('${escQ(s.savePath)}')">${svgIcon('folder')}</button>` : ''}
-      ${(!_dlSelectionMode && s.status === 'done') ? `<button class="queue-cancel" style="color:var(--neon-cyan)" title="转换格式" onclick="event.stopPropagation();showConvertModal('${escQ(s.savePath || '')}', '${escQ(s.title || '')}')">${svgIcon('refresh')}</button>` : ''}
+      ${(!_dlSelectionMode && s.status === 'done' && !skip.skipped) ? `<button class="queue-cancel" style="color:var(--neon-cyan)" title="转换格式" onclick="event.stopPropagation();showConvertModal('${escQ(s.savePath || '')}', '${escQ(s.title || '')}')">${svgIcon('refresh')}</button>` : ''}
       ${(!_dlSelectionMode && s.status === 'error') ? `
         <button class="queue-cancel" style="color:var(--neon-yellow)" title="诊断失败原因" onclick="event.stopPropagation();window.diagnoseFailure('${escQ(s.taskId)}')">${svgIcon('sos')}</button>
         <button class="queue-cancel" style="color:var(--neon-orange)" title="重试下载" onclick="event.stopPropagation();retryQueueItem('${escQ(s.taskId)}')">${svgIcon('refresh')}</button>
@@ -318,6 +321,11 @@ function _queueRowHtml(s) {
         ${s.savePath ? `<div class="queue-detail-row"><span class="queue-detail-label">文件路径</span><span class="queue-detail-value queue-detail-path" title="${escAttr(s.savePath)}">${esc(s.savePath)}</span></div>` : ''}
         ${s.source ? `<div class="queue-detail-row"><span class="queue-detail-label">来源</span><span class="queue-detail-value">${esc(s.source)}${s.quality ? ' · ' + esc(s.quality) : ''}</span></div>` : ''}
         ${maskedUrl ? `<div class="queue-detail-row"><span class="queue-detail-label">下载链接</span><span class="queue-detail-value queue-detail-url" title="${escAttr(s.downloadUrl)}">${esc(maskedUrl)}</span></div>` : ''}
+        ${skip.skipped ? `
+        <div class="queue-detail-row queue-detail-error"><span class="queue-detail-label">跳过原因</span><span class="queue-detail-value">${esc(skip.summary)}</span></div>
+        ${skip.detail.map(d => `<div class="queue-detail-row"><span class="queue-detail-label">判定依据</span><span class="queue-detail-value">${esc(d)}</span></div>`).join('')}
+        ${skip.hint ? `<div class="queue-detail-row"><span class="queue-detail-label">怎么办</span><span class="queue-detail-value">${esc(skip.hint)}</span></div>` : ''}
+        ` : ''}
         ${s.error ? `<div class="queue-detail-row queue-detail-error"><span class="queue-detail-label">错误信息</span><span class="queue-detail-value">${esc(s.error)}</span></div>` : ''}
       </div>
     </div>` : ''}`;
