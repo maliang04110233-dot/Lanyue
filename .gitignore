@@ -75,3 +75,8 @@ spark-output/
 /test-m4a-real.js
 /test-online-lrc.js
 /test_console.py
+
+# CDP 工具栏探针（一次性诊断脚本，不入仓库）。
+# 用**精确路径**，不要写成 scripts/*-probe.mjs —— 那会静默吃掉将来
+# 正当的探针测试（仓库里已有 *-wiring.test.js 这类形态）。
+scripts/cdp-toolbar-probe.mjs

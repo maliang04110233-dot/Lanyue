@@ -241,7 +241,7 @@ async function fetchShare(trackId) {
   const awl = page.audioWithLyricsOption || {};
   const data = {
     url: String(awl.url || '').trim(),
-    duration: Number(awl.duration) || 0, // ⚠️ 秒
+    duration: (Number(awl.duration) || 0) * 1000, // 统一为毫秒：分享页给的是秒，搜索路径给的是毫秒
     lyrics: (awl.lyrics && awl.lyrics.sentences) || [],
     name: String(awl.trackName || '').trim(),
     artist: String(awl.artistName || '').trim(),
@@ -344,9 +344,10 @@ async function sodaGetUrl(id, _quality = 'standard') {
       logger.warn('[soda] 直链预检未通过:', url.slice(0, 80), probe.reason || probe.status);
       return { error: '汽水音源暂不可用', code: 'CDN_EMPTY', fatal: true };
     }
-    const br = estimateBr(probe.sizeBytes, share.duration);
-    if (isImpliedBitrateImpossible(probe.sizeBytes, share.duration)) {
-      logger.warn(`[soda] 声称 ${share.duration}s 只有 ${probe.sizeBytes} 字节，判为试听片段`);
+    const durationSec = share.duration / 1000; // share.duration 是毫秒，码率估算吃秒
+    const br = estimateBr(probe.sizeBytes, durationSec);
+    if (isImpliedBitrateImpossible(probe.sizeBytes, durationSec)) {
+      logger.warn(`[soda] 声称 ${durationSec}s 只有 ${probe.sizeBytes} 字节，判为试听片段`);
       return {
         error: '汽水分享页仅有试听片段（无整曲音源）',
         code: 'NO_AUDIO_STREAM',
