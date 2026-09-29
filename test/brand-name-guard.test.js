@@ -45,7 +45,6 @@ const OLD_BRAND = /(?:^|[^A-Za-z])Music[-_ ]?DL(?:$|[^A-Za-z])/i;
 // 白名单：精确到 文件:行，必须写理由
 const ALLOWED = new Map([
   ['build/config.cjs:12', 'appId 钉死在旧拼写上：改动等于换应用身份，Windows 升级链断裂'],
-  ['build/config.cjs:123', '安装产物名有既定约束（见 config.cjs 同处注释）；改名属发布工程决策，不走文案批次'],
   ['src/main/mcp/mcpCore.js:16', "MCP SERVER_NAME 是机器标识符，与保留的 appId 同族；改成 lanyue 会与 com.musicdl.app 互相打架"],
   ['scripts/write_tags.py:54', 'HTTP User-Agent 头必须保持 ASCII/latin-1，CJK 会直接让请求失败'],
   ['README.md:3', '名称史留档：这里必须保留旧名，否则读者无法理解 1.0.31 及更早的发布'],

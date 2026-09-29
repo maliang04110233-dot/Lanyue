@@ -119,8 +119,13 @@ module.exports = {
 
   // ── NSIS 安装程序 ──────────────────────────────────
   nsis: {
-    // 产物名钉死在旧 ASCII 命名上：已发布的 latest.yml / GitHub Release 资产名直接引用它们
-    artifactName: 'MusicDL-Setup-${version}.${ext}',
+    // 产物名：v1.0.33 及更早发布为 MusicDL-Setup-*（旧品牌），v1.0.34 起改用 Lanyue-*。
+    // 此前"钉死旧名"的理由是"已发布的 latest.yml / Release 资产直接引用它们"——
+    // 那条约束其实只对**已发布**的版本成立，改名因此是安全的：
+    //   ① 每次发版重新生成 latest.yml，它指向的是本次自己的产物名，自洽；
+    //   ② 旧资产不会被删除，旧下载 URL 继续可达（v1.0.33 的链接照常有效）；
+    //   ③ appId 与包名（→ updaterCacheDirName）都没动 ⇒ 升级链与更新缓存目录不受影响。
+    artifactName: 'Lanyue-Setup-${version}.${ext}',
     oneClick: false,
     perMachine: true,
     allowToChangeInstallationDirectory: true,
