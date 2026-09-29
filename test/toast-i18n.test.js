@@ -771,7 +771,7 @@ function cjkLiterals(code) {
  *      showToast 调用，LEDGER 的"看实参"判据对它们**完全失明**。
  *   ② 同文件内、但不落在反馈调用上的字面量（弹窗标题/按钮 title/剪贴板报告…）：
  *      views/playlist.js 归零 LEDGER 之后，整文件仍有 47 处 CJK 字面量 ——
- *      其中 `🧮 MusicDL 跨歌单重复报告（${n} 首）`（copyDedupeScanReport）直接进剪贴板，
+  *      其中 `🧮 揽乐 跨歌单重复报告（${n} 首）`（copyDedupeScanReport）直接进剪贴板，
  *      英文界面上照样是中文。
  *
  * 入表规则（写死，别再出现"LEDGER 说 0 就当这个文件干净了"）：

@@ -139,7 +139,7 @@ async function exportHistoryM3u() {
         duration: (s.duration || 0) * 1000,
       })),
       format: 'm3u',
-      name: 'MusicDL History',
+      name: 'Lanyue History',
     });
     if (result.canceled) return;
     if (result.error) {

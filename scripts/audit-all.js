@@ -95,7 +95,7 @@ for(const f of jsFiles){
   for(const t of todos) issues.push(`${t.trim()} in ${rel}`);
 }
 
-console.log('=== MusicDL 代码审计报告 ===');
+console.log('=== 揽乐 代码审计报告 ===');
 console.log(`总问题数: ${issues.length}\n`);
 const byType = {};
 for(const i of issues){

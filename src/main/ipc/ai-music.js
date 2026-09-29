@@ -68,7 +68,7 @@ function generateLrcWithTiming(lyrics, title, durationMs) {
   let lrcContent = `[ti:${title || 'AI创作'}]\n`;
   lrcContent += `[ar:AI创作]\n`;
   lrcContent += `[al:${title || 'AI创作'}]\n`;
-  lrcContent += `[by:MusicDL]\n\n`;
+  lrcContent += `[by:揽乐]\n\n`;
 
   let currentTime = introTime;
 

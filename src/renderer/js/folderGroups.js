@@ -108,7 +108,7 @@ async function _exportFolder(songs, label) {
   try {
     const r = await api.exportPlaylist({
       songs, format: 'm3u',
-      name: 'MusicDL-' + sanitizeFileBase(label),
+      name: 'Lanyue-' + sanitizeFileBase(label),
     });
     if (r && r.canceled) return;
     if (r && r.error) throw new Error(r.error);

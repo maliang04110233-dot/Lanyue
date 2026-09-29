@@ -3,13 +3,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 // （见 src/shared/ipcContract.js buildContractArg）。sandbox preload 运行时
 // 不能 require 应用相对路径，argv 是保持单一事实源的传递方式。
 const logger = {
-  warn: (...args) => console.warn('[MusicDL][preload]', ...args),
+  warn: (...args) => console.warn('[揽乐][preload]', ...args),
 };
 
 const raw = process.argv.find(a => a.startsWith('--ipc-contract='));
 if (!raw) {
   // 不静默降级为无白名单：宁可窗口明确报错也不暴露未校验的桥
-  console.error('[MusicDL][preload] 缺少 --ipc-contract 参数，musicAPI 不可用（检查主进程 additionalArguments 注入）');
+  console.error('[揽乐][preload] 缺少 --ipc-contract 参数，musicAPI 不可用（检查主进程 additionalArguments 注入）');
 }
 const contract = raw ? JSON.parse(raw.slice('--ipc-contract='.length)) : { invoke: [], send: [], receive: [], methods: {}, events: {} };
 

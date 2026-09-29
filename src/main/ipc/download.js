@@ -287,7 +287,7 @@ function register() {
     const { dialog } = require('electron');
 
     try {
-      const { songs, format = 'm3u', name = 'MusicDL' } = params;
+      const { songs, format = 'm3u', name = 'Lanyue' } = params;
       if (!songs || !songs.length) return { error: '没有可导出的歌曲' };
 
       const ext = format === 'pls' ? 'pls' : 'm3u';

@@ -651,7 +651,7 @@ async function exportCurrentPlaylist() {
         duration: s.duration || 0,
       })),
       format: 'm3u',
-      name: 'MusicDL Playlist',
+      name: 'Lanyue Playlist',
     });
 
     if (result.canceled) return;

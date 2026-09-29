@@ -11,7 +11,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const raw = process.argv.find(a => a.startsWith('--ipc-contract='));
 if (!raw) {
-  console.error('[MusicDL][preload-secondary] 缺少 --ipc-contract 参数，miniAPI 不可用（检查主进程 additionalArguments 注入）');
+  console.error('[揽乐][preload-secondary] 缺少 --ipc-contract 参数，miniAPI 不可用（检查主进程 additionalArguments 注入）');
 }
 const contract = raw ? JSON.parse(raw.slice('--ipc-contract='.length)) : { send: [], receive: [] };
 

@@ -24,7 +24,7 @@
     "downloader",
     "electron"
   ],
-  "author": "MusicDL",
+  "author": "揽乐",
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.39.5",

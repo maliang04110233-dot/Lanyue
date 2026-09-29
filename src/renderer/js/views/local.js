@@ -370,7 +370,7 @@ async function exportLocalM3u() {
     return;
   }
   try {
-    const r = await api.exportPlaylist({ songs, format: 'm3u', name: 'MusicDL-本地库' });
+    const r = await api.exportPlaylist({ songs, format: 'm3u', name: 'Lanyue-本地库' });
     if (r && r.canceled) return;
     if (!r || r.error) { showToast('导出失败：' + ((r && r.error) || '未知错误'), 'error'); return; }
     const scope = _localSelectionMode && _selectedLocal.size ? '已选' : '当前';

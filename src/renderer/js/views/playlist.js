@@ -1215,7 +1215,7 @@ async function exportCurrentPlaylistM3u() {
     const r = await api.exportPlaylist({
       songs: enrichExportSongs(songs, pathMap),
       format: 'm3u',
-      name: 'MusicDL-' + sanitizeFileBase(name),
+      name: 'Lanyue-' + sanitizeFileBase(name),
     });
     if (r && r.canceled) return;
     if (r && r.success) showToast(t('toast.plExported', { count: songs.length, path: r.path }), 'success', 3500);
@@ -1424,7 +1424,7 @@ function closeDedupeScanModal() {
 async function copyDedupeScanReport() {
   const body = dedupeScanText(_dedupeGroups);
   if (!body) { showToast(t('toast.plNothingToCopyContent'), 'info'); return; }
-  const ok = await copyText(`🧮 MusicDL 跨歌单重复报告（${_dedupeGroups.length} 首）\n${body}`);
+  const ok = await copyText(`🧮 揽乐 跨歌单重复报告（${_dedupeGroups.length} 首）\n${body}`);
   showToast(ok ? t('toast.plDupReportCopied') : t('toast.copyFailed'), ok ? 'success' : 'error', 2500);
 }
 
