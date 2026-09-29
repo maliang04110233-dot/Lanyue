@@ -9,7 +9,8 @@
 
 const prefs = require('../../utils/prefs');
 const logger = require('../../utils/logger');
-const { aggregateAcrossSources, pickRepresentative } = require('../../utils/crossSourceAggregate');
+const { aggregateAcrossSources, pickRepresentative, songKey: aggSongKey } = require('../../utils/crossSourceAggregate');
+const cookieStore = require('../../utils/cookieStore');
 const { handle } = require('./register');
 const { trashRemove, trashRestore, purgeExpired, trashView, trashPurge } = require('../../utils/playlistTrash');
 
@@ -119,15 +120,27 @@ handle('aggregate-cross-source', async (_, opts) => {
   const clusters = new Map();
   for (const s of merged.songs) {
     if (!s._crossSource || !Array.isArray(s._dupOf)) continue;
-    const k = [...s._dupOf, require('../../utils/crossSourceAggregate').songKey(s)].sort().join('|');
+    const k = [...s._dupOf, aggSongKey(s)].sort().join('|');
     if (!clusters.has(k)) clusters.set(k, []);
     clusters.get(k).push(s);
   }
+
+  // 已登录平台集合：cookieStore 是登录态的唯一权威来源（设置页账号卡片读的是它）。
+  // 漏传会让 pickRepresentative 的第一条排序准则恒不生效——不是取错条目，
+  // 而是「未登录的源排到了已登录的源前面」，用户点了下载才失败。
+  // cookieStore 是懒加载（首次 getAll 才读盘），聚合只读不写它的缓存之外的东西。
+  const loggedIn = new Set(
+    Object.entries(cookieStore.getAll())
+      .filter(([, v]) => !!v)
+      .map(([k]) => String(k).trim().toLowerCase())
+  );
+
   for (const members of clusters.values()) {
-    const rep = pickRepresentative(members);
+    const rep = pickRepresentative(members, loggedIn);
     if (!rep) continue;
+    const repKey = aggSongKey(rep);
     for (const s of members) {
-      s._primary = songKey(s) === require('../../utils/crossSourceAggregate').songKey(rep);
+      s._primary = aggSongKey(s) === repKey;
     }
   }
 
