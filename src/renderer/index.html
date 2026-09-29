@@ -1241,6 +1241,15 @@
               <div class="about-disclaimer" data-i18n="settings.about.disclaimer">本项目仅供学习研究使用，请遵守各平台服务条款。</div>
             </div>
             <button id="checkUpdateBtn" class="setting-btn setting-btn--wide" onclick="window.checkForUpdate()" data-i18n="settings.about.checkUpdate">检查更新</button>
+            <!--
+              常驻安全提示（W2）。必须常驻而不是只在更新失败时弹：用户判断
+              「这个安装包能不能放心装」的时刻，早于任何一次更新失败。
+              文案与 CHANGELOG v1.0.35 第 4.1 节一致，不得写成「已启用签名校验」
+              —— 事实相反（build/config.cjs 无证书 ⇒ 产物无 publisherName
+              ⇒ verifyUpdateCodeSignature 空转，见 test/update-signature-guard.test.js）。
+              采购证书后，连同 test 的 RECORDED_STATE 一起改。
+            -->
+            <div class="setting-hint" style="margin-top:8px;" data-i18n="settings.about.updateSecurityHint">当前更新包未启用安装包签名校验，请仅从官方渠道获取。</div>
           </div>
 
           <div class="settings-section-title" data-i18n="settings.about.linksTitle">快捷链接</div>

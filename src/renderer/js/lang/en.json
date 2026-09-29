@@ -201,6 +201,7 @@
   "settings.about.desc": "Multi-platform music download desktop app · Electron",
   "settings.about.support": "Supports: NetEase Music · QQ Music · Bilibili · KuGou · Kuwo",
   "settings.about.checkUpdate": "Check for Updates",
+  "settings.about.updateSecurityHint": "Update packages are not currently code-signature verified. Please install from official channels only.",
   "settings.about.disclaimer": "For study and research only. Please comply with each platform's terms of service.",
   "settings.about.shortcutsTitle": "Shortcuts",
   "settings.about.shortcut.play": "Play/Pause",

@@ -114,6 +114,20 @@ module.exports = {
     // 曾经被显式置为 false：配合 src/main/updateMirror.js 的第三方镜像兜底
     // （ghproxy / gh.ddlc），等于把「更新包由谁提供」的信任根交给网络中间人 ——
     // 镜像或链路被劫持即可静默安装未签名程序。签名校验是镜像兜底能存在的前提。
+    //
+    // ── 当前未启用安装包签名校验 ──────────────────────────────
+    // 上面那句「不得关闭」描述的是**这个开关的意图**，不是当前的实际效果。
+    // 现状（2026-09-28 复审 + 2026-09-29 复核，见 test/update-signature-guard.test.js）：
+    //   electron-updater/out/NsisUpdater.js:84-99 先读产物 app-update.yml 的
+    //   publisherName，取不到就 return null，调用方只在**非 null** 时才抛
+    //   ERR_UPDATER_INVALID_SIGNATURE —— null 的语义是「无签名信息 → 放行」。
+    //   而 publisherName 只有在配置了代码签名证书时才会被 electron-builder 写入；
+    //   本仓库目前无任何证书配置，产物里没有这个字段。
+    // ⇒ **这个开关当前不产生实际约束，更新包的真实信任根尚未收敛到自有证书。**
+    //
+    // 因此：留 true 是为了证书到位那天直接生效，不是为了「现在有防护」。
+    // 改证书配置时，请同步核对 test/update-signature-guard.test.js 的 RECORDED_STATE
+    // 与设置页的常驻提示（当前显示「未启用安装包签名校验」）。
     verifyUpdateCodeSignature: true,
   },
 
