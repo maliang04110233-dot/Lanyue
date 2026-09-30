@@ -12,6 +12,7 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 
 const LOCAL_JS = read('src/renderer/js/views/local.js');
 const FILT_JS = read('src/renderer/js/localQualityFilter.js');
+const FILTERCYCLE_JS = read('src/renderer/js/filterCycle.js');
 const HTML = read('src/renderer/index.html');
 const PALETTE = read('src/renderer/js/commandPalette.js');
 
@@ -79,16 +80,17 @@ test('文案：每个 mode 一句话，未知 mode 回落全部（按钮文字�
 test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + 面板项，纯函数模块零 DOM', () => {
   assert.ok(LOCAL_JS.includes("import { qualModeLabel, nextQualMode, filterByQuality } from '../localQualityFilter.js';"));
   assert.ok(LOCAL_JS.includes("  if (_localQualMode !== 'all') songs = filterByQuality(songs, (fp) => _probeCache.get(fp), _localQualMode);"));
-  assert.ok(LOCAL_JS.includes([
-    'function cycleLocalQual() {',
-    "  _localQualMode = nextQualMode(_localQualMode);",
-    "  _syncFilterBtn('localQualBtn', qualModeLabel(_localQualMode), _localQualMode !== 'all');",
-    '  filterLocalSongs();',
-    '}',
-  ].join('\n')), '循环函数：换态 → 刷按钮字样+高亮 → 重过筛（必须 filterLocalSongs，renderLocalSongs 只重画旧数组，等于点了没用）');
+  // 循环动作已收敛到 filterCycle（状态与档位表仍在本地/各自卫星）：local.js 侧
+  // 只声明「按钮 + 换态 + 换完重过筛」，换态/文案/高亮由 createCycleButton 统一落。
+  assert.ok(LOCAL_JS.includes("const _qualCycle = createCycleButton({"), '音质循环按钮应由 filterCycle 驱动');
+  assert.ok(LOCAL_JS.includes("btnId: 'localQualBtn',"), '音质轴绑到 localQualBtn');
+  assert.ok(LOCAL_JS.includes('next: nextQualMode,') && LOCAL_JS.includes('label: qualModeLabel,'), '音质轴用 nextQualMode/qualModeLabel');
+  assert.ok(LOCAL_JS.includes('onChange: () => filterLocalSongs(),'), '换档后必须重过筛（renderLocalSongs 只重画旧数组，等于点了没用）');
+  assert.ok(LOCAL_JS.includes('function cycleLocalQual() { _qualCycle.cycle(); }'), 'cycleLocalQual 保留为转调壳（window 桥与 HTML onclick 依赖它）');
   // 标签精简成「🧪 + 值」后，"有没有在筛"只剩 .active 一个载体：文案与高亮必须同源
-  assert.ok(LOCAL_JS.includes("btn.classList.toggle('active', !!on);"),
-    '_syncFilterBtn 要把高亮与文案一次算完（分两处写迟早漂成"按钮亮着但视图没筛"）');
+  assert.ok(FILTERCYCLE_JS.includes("btn.textContent = cfg.label(mode);")
+    && FILTERCYCLE_JS.includes("btn.classList.toggle('active', !!isActive(mode));"),
+    'filterCycle 要把高亮与文案一次算完（分两处写迟早漂成"按钮亮着但视图没筛"）');
   assert.ok(LOCAL_JS.indexOf('if (_localFmtMode !== ') < LOCAL_JS.indexOf('if (_localQualMode !== '),
     '格式轴先于音质轴（音质按已过滤的视图再切，与收藏/关键词同为 AND 叠加）');
   assert.equal((LOCAL_JS.match(/window\.cycleLocalQual = cycleLocalQual;/g) || []).length, 1);

@@ -106,13 +106,10 @@ test('文案：每个 mode 一句话，未知 mode 回落全部（按钮文字�
 test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + 面板项，纯函数模块零 DOM', () => {
   assert.ok(LOCAL_JS.includes("import { metaModeLabel, nextMetaMode, filterByMeta } from '../localMetaFilter.js';"));
   assert.ok(LOCAL_JS.includes("  if (_localMetaMode !== 'all') songs = filterByMeta(songs, _localMetaMode);"));
-  assert.ok(LOCAL_JS.includes([
-    'function cycleLocalMeta() {',
-    '  _localMetaMode = nextMetaMode(_localMetaMode);',
-    "  _syncFilterBtn('localMetaBtn', metaModeLabel(_localMetaMode), _localMetaMode !== 'all');",
-    '  filterLocalSongs();',
-    '}',
-  ].join('\n')), '循环函数：换态 → 刷按钮字样+高亮 → 重过筛');
+  // 循环动作收敛到 filterCycle：local.js 只声明按钮+换态+换完重过筛
+  assert.ok(LOCAL_JS.includes("const _metaCycle = createCycleButton({"), '完整度循环按钮应由 filterCycle 驱动');
+  assert.ok(LOCAL_JS.includes("btnId: 'localMetaBtn',") && LOCAL_JS.includes('next: nextMetaMode,') && LOCAL_JS.includes('label: metaModeLabel,'), '完整度轴绑到 localMetaBtn + nextMetaMode/metaModeLabel');
+  assert.ok(LOCAL_JS.includes('function cycleLocalMeta() { _metaCycle.cycle(); }'), 'cycleLocalMeta 保留为转调壳（window 桥与 HTML onclick 依赖它）');
   assert.ok(LOCAL_JS.indexOf("if (_localQualMode !== ") < LOCAL_JS.indexOf("if (_localMetaMode !== "),
     '音质轴先于完整度轴（完整度按已过滤的视图再切，与其余轴同为 AND 叠加）');
   assert.equal((LOCAL_JS.match(/window\.cycleLocalMeta = cycleLocalMeta;/g) || []).length, 1);
@@ -121,11 +118,22 @@ test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + �
   assert.ok(!FILT_JS.includes('document') && !FILT_JS.includes('innerHTML'));
 });
 
-test('回归钉：每条本地库过滤轴的循环函数都必须重跑 filterLocalSongs（漏调致按钮失效）', () => {
-  const axes = ['toggleLocalFavOnly', 'cycleLocalFmt', 'cycleLocalQual', 'cycleLocalSort', 'cycleLocalMeta'];
-  for (const fn of axes) {
+test('回归钉：每条本地库过滤轴换态后都必须重跑 filterLocalSongs（漏调致按钮失效）', () => {
+  // 两条路径都算「重过筛」：① 函数体直接调 filterLocalSongs()（收藏轴是这种）；
+  // ② 转调 filterCycle 的循环函数，其按钮配置的 onChange 必须是 filterLocalSongs()。
+  // 只调 renderLocalSongs() 会重画旧 localFiltered，按钮点了没反应。
+  const direct = ['toggleLocalFavOnly'];
+  const delegated = { cycleLocalFmt: '_fmtCycle', cycleLocalQual: '_qualCycle', cycleLocalSort: '_sortCycle', cycleLocalMeta: '_metaCycle' };
+  for (const fn of direct) {
+    assert.ok(fnBody(LOCAL_JS, fn).includes('filterLocalSongs()'), `${fn} 换态后必须重过筛`);
+  }
+  for (const [fn, cfg] of Object.entries(delegated)) {
     const body = fnBody(LOCAL_JS, fn);
-    assert.ok(body.includes('filterLocalSongs()'),
-      `${fn} 换态后必须重过筛：只调 renderLocalSongs() 会重画旧 localFiltered，按钮点了没反应`);
+    assert.ok(body.includes(cfg + '.cycle()'), `${fn} 应转调 ${cfg}.cycle()`);
+    // 找到该按钮配置块，断言其 onChange 重过筛
+    const start = LOCAL_JS.indexOf(`const ${cfg} = createCycleButton({`);
+    assert.ok(start >= 0, `缺 ${cfg} 配置`);
+    const block = LOCAL_JS.slice(start, LOCAL_JS.indexOf('});', start));
+    assert.ok(block.includes('onChange: () => filterLocalSongs(),'), `${cfg} 换档后必须重过筛（onChange→filterLocalSongs）`);
   }
 });

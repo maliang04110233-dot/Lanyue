@@ -39,6 +39,7 @@ import { indexOfPlaying, flashRow } from '../locatePlaying.js';
 import { groupSongsForAlbumWall, normalizeGroupKey, UNKNOWN_ALBUM } from '../artistGroups.js';
 import { t } from '../i18n.js';
 import { createListSelection } from '../listSelection.js';
+import { createCycleButton } from '../filterCycle.js';
 
 // 统计/查重已拆到 local-stats.js（回调在文件末尾注入）
 import {
@@ -268,28 +269,44 @@ function _syncFilterBtn(id, label, on) {
 }
 
 /**
- * 音质过滤循环：五态走一格，按钮文案同步。
- * 必须走 filterLocalSongs()（而非 renderLocalSongs()）——后者只重画
- * 已算好的 localFiltered，换态不会重新过筛，等于按钮点了没用（修复）。
+ * 三枚循环过滤按钮（🧪 音质 / 🏷 完整度 / 🎞 格式）的动作统一走 filterCycle。
+ * 档位表与文案词表仍在各自卫星（localQualityFilter 等，各有单测）；这里只把
+ * 「走一格 → 同步按钮文案+高亮 → 重新过筛」这个动作交给 createCycleButton。
+ * 回调必须是 filterLocalSongs()（而非 renderLocalSongs()）——后者只重画已算好的
+ * localFiltered，换态不会重新过筛，等于按钮点了没用。
  */
-function cycleLocalQual() {
-  _localQualMode = nextQualMode(_localQualMode);
-  _syncFilterBtn('localQualBtn', qualModeLabel(_localQualMode), _localQualMode !== 'all');
-  filterLocalSongs();
-}
+const _qualCycle = createCycleButton({
+  btnId: 'localQualBtn',
+  getMode: () => _localQualMode,
+  setMode: (m) => { _localQualMode = m; },
+  next: nextQualMode,
+  label: qualModeLabel,
+  onChange: () => filterLocalSongs(),
+});
+const _metaCycle = createCycleButton({
+  btnId: 'localMetaBtn',
+  getMode: () => _localMetaMode,
+  setMode: (m) => { _localMetaMode = m; },
+  next: nextMetaMode,
+  label: metaModeLabel,
+  onChange: () => filterLocalSongs(),
+});
+const _fmtCycle = createCycleButton({
+  btnId: 'localFmtBtn',
+  getMode: () => _localFmtMode,
+  setMode: (m) => { _localFmtMode = m; },
+  next: nextFmtMode,                       // 格式档要看全集里实际出现了哪些格式
+  label: fmtModeLabel,
+  getExtra: () => [listFormats(getState('localSongs') || [])],
+  onChange: () => filterLocalSongs(),
+});
 
+/** 音质过滤循环：五态走一格，按钮文案同步 */
+function cycleLocalQual() { _qualCycle.cycle(); }
 /** 元数据完整度过滤循环：五态走一格，按钮文案同步 */
-function cycleLocalMeta() {
-  _localMetaMode = nextMetaMode(_localMetaMode);
-  _syncFilterBtn('localMetaBtn', metaModeLabel(_localMetaMode), _localMetaMode !== 'all');
-  filterLocalSongs();
-}
-
-function cycleLocalFmt() {
-  _localFmtMode = nextFmtMode(_localFmtMode, listFormats(getState('localSongs') || []));
-  _syncFilterBtn('localFmtBtn', fmtModeLabel(_localFmtMode), _localFmtMode !== 'all');
-  filterLocalSongs();
-}
+function cycleLocalMeta() { _metaCycle.cycle(); }
+/** 格式过滤循环：按全集实际格式表走一格 */
+function cycleLocalFmt() { _fmtCycle.cycle(); }
 
 // 📋 复制曲单：当前过滤视图一行一首纯文本（歌名 - 歌手）进剪贴板，零新通道
 async function copyLocalListText() {
@@ -300,12 +317,16 @@ async function copyLocalListText() {
 }
 
 /** 排序循环：默认 → 标题 → 歌手 → 时长↓ → 大小↓ → 播放🔥 → 最近添加↓ → 默认 */
-function cycleLocalSort() {
-  _localSortMode = nextLocalSortMode(_localSortMode);
-  const btn = document.getElementById('localSortBtn');
-  if (btn) btn.textContent = localSortLabel(_localSortMode);
-  filterLocalSongs();
-}
+const _sortCycle = createCycleButton({
+  btnId: 'localSortBtn',
+  getMode: () => _localSortMode,
+  setMode: (m) => { _localSortMode = m; },
+  next: nextLocalSortMode,
+  label: localSortLabel,
+  isActive: () => false,                    // 纯排序轴：按钮只显文案，不打 .active
+  onChange: () => filterLocalSongs(),
+});
+function cycleLocalSort() { _sortCycle.cycle(); }
 
 // ── 曲库目录监听自动刷新（主进程 fs.watch → local-library-changed 推送）──
 let _autoRefreshing = false;

@@ -24,6 +24,7 @@ const path = require('node:path');
 const HTML = fs.readFileSync(path.join(__dirname, '../src/renderer/index.html'), 'utf8');
 const CSS = fs.readFileSync(path.join(__dirname, '../src/renderer/styles/player.css'), 'utf8');
 const LOCAL_JS = fs.readFileSync(path.join(__dirname, '../src/renderer/js/views/local.js'), 'utf8');
+const CYCLE_JS = fs.readFileSync(path.join(__dirname, '../src/renderer/js/filterCycle.js'), 'utf8');
 
 /** 工具栏区段：从 local-toolbar 开标签到「批量选择操作栏」注释（下拉菜单也在其中） */
 function toolbarHtml() {
@@ -78,11 +79,22 @@ test('HTML 默认字样 == 纯函数 all 态字样（两处漂了首屏一个样
 });
 
 test('三枚循环按钮的文案与高亮同源，且高亮判据是"非 all"', () => {
-  for (const [id, fn] of [['localQualBtn', 'qualModeLabel'], ['localMetaBtn', 'metaModeLabel'], ['localFmtBtn', 'fmtModeLabel']]) {
-    assert.ok(new RegExp(`_syncFilterBtn\\('${id}', ${fn}\\(_local\\w+Mode\\), _local\\w+Mode !== 'all'\\)`).test(LOCAL_JS),
-      `${id} 的文案/高亮没走同一个同步口（或高亮判据不是"非 all"）`);
+  // 文案与高亮一处算：sync() 同时写 textContent 与 .active
+  assert.ok(CYCLE_JS.includes('btn.textContent = cfg.label(mode);')
+    && CYCLE_JS.includes("btn.classList.toggle('active', !!isActive(mode));"),
+    'filterCycle.sync 里文案与高亮必须一次算完（分两处写迟早漂成"按钮亮着但视图没筛"）');
+  // 默认高亮判据 = 非 all；三枚过滤轴都不覆盖 isActive，故吃这个默认
+  assert.ok(CYCLE_JS.includes("cfg.isActive || ((m) => m !== 'all')"), '高亮判据默认应为「非 all」');
+  // 三枚轴各由一个 filterCycle 按钮驱动，文案取自各自的 *ModeLabel
+  for (const [cfgName, btnId, labelFn] of [
+    ['_qualCycle', 'localQualBtn', 'qualModeLabel'],
+    ['_metaCycle', 'localMetaBtn', 'metaModeLabel'],
+    ['_fmtCycle', 'localFmtBtn', 'fmtModeLabel'],
+  ]) {
+    assert.ok(LOCAL_JS.includes(`const ${cfgName} = createCycleButton({`), `${cfgName} 应由 filterCycle 驱动`);
+    assert.ok(LOCAL_JS.includes(`btnId: '${btnId}',`), `${cfgName} 绑到 ${btnId}`);
+    assert.ok(LOCAL_JS.includes(`label: ${labelFn},`), `${btnId} 的文案走 ${labelFn}`);
   }
-  assert.match(LOCAL_JS, /btn\.classList\.toggle\('active', !!on\);/, '_syncFilterBtn 里高亮写丢了');
 });
 
 test('折进下拉的 13 枚动作仍各自可达（精简不许变成删功能）', () => {
