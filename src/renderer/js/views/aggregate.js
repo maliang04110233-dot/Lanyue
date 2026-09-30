@@ -19,6 +19,7 @@ async function loadAggregated(opts = {}) {
       songs: Array.isArray(r && r.songs) ? r.songs : [],
       stats: (r && r.stats) || { total: 0, sources: 0, duplicates: 0, groups: 0, undecidable: 0 },
       failed: Array.isArray(r && r.failed) ? r.failed : [],
+      truncated: (r && r.truncated && typeof r.truncated === 'object') ? r.truncated : {},
     };
   } catch (e) {
     logger.warn('聚合曲库失败:', e && e.message);
@@ -26,6 +27,7 @@ async function loadAggregated(opts = {}) {
       songs: [],
       stats: { total: 0, sources: 0, duplicates: 0, groups: 0, undecidable: 0 },
       failed: [],
+      truncated: {},
     };
   } finally {
     _aggLoading = false;
@@ -77,6 +79,18 @@ function _aggStatBar() {
   if (st.undecidable > 0) {
     html += '<span class="agg-undecidable" title="' + escAttr(t('aggregate.undecidableHint')) + '">'
       + esc(t('aggregate.undecidableSome', { count: st.undecidable })) + '</span>';
+  }
+  // 触达单源取数上限的来源：有数据，但只有前 N 首。
+  // 与 failed 分开表述 —— failed 说"这个源没数据"，这里说"这个源数据不全"，
+  // 混成一句话会让用户去反复重登一个其实能用的源。
+  const truncated = (_aggState && _aggState.truncated) || {};
+  const cutNames = Object.keys(truncated);
+  if (cutNames.length) {
+    // 各源上限相同，取任一即可（不一致时这里会显示最小值，属于偏保守的说法）
+    const n = Math.min.apply(null, cutNames.map((s) => Number(truncated[s]) || 0));
+    const names = cutNames.map((src) => platformName(src) || src).join('、');
+    html += '<span class="agg-truncated" title="' + escAttr(t('aggregate.truncatedHint')) + '">'
+      + esc(t('aggregate.truncatedSome', { n, names })) + '</span>';
   }
   return html;
 }

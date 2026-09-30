@@ -177,6 +177,67 @@ function clusterKey(song) {
   return t + '␟' + normalizeArtists(song && song.artist);
 }
 
+/**
+ * 单源拉取上限（首）
+ *
+ * 各平台收藏接口的分页语义差异很大（有的没有 offset，有的游标不透明），
+ * 本版不做跨平台分页，统一按这个上限取。超出部分**不会**静默丢弃：
+ * 见 markTruncation —— 触达上限时显式回报 truncated，界面据此告知用户。
+ */
+const SOURCE_FETCH_LIMIT = 2000;
+
+/**
+ * 某来源的取数是否触达上限（⇒ 该源展示的是子集）
+ *
+ * 判据三条同时成立才算截断，缺一条都不能报：
+ *   1. 该来源确实走的是**有上限的拉取**（opts.fetched 登记了 limit）；
+ *   2. 落进结果的去重条目数 >= limit；
+ *   3. limit 是有效正整数。
+ *
+ * 第 1 条最要紧：本地红心不受这个上限约束，它恰好 2000 首时**没有**任何东西
+ * 被截掉。若把判据简化成「结果里有 2000 首 ⇒ 报截断」，红心满 2000 的用户
+ * 会被永久告知「此处仅显示前 2000 首」——一条假话，比不说更糟。
+ * 这也是把上限挂在本函数参数上（调用方声明事实）而不是猜数字的原因。
+ *
+ * @param {string} source
+ * @param {Array} songs 去重后结果
+ * @param {{fetched?: Object<string, number>}} [opts]
+ * @returns {boolean}
+ */
+function isSourceTruncated(source, songs, opts) {
+  const limits = (opts && opts.fetched) || null;
+  if (!limits) return false;
+  const limit = Number(limits[source]);
+  if (!Number.isFinite(limit) || limit <= 0) return false;
+  let n = 0;
+  for (const s of songs) if (s && s.source === source) n += 1;
+  return n >= limit;
+}
+
+/**
+ * 给触达上限的来源打 truncated 标记
+ *
+ * 与另外两个"数据不完整"信号是同族，必须分开，粒度错一次提示就废了：
+ *   failed       —— 源级，这次**没拿到**数据（该源按空列表计入）
+ *   truncated    —— 源级，**拿到了但不全**（有数据，是前 N 首）
+ *   _undecidable —— 条目级，数据全但判据不齐（无法判断是否跨源同曲）
+ *
+ * 三者混排会互相掩护：把 truncated 塞进 failed，用户看到的是"该源不可用"，
+ * 事实是它返回了 2000 首。
+ *
+ * @returns {{truncated: Object<string, number>}} source -> 实际取到的条数
+ */
+function markTruncation(songs, opts) {
+  const truncated = {};
+  for (const s of new Set((songs || []).map((x) => x && x.source).filter(Boolean))) {
+    if (!isSourceTruncated(s, songs, opts)) continue;
+    let n = 0;
+    for (const x of songs) if (x && x.source === s) n += 1;
+    truncated[s] = n;
+  }
+  return { truncated };
+}
+
 /** 跨源标识：同一首歌在同一平台内可能有多个条目（不同专辑的同一首） */
 function songKey(song) {
   if (!song || song.id == null || song.id === '') return '';
@@ -224,7 +285,9 @@ function aggregateAcrossSources(groups, opts = {}) {
     groups: 0,
     undecidable: 0,
   };
-  if (!out.length || opts.markDuplicates === false) return { songs: out, stats };
+  if (!out.length || opts.markDuplicates === false) {
+    return { songs: out, stats, ...markTruncation(out, opts) };
+  }
 
   // 粗分组：归一后歌名+歌手相同的一批（把 O(n²) 的比较压到 O(n·k)）
   const buckets = new Map();
@@ -299,7 +362,7 @@ function aggregateAcrossSources(groups, opts = {}) {
     }
   }
 
-  return { songs: out, stats };
+  return { songs: out, stats, ...markTruncation(out, opts) };
 }
 
 /**
@@ -333,6 +396,9 @@ function pickRepresentative(members, loggedIn) {
 
 module.exports = {
   DURATION_TOLERANCE_MS,
+  SOURCE_FETCH_LIMIT,
+  isSourceTruncated,
+  markTruncation,
   VERSION_TAILS,
   VERSION_MODIFIERS,
   aggregateAcrossSources,

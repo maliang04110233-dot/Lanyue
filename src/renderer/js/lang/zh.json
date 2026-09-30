@@ -545,5 +545,7 @@
   "aggregate.undecidableBadge": "无法判定",
   "aggregate.undecidableRowHint": "该条目缺少时长或歌手信息，无法判断它与其他平台的是否同一首歌。它不会被标成重复，也没有被跳过。",
   "aggregate.undecidableSome": "{count} 首无法判定是否跨源同曲（缺少时长或歌手信息）",
-  "aggregate.undecidableHint": "这些条目歌名与其他平台撞上了，但该平台不提供时长（或条目缺歌手），无法确认是否同一首。它们既没被标成重复，也没有被丢弃。"
+  "aggregate.undecidableHint": "这些条目歌名与其他平台撞上了，但该平台不提供时长（或条目缺歌手），无法确认是否同一首。它们既没被标成重复，也没有被丢弃。",
+  "aggregate.truncatedSome": "以下来源的收藏超过本版取数上限，此处只显示前 {n} 首：{names}",
+  "aggregate.truncatedHint": "这些平台的收藏接口本版不做分页，超过上限的部分没有进入这个列表。收藏本身没有丢失，重新打开该平台的原歌单仍可看到。"
 }

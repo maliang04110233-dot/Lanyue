@@ -9,7 +9,7 @@
 
 const prefs = require('../../utils/prefs');
 const logger = require('../../utils/logger');
-const { aggregateAcrossSources, pickRepresentative, songKey: aggSongKey } = require('../../utils/crossSourceAggregate');
+const { aggregateAcrossSources, pickRepresentative, songKey: aggSongKey, SOURCE_FETCH_LIMIT } = require('../../utils/crossSourceAggregate');
 const cookieStore = require('../../utils/cookieStore');
 const { handle } = require('./register');
 const { trashRemove, trashRestore, purgeExpired, trashView, trashPurge } = require('../../utils/playlistTrash');
@@ -80,6 +80,9 @@ handle('aggregate-cross-source', async (_, opts) => {
   // ── 组装来源分组 ──
   const groups = [];
   const failed = [];
+  // 哪些来源走的是「有上限的拉取」以及上限是多少。聚合层靠它判断某源是否
+  // 触顶（truncated），本地红心不登记 —— 它没有上限，满 2000 也不是截断。
+  const fetched = {};
 
   const wantSources = Array.isArray(o.sources) && o.sources.length
     ? o.sources.map((x) => String(x || '').trim()).filter(Boolean)
@@ -95,6 +98,7 @@ handle('aggregate-cross-source', async (_, opts) => {
       try {
         const songs = await getPlatformPlaylistSongs(src, pid);
         groups.push({ source: src, songs: Array.isArray(songs) ? songs : [] });
+        fetched[src] = SOURCE_FETCH_LIMIT;
       } catch (e) {
         logger.warn('[aggregate] 拉取歌单失败，降级为空:', src, e && e.message);
         groups.push({ source: src, songs: [] });
@@ -114,7 +118,7 @@ handle('aggregate-cross-source', async (_, opts) => {
     for (const [src, songs] of bySource) groups.push({ source: src, songs });
   }
 
-  const merged = aggregateAcrossSources(groups, { markDuplicates: mark });
+  const merged = aggregateAcrossSources(groups, { markDuplicates: mark, fetched });
 
   // 给每个跨源簇算出「下载优先选哪一条」
   const clusters = new Map();
@@ -154,7 +158,7 @@ handle('aggregate-cross-source', async (_, opts) => {
  */
 async function getPlatformPlaylistSongs(source, playlistId) {
   const { getPlaylistSongs } = require('../../api');
-  const r = await getPlaylistSongs(platformIdOf(source), playlistId, 2000);
+  const r = await getPlaylistSongs(platformIdOf(source), playlistId, SOURCE_FETCH_LIMIT);
   return (r && (r.songs || r.list)) || [];
 }
 

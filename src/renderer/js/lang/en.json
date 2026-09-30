@@ -545,5 +545,7 @@
   "aggregate.undecidableBadge": "Undecidable",
   "aggregate.undecidableRowHint": "This entry has no duration or artist, so it cannot be matched against the same track on other platforms. It is neither flagged as a duplicate nor dropped.",
   "aggregate.undecidableSome": "{count} tracks cannot be matched across sources (no duration or artist)",
-  "aggregate.undecidableHint": "These titles collide with other platforms, but the platform gives no duration (or the entry has no artist), so sameness cannot be confirmed. They are neither flagged as duplicates nor discarded."
+  "aggregate.undecidableHint": "These titles collide with other platforms, but the platform gives no duration (or the entry has no artist), so sameness cannot be confirmed. They are neither flagged as duplicates nor discarded.",
+  "aggregate.truncatedSome": "Favorites on these sources exceed this build's fetch cap; only the first {n} are listed: {names}",
+  "aggregate.truncatedHint": "This build does not paginate these platforms' favorite-track APIs, so anything past the cap never enters this list. The favorites themselves are intact and still visible in the platform's own playlist."
 }
