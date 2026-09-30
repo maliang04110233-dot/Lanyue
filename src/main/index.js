@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Menu, Tray, nativeImage, Notification, globalShortcut } = require('electron');
+const { app, BrowserWindow, session, Menu, Tray, nativeImage, Notification, globalShortcut, protocol } = require('electron');
 const { handle: ipcHandle, on: ipcOn, assertContractCoverage } = require('./ipc/register');
 const { buildContractArg } = require('../shared/ipcContract');
 const { defaultDownloadDir } = require('../shared/downloadDefaults');
@@ -14,6 +14,8 @@ const { init: initContext, safeSend: ctxSafeSend } = require('./context');
 const taskbarProgress = require('./taskbarProgress');
 const { createDownloadQueueEngine } = require('./downloadQueue');
 const playCache = require('./playCache');
+const { registerStreamScheme, STREAM_SCHEME } = require('./streamProtocol');
+const streamRegistry = require('./streamRegistry');
 const approvedDirs = require('./approvedDirs');
 const history = require('../utils/history');
 const prefs = require('../utils/prefs');
@@ -47,6 +49,22 @@ let libraryWatcher = null;
 // ─── 全局未捕获拒绝归口 ─────────────────────────────────
 // 「为什么需要它、为什么按栈帧分流」见 utils/rejectionGuard.js 顶部说明。
 installRejectionGuard({ logger });
+
+// 在 app ready 之前声明：Electron 要求特权 scheme 只能在 ready 前注册。
+// 少了 standard，Chromium 不会按媒体语义对这个 scheme 发 Range 请求，
+// 流式播放就退化成"只能从头顺播"，seek 依旧不可用 —— 这正是根因 1。
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: STREAM_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: false,
+    },
+  },
+]);
 
 let mainWindow;
 let tray = null;
@@ -483,6 +501,10 @@ function buildAppMenu() {
 }
 
 app.whenReady().then(async () => {
+  // 流式播放 scheme 就位（根因 1）。旧路径是把整首落盘再给 file://，
+  // 那样整首下完前 audio.duration 恒为 NaN，seek 入口根本不存在。
+  registerStreamScheme(protocol, (u) => streamRegistry.resolveStream(u));
+
   // 初始化 cookieStore
   cookieStore.init(app.getPath('userData'));
   setCookieStore(cookieStore);

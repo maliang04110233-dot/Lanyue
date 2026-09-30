@@ -11,7 +11,8 @@ const api = require('../../api');
 const { handle } = require('./register');
 const { getDownloadQueue, safeSend } = require('../context');
 const { queueMove } = require('../queueOrder');
-const { proxyPlay } = require('../playCache');
+// 根因 1 起 proxy-play 走 streamProtocol 的流式路径，playCache 的整首落盘
+// 仅保留给诊断/设置页的缓存统计，不再是播放链路的一环。
 const history = require('../../utils/history');
 const logger = require('../../utils/logger');
 // 主进程即 UI 线程：文件 IO 必须异步
@@ -59,11 +60,11 @@ function register() {
     }
   });
 
-  // 在线播放：把跨域音频代理到本地临时文件
-  const { app } = require('electron');
+  // 在线播放：把跨域音频以流式代理喂给 audio 元素（根因 1）
   const { assertPublicHttpUrl } = require('../../utils/urlGuard');
+  const streamRegistry = require('../streamRegistry');
   handle('proxy-play', async (_, url, referer) => {
-    
+
     // C10: SSRF protection — full guard via urlGuard:
     //   scheme/userinfo 校验 + DNS 全记录解析 + 内网 IP 判定（含
     //   2130706433 / 0x7f.0.0.1 / 0177.0.0.1 / [::ffff:127.0.0.1] 等编码绕过）
@@ -72,11 +73,13 @@ function register() {
     if (!check.ok) {
       return { error: `URL 校验失败: ${check.reason}` };
     }
-    try {
-      return await proxyPlay(url, referer, app.getPath('userData'));
-    } catch (e) {
-      return { error: e.message || 'proxy-play failed' };
-    }
+    // 登记后立即返回 scheme URL：不再等整首落盘。渲染层拿到就能播，
+    // duration 由首个响应头给出，seek 从此可用。
+    // SSRF 校验在 protocol.handle 里会再做一次（见 streamProtocol.js 头注约束 1），
+    // 这一次是为了在登记前就拒掉明显非法的入参、少占一条登记位。
+    const streamUrl = streamRegistry.registerStream(url, referer);
+    if (!streamUrl) return { error: 'no url' };
+    return { fileUrl: streamUrl, streaming: true };
   });
 
   // 添加到下载队列
