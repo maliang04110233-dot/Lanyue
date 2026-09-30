@@ -80,13 +80,12 @@ test('文案：每个 mode 一句话，未知 mode 回落全部（按钮文字�
 test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + 面板项，纯函数模块零 DOM', () => {
   assert.ok(LOCAL_JS.includes("import { qualModeLabel, nextQualMode, filterByQuality } from '../localQualityFilter.js';"));
   assert.ok(LOCAL_JS.includes("  if (_localQualMode !== 'all') songs = filterByQuality(songs, (fp) => _probeCache.get(fp), _localQualMode);"));
-  // 循环动作已收敛到 filterCycle（状态与档位表仍在本地/各自卫星）：local.js 侧
-  // 只声明「按钮 + 换态 + 换完重过筛」，换态/文案/高亮由 createCycleButton 统一落。
-  assert.ok(LOCAL_JS.includes("const _qualCycle = createCycleButton({"), '音质循环按钮应由 filterCycle 驱动');
-  assert.ok(LOCAL_JS.includes("btnId: 'localQualBtn',"), '音质轴绑到 localQualBtn');
-  assert.ok(LOCAL_JS.includes('next: nextQualMode,') && LOCAL_JS.includes('label: qualModeLabel,'), '音质轴用 nextQualMode/qualModeLabel');
-  assert.ok(LOCAL_JS.includes('onChange: () => filterLocalSongs(),'), '换档后必须重过筛（renderLocalSongs 只重画旧数组，等于点了没用）');
-  assert.ok(LOCAL_JS.includes('function cycleLocalQual() { _qualCycle.cycle(); }'), 'cycleLocalQual 保留为转调壳（window 桥与 HTML onclick 依赖它）');
+  // 循环动作收敛到 LOCAL_AXES 声明式表 + listAxes 装配：local.js 只声明
+  // 「这条轴用什么档位表、文案怎么算」，换态/落按钮由 createCycleButton 统一。
+  assert.ok(/id:\s*'qual'/.test(LOCAL_JS) && /btnId:\s*'localQualBtn'/.test(LOCAL_JS), '音质轴应在 LOCAL_AXES 表里声明并绑到 localQualBtn');
+  assert.ok(/id:\s*'qual'[\s\S]{0,320}next:\s*nextQualMode,/.test(LOCAL_JS) && /id:\s*'qual'[\s\S]{0,320}label:\s*qualModeLabel,/.test(LOCAL_JS), '音质轴用 nextQualMode/qualModeLabel');
+  assert.ok(/wireAxes\(LOCAL_AXES,\s*\(\)\s*=>\s*filterLocalSongs\(\)\)/.test(LOCAL_JS), '换档后共用重过筛回调');
+  assert.ok(LOCAL_JS.includes("function cycleLocalQual() { _axes.cycle('qual'); }"), 'cycleLocalQual 保留为转调壳（window 桥与 HTML onclick 依赖它）');
   // 标签精简成「🧪 + 值」后，"有没有在筛"只剩 .active 一个载体：文案与高亮必须同源
   assert.ok(FILTERCYCLE_JS.includes("btn.textContent = cfg.label(mode);")
     && FILTERCYCLE_JS.includes("btn.classList.toggle('active', !!isActive(mode));"),

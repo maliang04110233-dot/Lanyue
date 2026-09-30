@@ -46,8 +46,11 @@ test('local.js 管线：开关先收藏后关键词串接，按钮文案/active 
   assert.match(LOCAL_JS, /import \{ favOnlyFilter \} from '\.\.\/localFavFilter\.js';/);
   assert.match(LOCAL_JS, /let _localFavOnly = false;/);
   assert.match(LOCAL_JS, /if \(_localFavOnly\) songs = favOnlyFilter\(songs, getState\('favoriteKeys'\)\);/);
-  assert.match(LOCAL_JS, /btn\.textContent = _localFavOnly \? '♥ 仅收藏' : '♥ 收藏';/);
-  assert.match(LOCAL_JS, /btn\.classList\.toggle\('active', _localFavOnly\)/);
+  // 收藏轴已进 LOCAL_AXES 声明式表：文案随两态切换、高亮=mode 本身（落按钮由 createCycleButton 统一）
+  assert.match(LOCAL_JS, /id: 'fav', btnId: 'localFavBtn'/);
+  assert.match(LOCAL_JS, /label: \(m\) => \(m \? '♥ 仅收藏' : '♥ 收藏'\),/);
+  assert.match(LOCAL_JS, /isActive: \(m\) => !!m,/);
+  assert.match(LOCAL_JS, /function toggleLocalFavOnly\(\) \{ _axes\.cycle\('fav'\); \}/);
   // 90 起：即时重过滤收敛到 favorites.js 钩子回调（行内红心/行菜单共用）
   assert.match(LOCAL_JS, /window\.onLocalFavToggle = \(\) => \{ if \(_localFavOnly\) filterLocalSongs\(\); \}/);
   assert.match(LOCAL_JS, /window\.toggleLocalFavOnly = toggleLocalFavOnly;/);

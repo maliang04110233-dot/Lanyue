@@ -39,7 +39,7 @@ import { indexOfPlaying, flashRow } from '../locatePlaying.js';
 import { groupSongsForAlbumWall, normalizeGroupKey, UNKNOWN_ALBUM } from '../artistGroups.js';
 import { t } from '../i18n.js';
 import { createListSelection } from '../listSelection.js';
-import { createCycleButton } from '../filterCycle.js';
+import { wireAxes } from '../listAxes.js';
 
 // 统计/查重已拆到 local-stats.js（回调在文件末尾注入）
 import {
@@ -240,73 +240,78 @@ function filterLocalSongs() {
   else renderLocalSongs();
 }
 
-/** ♥ 仅看收藏开关：只留进了收藏歌单的本地曲，按钮文案同步 */
-function toggleLocalFavOnly() {
-  _localFavOnly = !_localFavOnly;
-  const btn = document.getElementById('localFavBtn');
-  if (btn) {
-    btn.textContent = _localFavOnly ? '♥ 仅收藏' : '♥ 收藏';
-    btn.classList.toggle('active', _localFavOnly);
-  }
-  filterLocalSongs();
-}
-
 // 收藏钩子（favorites.js 在本地歌收藏切换成功后回调）：仅收藏视图即时重过滤
 window.onLocalFavToggle = () => { if (_localFavOnly) filterLocalSongs(); };
 
 /**
- * 三枚循环过滤按钮（🧪 音质 / 🏷 完整度 / 🎞 格式）的文案与高亮同步。
+ * 本地曲库的五条「单值档位轴」：♥ 收藏 / 🎞 格式 / 🧪 音质 / 🏷 完整度 / ↕ 排序。
  *
- * 标签精简成「emoji + 值」后，"这条轴有没有在筛"不再由「全部」二字说明，
- * 改由 .active 高亮表示（与 ♥ 收藏轴同一套视觉）。文案与高亮必须一处算：
- * 分两处写迟早漂成"按钮亮着但视图没筛"或反之。
+ * 装配统一走 listAxes（见 listAxes.js）——每条轴是一份纯数据描述，装配与
+ * 「点一下」的动作由 createCycleButton 承担。加一条轴＝往这张表加一行，
+ * 不再复制一段接线。
+ *
+ * 档位表与文案词表仍在各自卫星（localFormatFilter / localQualityFilter /
+ * localMetaFilter / localSort，各有单测），本表只声明"这条轴用什么档位表、
+ * 文案怎么算、是否高亮、换完做什么"。
+ *
+ * 收藏轴是**两态**（next 恒取反、label 随 mode、高亮=mode 本身），与 cycle
+ * 同语义，故也能进这张表；排序轴是纯排序（只显文案不打卡）。
+ *
+ * onChange 一律是 filterLocalSongs()（重新过筛），不能是 renderLocalSongs()
+ * ——后者只重画已算好的 localFiltered，换态等于点了没用。
  */
-function _syncFilterBtn(id, label, on) {
-  const btn = document.getElementById(id);
-  if (!btn) return;
-  btn.textContent = label;
-  btn.classList.toggle('active', !!on);
-}
+const LOCAL_AXES = [
+  {
+    id: 'fav', btnId: 'localFavBtn',
+    get: () => _localFavOnly,
+    set: (m) => { _localFavOnly = m; },
+    next: (m) => !m,                                  // 两态：开↔关
+    label: (m) => (m ? '♥ 仅收藏' : '♥ 收藏'),
+    isActive: (m) => !!m,
+  },
+  {
+    id: 'fmt', btnId: 'localFmtBtn',
+    get: () => _localFmtMode,
+    set: (m) => { _localFmtMode = m; },
+    next: nextFmtMode,                                // 格式档要看全集实际出现的格式
+    label: fmtModeLabel,
+    getExtra: () => [listFormats(getState('localSongs') || [])],
+  },
+  {
+    id: 'qual', btnId: 'localQualBtn',
+    get: () => _localQualMode,
+    set: (m) => { _localQualMode = m; },
+    next: nextQualMode,
+    label: qualModeLabel,
+  },
+  {
+    id: 'meta', btnId: 'localMetaBtn',
+    get: () => _localMetaMode,
+    set: (m) => { _localMetaMode = m; },
+    next: nextMetaMode,
+    label: metaModeLabel,
+  },
+  {
+    id: 'sort', btnId: 'localSortBtn',
+    get: () => _localSortMode,
+    set: (m) => { _localSortMode = m; },
+    next: nextLocalSortMode,
+    label: localSortLabel,
+    isActive: () => false,                            // 纯排序轴：只显文案，不打 .active
+  },
+];
+const _axes = wireAxes(LOCAL_AXES, () => filterLocalSongs());
 
-/**
- * 三枚循环过滤按钮（🧪 音质 / 🏷 完整度 / 🎞 格式）的动作统一走 filterCycle。
- * 档位表与文案词表仍在各自卫星（localQualityFilter 等，各有单测）；这里只把
- * 「走一格 → 同步按钮文案+高亮 → 重新过筛」这个动作交给 createCycleButton。
- * 回调必须是 filterLocalSongs()（而非 renderLocalSongs()）——后者只重画已算好的
- * localFiltered，换态不会重新过筛，等于按钮点了没用。
- */
-const _qualCycle = createCycleButton({
-  btnId: 'localQualBtn',
-  getMode: () => _localQualMode,
-  setMode: (m) => { _localQualMode = m; },
-  next: nextQualMode,
-  label: qualModeLabel,
-  onChange: () => filterLocalSongs(),
-});
-const _metaCycle = createCycleButton({
-  btnId: 'localMetaBtn',
-  getMode: () => _localMetaMode,
-  setMode: (m) => { _localMetaMode = m; },
-  next: nextMetaMode,
-  label: metaModeLabel,
-  onChange: () => filterLocalSongs(),
-});
-const _fmtCycle = createCycleButton({
-  btnId: 'localFmtBtn',
-  getMode: () => _localFmtMode,
-  setMode: (m) => { _localFmtMode = m; },
-  next: nextFmtMode,                       // 格式档要看全集里实际出现了哪些格式
-  label: fmtModeLabel,
-  getExtra: () => [listFormats(getState('localSongs') || [])],
-  onChange: () => filterLocalSongs(),
-});
-
-/** 音质过滤循环：五态走一格，按钮文案同步 */
-function cycleLocalQual() { _qualCycle.cycle(); }
-/** 元数据完整度过滤循环：五态走一格，按钮文案同步 */
-function cycleLocalMeta() { _metaCycle.cycle(); }
+/** ♥ 仅看收藏开关：只留进了收藏歌单的本地曲，按钮文案同步 */
+function toggleLocalFavOnly() { _axes.cycle('fav'); }
 /** 格式过滤循环：按全集实际格式表走一格 */
-function cycleLocalFmt() { _fmtCycle.cycle(); }
+function cycleLocalFmt() { _axes.cycle('fmt'); }
+/** 音质过滤循环：五态走一格，按钮文案同步 */
+function cycleLocalQual() { _axes.cycle('qual'); }
+/** 元数据完整度过滤循环：五态走一格，按钮文案同步 */
+function cycleLocalMeta() { _axes.cycle('meta'); }
+/** 排序循环：默认 → 标题 → 歌手 → 时长↓ → 大小↓ → 播放🔥 → 最近添加↓ → 默认 */
+function cycleLocalSort() { _axes.cycle('sort'); }
 
 // 📋 复制曲单：当前过滤视图一行一首纯文本（歌名 - 歌手）进剪贴板，零新通道
 async function copyLocalListText() {
@@ -315,18 +320,6 @@ async function copyLocalListText() {
   const ok = await copyText(lines.join('\n'));
   showToast(ok ? `📋 已复制 ${lines.length} 首歌名清单` : '复制失败：剪贴板被占用或无权限', ok ? 'success' : 'error', 2500);
 }
-
-/** 排序循环：默认 → 标题 → 歌手 → 时长↓ → 大小↓ → 播放🔥 → 最近添加↓ → 默认 */
-const _sortCycle = createCycleButton({
-  btnId: 'localSortBtn',
-  getMode: () => _localSortMode,
-  setMode: (m) => { _localSortMode = m; },
-  next: nextLocalSortMode,
-  label: localSortLabel,
-  isActive: () => false,                    // 纯排序轴：按钮只显文案，不打 .active
-  onChange: () => filterLocalSongs(),
-});
-function cycleLocalSort() { _sortCycle.cycle(); }
 
 // ── 曲库目录监听自动刷新（主进程 fs.watch → local-library-changed 推送）──
 let _autoRefreshing = false;

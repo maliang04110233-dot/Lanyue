@@ -85,16 +85,22 @@ test('三枚循环按钮的文案与高亮同源，且高亮判据是"非 all"',
     'filterCycle.sync 里文案与高亮必须一次算完（分两处写迟早漂成"按钮亮着但视图没筛"）');
   // 默认高亮判据 = 非 all；三枚过滤轴都不覆盖 isActive，故吃这个默认
   assert.ok(CYCLE_JS.includes("cfg.isActive || ((m) => m !== 'all')"), '高亮判据默认应为「非 all」');
-  // 三枚轴各由一个 filterCycle 按钮驱动，文案取自各自的 *ModeLabel
-  for (const [cfgName, btnId, labelFn] of [
-    ['_qualCycle', 'localQualBtn', 'qualModeLabel'],
-    ['_metaCycle', 'localMetaBtn', 'metaModeLabel'],
-    ['_fmtCycle', 'localFmtBtn', 'fmtModeLabel'],
+  // 三枚过滤轴各在 LOCAL_AXES 表里声明，文案取自各自的 *ModeLabel（收藏/排序另有两态/纯排序判据）
+  for (const [axisId, btnId, labelFn] of [
+    ['qual', 'localQualBtn', 'qualModeLabel'],
+    ['meta', 'localMetaBtn', 'metaModeLabel'],
+    ['fmt', 'localFmtBtn', 'fmtModeLabel'],
   ]) {
-    assert.ok(LOCAL_JS.includes(`const ${cfgName} = createCycleButton({`), `${cfgName} 应由 filterCycle 驱动`);
-    assert.ok(LOCAL_JS.includes(`btnId: '${btnId}',`), `${cfgName} 绑到 ${btnId}`);
-    assert.ok(LOCAL_JS.includes(`label: ${labelFn},`), `${btnId} 的文案走 ${labelFn}`);
+    const at = LOCAL_JS.indexOf(`id: '${axisId}'`);
+    assert.ok(at >= 0, `LOCAL_AXES 里缺 ${axisId} 轴`);
+    const block = LOCAL_JS.slice(at, at + 320);
+    assert.ok(block.includes(`btnId: '${btnId}',`), `${axisId} 轴绑到 ${btnId}`);
+    assert.ok(block.includes(`label: ${labelFn},`), `${btnId} 的文案走 ${labelFn}`);
+    assert.ok(!/isActive:/.test(block), `${axisId} 是过滤轴，高亮用默认判据（非 all），不需覆写`);
   }
+  // 收藏轴是布尔两态、排序轴是纯排序——这两条必须覆写 isActive（默认值对它们不成立）
+  assert.ok(/id:\s*'fav'[\s\S]{0,320}isActive:\s*\(m\)\s*=>\s*!!m/.test(LOCAL_JS), '收藏轴两态，高亮=mode 本身');
+  assert.ok(/id:\s*'sort'[\s\S]{0,320}isActive:\s*\(\)\s*=>\s*false/.test(LOCAL_JS), '排序轴只显文案不打卡');
 });
 
 test('折进下拉的 13 枚动作仍各自可达（精简不许变成删功能）', () => {
