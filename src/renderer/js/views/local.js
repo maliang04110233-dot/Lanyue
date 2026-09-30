@@ -150,7 +150,7 @@ async function _relinkNote(result) {
   const n = (result && result.relinked && result.relinked.fixed) || 0;
   if (!n) return '';
   if (typeof window.loadUserPlaylists === 'function') await window.loadUserPlaylists();
-  return `  🔁 已自动接回 ${n} 个被外部改名的下载文件（徽标/歌单已同步）`;
+  return '  ' + t('toast.localRelinkFixed', { n });
 }
 
 async function _doScanLocalDir() {
@@ -189,7 +189,7 @@ async function _doScanLocalDir() {
       const retry = await api.scanLocalLibrary(localDirPath);
       if (retry.error) { showToast(t('toast.localScanFailed', { msg: retry.error }), 'error'); return; }
       setState('localSongs', retry.songs || []);
-      document.getElementById('localInfo').textContent = `共 ${(retry.songs || []).length} 首 · ${localDirPath}`;
+      document.getElementById('localInfo').textContent = t('local.totalCount', { count: (retry.songs || []).length, dir: localDirPath });
       filterLocalSongs(); // 重扫后必须重套当前筛选（与 refreshLocalLibrary 同一约定）
       const note = await _relinkNote(retry);
       showToast(t('toast.localScanDone', { count: (retry.songs || []).length, note }), 'success');
@@ -197,7 +197,7 @@ async function _doScanLocalDir() {
     }
     const localSongs = result.songs || [];
     setState('localSongs', localSongs);
-    document.getElementById('localInfo').textContent = `共 ${localSongs.length} 首 · ${localDirPath}`;
+    document.getElementById('localInfo').textContent = t('local.totalCount', { count: localSongs.length, dir: localDirPath });
     filterLocalSongs(); // 重扫后必须重套当前筛选：直接 setState('localFiltered') 会丢掉收藏/格式/音质/完整度/关键词全部轴
     const note = await _relinkNote(result);
     showToast(t('toast.localScanDone', { count: localSongs.length, note }), 'success');
@@ -350,7 +350,7 @@ async function refreshLocalLibrary() {
       const prevCount = (getState('localSongs') || []).length;
       const songs = result.songs || [];
       setState('localSongs', songs);
-      document.getElementById('localInfo').textContent = `共 ${songs.length} 首 · ${dir}`;
+      document.getElementById('localInfo').textContent = t('local.totalCount', { count: songs.length, dir });
       filterLocalSongs(); // 重新套用当前筛选并重渲染（列表/网格都兼顾）
       const note = await _relinkNote(result);
       if (songs.length !== prevCount || note) showToast(t('toast.localAutoRefreshed', { note }), 'info', note ? 4500 : 1800);
@@ -614,7 +614,7 @@ async function batchProbeQuality() {
           if (r.verdict === 'suspicious' || r.verdict === 'lossy') flagged.push({ s, r });
         }
         if (bar) bar.style.width = Math.round((done / total) * 100) + '%';
-        if (label) label.textContent = `正在扫描音质 (${done}/${total})` + (flagged.length ? ` · 已发现 ${flagged.length} 首非真无损` : '');
+        if (label) label.textContent = t('local.probingProgress', { done, total }) + (flagged.length ? t('local.probingFound', { n: flagged.length }) : '');
       },
     });
     // 汇总口径 = 全库缓存（含本轮新结果 + 此前逐曲实测）
@@ -624,7 +624,12 @@ async function batchProbeQuality() {
     if (flagged.length) {
       showProbeReportModal(flagged.map(({ s, r }) => ({
         icon: r.verdict === 'suspicious' ? '⚠️' : '❌',
-        text: `${s.title || '未知曲目'} - ${s.artist || '未知艺人'}（${(r.codec || '?').toUpperCase()}${r.bitrateKbps ? ' · ' + r.bitrateKbps + 'kbps' : ''}）`,
+        text: t('local.probeRow', {
+          title: s.title || t('local.unknownTitle'),
+          artist: s.artist || t('local.unknownArtist'),
+          codec: (r.codec || '?').toUpperCase(),
+          rate: r.bitrateKbps ? ' · ' + r.bitrateKbps + 'kbps' : '',
+        }),
       })));
     }
   } finally {
@@ -1082,7 +1087,7 @@ function updateRenamePreview() {
 
   previewEl.innerHTML = previews.map(p => `<div class="rename-preview-item">${esc(p)}</div>`).join('');
   if (selected.length < _selectedLocal.size) {
-    previewEl.innerHTML += `<div class="rename-preview-more">...还有 ${_selectedLocal.size - selected.length} 首</div>`;
+    previewEl.innerHTML += `<div class="rename-preview-more">${t('toast.localRenameMore', { n: _selectedLocal.size - selected.length })}</div>`;
   }
 }
 
@@ -1173,7 +1178,7 @@ async function executeBatchRename() {
   // 不重拉的话用户下次收藏就会把刚修好的路径覆盖回旧值
   if (ok && typeof window.loadUserPlaylists === 'function') await window.loadUserPlaylists();
 
-  const relinkNote = relinkFailed ? `  ⚠ ${relinkFailed} 个文件的记录路径未同步（歌单/历史可能仍指向旧名）` : '';
+  const relinkNote = relinkFailed ? '  ' + t('toast.localRelinkUnsynced', { n: relinkFailed }) : '';
   showToast(t('toast.localRenameDone', { ok, fail, note: relinkNote }), ok > 0 ? 'success' : 'warn', 4000);
 }
 

@@ -156,9 +156,9 @@ function openBatchEdit() {
   setState('editingCoverBase64', null);
   setState('editingSong', null);
 
-  el('editTitleLabel').textContent = `✏️ 批量编辑 ${count} 首`;
+  el('editTitleLabel').textContent = D.t('toast.localBatchEditTitle', { count });
   el('editBatchHint').style.display = 'block';
-  el('editBatchHint').textContent = `已选 ${count} 首歌曲。只填写的字段会批量写入，留空则跳过该字段。`;
+  el('editBatchHint').textContent = D.t('toast.localBatchEditHint', { count });
   el('editSaveBtn').textContent = '批量保存';
   el('editSaveBtn').setAttribute('onclick', 'saveBatchEdit()');
   el('editOverlay').classList.remove('hidden');
