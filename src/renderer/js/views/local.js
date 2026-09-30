@@ -386,18 +386,18 @@ async function exportLocalM3u() {
   const localFiltered = getState('localFiltered') || [];
   const songs = buildExportSongs(localFiltered, _localSelectionMode ? _selectedLocal : null);
   if (!songs.length) {
-    showToast('没有可导出的本地歌曲（需已有文件路径）', 'warn');
+    showToast(t('toast.localExportEmpty'), 'warn');
     return;
   }
   try {
     const r = await api.exportPlaylist({ songs, format: 'm3u', name: 'Lanyue-本地库' });
     if (r && r.canceled) return;
-    if (!r || r.error) { showToast('导出失败：' + ((r && r.error) || '未知错误'), 'error'); return; }
+    if (!r || r.error) { showToast(t('toast.localExportFailed', { msg: (r && r.error) || t('toast.localUnknownErr') }), 'error'); return; }
     const scope = _localSelectionMode && _selectedLocal.size ? '已选' : '当前';
-    showToast(`✅ 已导出${scope}视图 ${songs.length} 首`, 'success');
+    showToast(t('toast.localExportDone', { scope, count: songs.length }), 'success');
   } catch (e) {
     logger.warn('[local] 导出 m3u 失败:', e.message);
-    showToast('导出失败：' + errBrief(e), 'error');
+    showToast(t('toast.localExportFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -522,18 +522,18 @@ function decodeFilePath(encoded) {
 const _probeCache = new Map(); // filePath → 成功的实测结果，避免重复起进程
 
 function _toastProbeResult(r, s) {
-  if (!r || !r.ok) { showToast('检测失败：' + ((r && r.error) || '未知错误'), 'warn', 3500); return; }
+  if (!r || !r.ok) { showToast(t('toast.localProbeFailed', { msg: (r && r.error) || t('toast.localUnknownErr') }), 'warn', 3500); return; }
   const codec = r.codec ? r.codec.toUpperCase() : '未知';
   const kb = r.bitrateKbps ? r.bitrateKbps + 'kbps' : '码率未知';
   const sr = r.sampleRate ? ' · ' + (r.sampleRate / 1000) + 'kHz' : '';
-  if (r.verdict === 'lossless') showToast(`✅ 《${s.title || ''}》真无损：${codec} · ${kb}${sr}`, 'success', 4500);
-  else if (r.verdict === 'suspicious') showToast(`⚠️ 《${s.title || ''}》存疑：无损编码 ${codec} 但码率仅 ${kb}，疑低码率转制`, 'warn', 5500);
-  else showToast(`❌ 《${s.title || ''}》伪无损！实际是有损编码 ${codec} · ${kb}${sr}`, 'error', 6000);
+  if (r.verdict === 'lossless') showToast(t('toast.localVerdictLossless', { title: s.title || '', codec, kb, sr }), 'success', 4500);
+  else if (r.verdict === 'suspicious') showToast(t('toast.localVerdictSuspect', { title: s.title || '', codec, kb }), 'warn', 5500);
+  else showToast(t('toast.localVerdictFake', { title: s.title || '', codec, kb, sr }), 'error', 6000);
 }
 
 async function probeLocalQuality(s) {
   if (_probeCache.has(s.filePath)) { _toastProbeResult(_probeCache.get(s.filePath), s); return; }
-  showToast(`🔬 正在实测《${s.title || ''}》…`, 'info', 1500);
+  showToast(t('toast.localProbing', { title: s.title || '' }), 'info', 1500);
   let r;
   try { r = await api.probeAudio(s.filePath); }
   catch (e) { r = { error: e.message }; }
@@ -566,7 +566,7 @@ async function revealLocalFile(s) {
 // 📋 复制文件本地路径（排障/搬运常用）
 async function copyLocalPath(fp) {
   const ok = await copyText(fp);
-  showToast(ok ? '📋 文件路径已复制' : '复制失败，请检查剪贴板权限', ok ? 'success' : 'error');
+  showToast(ok ? t('toast.localPathCopied') : t('toast.copyFailed'), ok ? 'success' : 'error');
 }
 
 // 🎯 定位正在播放的歌：虚拟滚动先跳过去，重绘前后各闪一次（后一次兜底）
@@ -574,7 +574,7 @@ function locatePlayingLocal() {
   const cur = typeof getState === 'function' ? getState('currentPlaying') : null;
   const list = (typeof getState === 'function' && getState('localFiltered')) || [];
   const idx = indexOfPlaying(list, cur);
-  if (idx < 0) { showToast('正在播放的歌不在当前曲库视图（未在播放或已被过滤）', 'info', 2500); return; }
+  if (idx < 0) { showToast(t('toast.localNotInView'), 'info', 2500); return; }
   if (_localVirtualScroller) _localVirtualScroller.scrollToIndex(idx);
   const flash = () => {
     const row = document.querySelector(`.local-row[data-idx="${idx}"]`);
@@ -593,7 +593,7 @@ async function batchProbeQuality() {
   const { targets, cached } = collectProbeTargets(localSongs, _probeCache);
   if (!targets.length) {
     if (!cached) { showToast(t('toast.localNeedScanFirst'), 'warn', 3500); return; }
-    showToast(probeReportLine(summarizeProbe(Array.from(_probeCache.values())), false) + '（全部命中缓存）', 'info', 5500);
+    showToast(probeReportLine(summarizeProbe(Array.from(_probeCache.values())), false) + t('toast.localProbeAllCached'), 'info', 5500);
     return;
   }
   _probeScanCancelled = false;
@@ -946,7 +946,7 @@ async function batchAutoMeta() {
   const localSongs = getState('localSongs');
   const needMeta = localSongs.filter(s => s.title && s.artist);
   if (!needMeta.length) {
-    showToast('没有带标题和艺术家的歌曲可供补全', 'warn');
+    showToast(t('toast.localNoNamedForMeta'), 'warn');
     return;
   }
 
@@ -1002,7 +1002,7 @@ async function batchAutoMeta() {
   progressWrap.style.display = 'none';
   progressBar.style.width = '0%';
   renderLocalSongs();
-  showToast(`一键补全完成：封面 ✅${coverOk} ❌${coverFail} | 歌词 ✅${lyricOk} ❌${lyricFail}`, coverOk + lyricOk > 0 ? 'success' : 'warn', 5000);
+  showToast(t('toast.localMetaDone', { coverOk, coverFail, lyricOk, lyricFail }), coverOk + lyricOk > 0 ? 'success' : 'warn', 5000);
 }
 
 
@@ -1012,7 +1012,7 @@ async function batchAutoMeta() {
 
 function openBatchRename() {
   const count = _selectedLocal.size;
-  if (!count) { showToast('请先选择要重命名的歌曲', 'warn'); return; }
+  if (!count) { showToast(t('toast.localRenameNeedSelect'), 'warn'); return; }
 
   let overlay = document.getElementById('renameModal');
   if (overlay) overlay.remove();
@@ -1101,7 +1101,7 @@ function sanitizeFilename(name) {
 
 async function executeBatchRename() {
   const template = document.getElementById('renameTemplate')?.value;
-  if (!template) { showToast('请输入命名模板', 'warn'); return; }
+  if (!template) { showToast(t('toast.localRenameNeedTemplate'), 'warn'); return; }
 
   const keepExt = document.getElementById('renameKeepExt')?.checked;
   const sanitize = document.getElementById('renameSanitize')?.checked;
@@ -1174,7 +1174,7 @@ async function executeBatchRename() {
   if (ok && typeof window.loadUserPlaylists === 'function') await window.loadUserPlaylists();
 
   const relinkNote = relinkFailed ? `  ⚠ ${relinkFailed} 个文件的记录路径未同步（歌单/历史可能仍指向旧名）` : '';
-  showToast(`重命名完成：✅ ${ok} 成功  ❌ ${fail} 失败${relinkNote}`, ok > 0 ? 'success' : 'warn', 4000);
+  showToast(t('toast.localRenameDone', { ok, fail, note: relinkNote }), ok > 0 ? 'success' : 'warn', 4000);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1185,7 +1185,7 @@ async function batchDownloadCovers() {
   const localSongs = getState('localSongs');
   const needCover = localSongs.filter(s => !s.cover && s.title && s.artist);
   if (!needCover.length) {
-    showToast('✅ 所有歌曲都已有封面', 'info');
+    showToast(t('toast.localAllHaveCoverShort'), 'info');
     return;
   }
 
@@ -1224,7 +1224,7 @@ async function batchDownloadCovers() {
   progressWrap.style.display = 'none';
   progressBar.style.width = '0%';
   renderLocalSongs();
-  showToast(`批量封面下载完成：✅ ${ok} 成功  ❌ ${fail} 失败`, ok > 0 ? 'success' : 'warn', 4000);
+  showToast(t('toast.localBatchCoverDlDone', { ok, fail }), ok > 0 ? 'success' : 'warn', 4000);
 }
 
 // ── 多格式转码（复用 converter-core 的共用弹窗）──────────
@@ -1251,7 +1251,7 @@ function _selectedSongsToConvert() {
 async function convertSelectedAudio() {
   const songsToConvert = _selectedSongsToConvert();
   if (!songsToConvert.length) {
-    showToast('请先选择要转换的歌曲', 'warn');
+    showToast(t('toast.localConvertNeedSelect'), 'warn');
     return;
   }
 
@@ -1271,7 +1271,11 @@ async function convertSelectedAudio() {
       });
       if (ok > 0 || fail > 0 || canceled > 0) {
         showToast(
-          `转码结束：✅ ${ok} 成功${fail > 0 ? ` ❌ ${fail} 失败` : ''}${canceled > 0 ? ' ⏹ 已取消' : ''}`,
+          t('toast.localConvertDone', {
+            ok,
+            failPart: fail > 0 ? ' ' + t('toast.localConvertFailPart', { n: fail }) : '',
+            canceledPart: canceled > 0 ? ' ' + t('toast.localConvertCancelPart') : '',
+          }),
           ok > 0 ? 'success' : 'warn',
           4000,
         );

@@ -730,10 +730,8 @@ const LEDGER = {
   'src/renderer/js/views/history.js': 24,
   'src/renderer/js/views/home.js': 15,
   'src/renderer/js/views/local-stats.js': 11,
-  // 40 → 21（阶段5b-1）：扫描/刷新/补全封面/补全歌词/单曲拉封面这 19 处反馈文案
-  // 接进词典（toast.local*），欠账随之减少。剩下的 21 处属查重/重命名/导出/转码/音质，
-  // 留给 5b-2。
-  'src/renderer/js/views/local.js': 21,
+  // 46 → 0（阶段5b-1 + 5b-2 + 5a）：本地曲库的反馈文案已全部收编进词典，
+  // 按台账家法「归零即删项」，此处不留恒真记录。
   'src/renderer/js/views/nameBatch.js': 8,
   'src/renderer/js/views/search.js': 36,
 };
