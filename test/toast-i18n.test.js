@@ -713,6 +713,9 @@ const LEDGER = {
   'src/renderer/js/historyTrend.js': 2,
   'src/renderer/js/lyricEditor.js': 4,
   'src/renderer/js/lyricNudge.js': 3,
+  // 阶段4 从 views/local.js 抽出的 ID3 编辑弹窗：批量编辑/保存的硬编码中文随之搬家，
+  // 计数与 local.js 的减量对应（editor 只减不增的债不许趁机还）。
+  'src/renderer/js/localEditModal.js': 6,
   'src/renderer/js/m3uToPlaylist.js': 6,
   'src/renderer/js/playRetry.js': 6,
   'src/renderer/js/player.js': 10,
@@ -730,10 +733,9 @@ const LEDGER = {
   'src/renderer/js/views/history.js': 24,
   'src/renderer/js/views/home.js': 15,
   'src/renderer/js/views/local-stats.js': 11,
-  // 48 → 46：revealLocalFile 里的两处硬编码中文（「无法打开文件夹：」/「打开文件夹失败:」）
-  // 改走 openFolderSafe 的统一反馈（toast.folderBlocked / toast.folderOpenFailed），
-  // 顺带修掉「主进程已加沙箱、8 个调用点却静默失败」的缺陷。
-  'src/renderer/js/views/local.js': 46,
+  // 46 → 40：ID3 编辑弹窗整块抽到 js/localEditModal.js（阶段4），editor 里的
+  // 6 处硬编码中文（保存/失败/批量提示等）随之搬走，本文件只减不增。
+  'src/renderer/js/views/local.js': 40,
   'src/renderer/js/views/nameBatch.js': 8,
   'src/renderer/js/views/search.js': 36,
 };

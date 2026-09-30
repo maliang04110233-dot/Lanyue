@@ -40,6 +40,10 @@ import { groupSongsForAlbumWall, normalizeGroupKey, UNKNOWN_ALBUM } from '../art
 import { t } from '../i18n.js';
 import { createListSelection } from '../listSelection.js';
 import { wireAxes } from '../listAxes.js';
+import {
+  setDeps as setEditModalDeps, openEdit, closeEditOnBg, onEditCoverSelect, clearEditCover,
+  saveEdit, openBatchEdit, closeEdit, saveBatchEdit, teardownDragCover,
+} from '../localEditModal.js';
 
 // 统计/查重已拆到 local-stats.js（回调在文件末尾注入）
 import {
@@ -302,6 +306,16 @@ const LOCAL_AXES = [
 ];
 const _axes = wireAxes(LOCAL_AXES, () => filterLocalSongs());
 
+// ID3 编辑弹窗依赖注入：只收回调（重画列表 / 退出选择态 / 取选中集），
+// 避免 localEditModal 反向 import 视图绕成环。getState/setState/api/showToast/
+// errBrief 那边直接用 window 全局或 import（见 localEditModal.js 头注）——
+// 注入它们会让 toast-i18n 的欠账判据看不见编辑器里的硬编码中文。
+setEditModalDeps({
+  renderLocalSongs: () => renderLocalSongs(),
+  exitSelection: () => exitLocalSelectionMode(),
+  getSelectedPaths: () => Array.from(_selectedLocal),
+});
+
 /** ♥ 仅看收藏开关：只留进了收藏歌单的本地曲，按钮文案同步 */
 function toggleLocalFavOnly() { _axes.cycle('fav'); }
 /** 格式过滤循环：按全集实际格式表走一格 */
@@ -474,236 +488,6 @@ async function playLocalSong(idx) {
   }
 }
 
-// ── 单曲编辑 ─────────────────────────────────────────
-// ── 编辑弹窗 document 级 click 监听管理 ──────────────
-let _editDocClickHandler = null;
-
-function _addEditDocClickListener() {
-  _removeEditDocClickListener();
-  _editDocClickHandler = (e) => {
-    const overlay = document.getElementById('editOverlay');
-    if (overlay && e.target === overlay) closeEdit();
-  };
-  document.addEventListener('click', _editDocClickHandler);
-}
-
-function _removeEditDocClickListener() {
-  if (_editDocClickHandler) {
-    document.removeEventListener('click', _editDocClickHandler);
-    _editDocClickHandler = null;
-  }
-}
-
-function openEdit(idx) {
-  const localFiltered = getState('localFiltered');
-  const s = localFiltered[idx];
-  if (!s) return;
-  setState('editingSong', s);
-  setState('editingCoverBase64', s.cover || null);
-
-  document.getElementById('editTitle').value = s.title || '';
-  document.getElementById('editArtist').value = s.artist || '';
-  document.getElementById('editAlbum').value = s.album || '';
-  document.getElementById('editYear').value = s.year || '';
-  document.getElementById('editGenre').value = s.genre || '';
-
-  const preview = document.getElementById('editCoverPreview');
-  if (s.cover) {
-    // s.cover 应为 data:image 前缀的 base64 形态（来自内嵌标签或在线封面）。
-    // 白名单校验后再插值：非 data:image 前缀的一律当无封面处理，
-    // 防止把外部输入直接塞进 innerHTML 的 src 属性。
-    const isDataImage = typeof s.cover === 'string' && /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(s.cover);
-    preview.innerHTML = isDataImage
-      ? `<img src="${s.cover}" style="width:100%;height:100%;object-fit:cover">`
-      : '<span style="font-size:28px">🎵</span>';
-  } else {
-    preview.innerHTML = '<span style="font-size:28px">🎵</span>';
-  }
-
-  document.getElementById('editBatchHint').style.display = 'none';
-  document.getElementById('editOverlay').classList.remove('hidden');
-  _addEditDocClickListener();
-}
-
-function closeEditOnBg(e) {
-  if (e.target === document.getElementById('editOverlay')) closeEdit();
-}
-
-function onEditCoverSelect(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    setState('editingCoverBase64', e.target.result);
-    document.getElementById('editCoverPreview').innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
-  };
-  reader.readAsDataURL(file);
-}
-
-function clearEditCover() {
-  setState('editingCoverBase64', null);
-  document.getElementById('editCoverPreview').innerHTML = '<span style="font-size:28px">🎵</span>';
-}
-
-async function saveEdit() {
-  const editingSong = getState('editingSong');
-  if (!editingSong) return;
-
-  const tags = {
-    title: document.getElementById('editTitle').value.trim(),
-    artist: document.getElementById('editArtist').value.trim(),
-    album: document.getElementById('editAlbum').value.trim(),
-    year: document.getElementById('editYear').value.trim(),
-    genre: document.getElementById('editGenre').value.trim(),
-  };
-
-  try {
-    const result = await api.updateId3Tags(editingSong.filePath, tags);
-    if (result.success) {
-      const editingCoverBase64 = getState('editingCoverBase64');
-      if (editingCoverBase64 !== editingSong.cover) {
-        if (editingCoverBase64) {
-          await api.updateId3Cover(editingSong.filePath, editingCoverBase64);
-        }
-      }
-      Object.assign(editingSong, tags);
-      editingSong.cover = editingCoverBase64;
-      renderLocalSongs();
-      closeEdit();
-      showToast('歌曲信息已保存', 'success');
-    } else {
-      showToast('保存失败: ' + (result.error || '未知错误'), 'error');
-    }
-  } catch (e) {
-    showToast('保存出错: ' + errBrief(e), 'error');
-  }
-}
-
-// ── 批量编辑 ─────────────────────────────────────────
-function openBatchEdit() {
-  const count = _selectedLocal.size;
-  if (!count) { showToast('请先选择要编辑的歌曲', 'warn'); return; }
-
-  document.getElementById('editTitle').value = '';
-  document.getElementById('editArtist').value = '';
-  document.getElementById('editAlbum').value = '';
-  document.getElementById('editYear').value = '';
-  document.getElementById('editGenre').value = '';
-  document.getElementById('editCoverPreview').innerHTML = '<span style="font-size:28px">🎵</span>';
-  setState('editingCoverBase64', null);
-  setState('editingSong', null);
-
-  document.getElementById('editTitleLabel').textContent = `✏️ 批量编辑 ${count} 首`;
-  document.getElementById('editBatchHint').style.display = 'block';
-  document.getElementById('editBatchHint').textContent = `已选 ${count} 首歌曲。只填写的字段会批量写入，留空则跳过该字段。`;
-  document.getElementById('editSaveBtn').textContent = '批量保存';
-  document.getElementById('editSaveBtn').setAttribute('onclick', 'saveBatchEdit()');
-  document.getElementById('editOverlay').classList.remove('hidden');
-  _addEditDocClickListener();
-}
-
-function closeEdit() {
-  _removeEditDocClickListener();
-  document.getElementById('editOverlay').classList.add('hidden');
-  setState('editingSong', null);
-  setState('editingCoverBase64', null);
-  document.getElementById('editTitleLabel').textContent = '✏️ 编辑歌曲信息';
-  document.getElementById('editBatchHint').style.display = 'none';
-  document.getElementById('editSaveBtn').textContent = '保存更改';
-  document.getElementById('editSaveBtn').setAttribute('onclick', 'saveEdit()');
-}
-
-async function saveBatchEdit() {
-  const count = _selectedLocal.size;
-  if (!count) return;
-
-  const tags = {
-    title: document.getElementById('editTitle').value.trim(),
-    artist: document.getElementById('editArtist').value.trim(),
-    album: document.getElementById('editAlbum').value.trim(),
-    year: document.getElementById('editYear').value.trim(),
-    genre: document.getElementById('editGenre').value.trim(),
-  };
-  // 过滤掉空字段
-  const filledTags = Object.fromEntries(Object.entries(tags).filter(([, v]) => v !== ''));
-  if (!Object.keys(filledTags).length) {
-    showToast('请至少填写一个字段', 'warn');
-    return;
-  }
-
-  const localSongs = getState('localSongs');
-  const localFiltered = getState('localFiltered');
-  let ok = 0, fail = 0;
-  const editingCoverBase64 = getState('editingCoverBase64');
-
-  for (const fp of _selectedLocal) {
-    try {
-      const result = await api.updateId3Tags(fp, filledTags);
-      if (result && result.success) {
-        if (editingCoverBase64) {
-          await api.updateId3Cover(fp, editingCoverBase64);
-        }
-        // 回填状态
-        const s = localSongs.find(x => x.filePath === fp);
-        if (s) { Object.assign(s, filledTags); if (editingCoverBase64) s.cover = editingCoverBase64; }
-        const fi = localFiltered.findIndex(x => x.filePath === fp);
-        if (fi >= 0) { Object.assign(localFiltered[fi], filledTags); if (editingCoverBase64) localFiltered[fi].cover = editingCoverBase64; }
-        ok++;
-      } else { fail++; }
-    } catch (e) { fail++; }
-  }
-
-  renderLocalSongs();
-  closeEdit();
-  exitLocalSelectionMode();
-  showToast(`批量编辑完成：✅ ${ok} 成功  ❌ ${fail} 失败`, ok > 0 ? 'success' : 'warn', 4000);
-}
-
-// ── 拖拽上传封面（编辑器） ───────────────────────────
-// H7/H8 修复：存储 handler 引用，支持清理
-const _dragCoverHandlers = {
-  dragover: null,
-  dragleave: null,
-  drop: null,
-};
-
-function setupDragCover() {
-  const preview = document.getElementById('editCoverPreview');
-  if (!preview) return;
-  // 先清理旧监听器，避免重复绑定
-  teardownDragCover();
-  _dragCoverHandlers.dragover = (e) => { e.preventDefault(); preview.style.borderColor = 'var(--neon-cyan-dim)'; };
-  _dragCoverHandlers.dragleave = () => { preview.style.borderColor = 'var(--neon-blue-dim)'; };
-  _dragCoverHandlers.drop = (e) => {
-    e.preventDefault();
-    preview.style.borderColor = 'var(--neon-blue-dim)';
-    const file = e.dataTransfer.files[0];
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setState('editingCoverBase64', ev.target.result);
-      preview.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover">`;
-    };
-    reader.readAsDataURL(file);
-  };
-  preview.addEventListener('dragover', _dragCoverHandlers.dragover);
-  preview.addEventListener('dragleave', _dragCoverHandlers.dragleave);
-  preview.addEventListener('drop', _dragCoverHandlers.drop);
-}
-
-function teardownDragCover() {
-  const preview = document.getElementById('editCoverPreview');
-  if (!preview) return;
-  if (_dragCoverHandlers.dragover) preview.removeEventListener('dragover', _dragCoverHandlers.dragover);
-  if (_dragCoverHandlers.dragleave) preview.removeEventListener('dragleave', _dragCoverHandlers.dragleave);
-  if (_dragCoverHandlers.drop) preview.removeEventListener('drop', _dragCoverHandlers.drop);
-  _dragCoverHandlers.dragover = null;
-  _dragCoverHandlers.dragleave = null;
-  _dragCoverHandlers.drop = null;
-}
-
-// 初始化拖拽监听
-setupDragCover();
 
 // ── 打开文件夹事件代理（修复 XSS，使用 data 属性传递路径）─────────
 (function setupOpenFolderDelegate() {
