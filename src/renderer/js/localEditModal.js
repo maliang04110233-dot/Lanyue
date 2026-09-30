@@ -27,6 +27,9 @@ import { errBrief } from './errBrief.js';
 //     本模块**直接用全局**而非注入——全仓渲染层没有一处 import showToast；改成注入会让
 //     toast-i18n 的欠账判据（按裸 showToast( 扫）看不见这里的硬编码中文，等于把债藏了。
 //   · errBrief 是纯函数（无 DOM），直接 import，可测。
+//   · t（取词）**按参数注入**而非 import i18n.js：i18n.js 静态 import 语言包 JSON，
+//     node 要求那种写法带 import attribute 而本仓 eslint 解析不了（两条路都堵，
+//     见 toast.js:52 头注）。本模块能被 node 直测，就不能把语言包拖进它的依赖图。
 //   · 只有真正属于 views/local.js 内部的三个（重画列表 / 退出选择态 / 取选中集）
 //     由调用方注入，避免本模块反向 import 视图绕成环。
 let D = null;
@@ -130,19 +133,19 @@ async function saveEdit() {
       editingSong.cover = editingCoverBase64;
       D.renderLocalSongs();
       closeEdit();
-      showToast('歌曲信息已保存', 'success');
+      showToast(D.t('toast.localEditSaved'), 'success');
     } else {
-      showToast('保存失败: ' + (result.error || '未知错误'), 'error');
+      showToast(D.t('toast.localEditSaveFailed', { msg: result.error || '未知错误' }), 'error');
     }
   } catch (e) {
-    showToast('保存出错: ' + errBrief(e), 'error');
+    showToast(D.t('toast.localEditSaveError', { msg: errBrief(e) }), 'error');
   }
 }
 
 // ── 批量编辑 ────────────────────────────────────────────────────
 function openBatchEdit() {
   const count = D.getSelectedPaths().length;
-  if (!count) { showToast('请先选择要编辑的歌曲', 'warn'); return; }
+  if (!count) { showToast(D.t('toast.localEditNeedSelect'), 'warn'); return; }
 
   el('editTitle').value = '';
   el('editArtist').value = '';
@@ -187,7 +190,7 @@ async function saveBatchEdit() {
   // 过滤掉空字段
   const filledTags = Object.fromEntries(Object.entries(tags).filter(([, v]) => v !== ''));
   if (!Object.keys(filledTags).length) {
-    showToast('请至少填写一个字段', 'warn');
+    showToast(D.t('toast.localEditNeedField'), 'warn');
     return;
   }
 
@@ -216,7 +219,7 @@ async function saveBatchEdit() {
   D.renderLocalSongs();
   closeEdit();
   D.exitSelection();
-  showToast(`批量编辑完成：✅ ${ok} 成功  ❌ ${fail} 失败`, ok > 0 ? 'success' : 'warn', 4000);
+  showToast(D.t('toast.localBatchEditDone', { ok, fail }), ok > 0 ? 'success' : 'warn', 4000);
 }
 
 // ── 拖拽上传封面（编辑器） ───────────────────────────────────────

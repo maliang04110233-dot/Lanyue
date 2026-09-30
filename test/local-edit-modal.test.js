@@ -50,8 +50,10 @@ async function harness(overrides) {
     updateId3Tags: async (fp, tags) => { calls.id3Tags.push([fp, tags]); return { success: true }; },
     updateId3Cover: async (fp, cov) => { calls.id3Cover.push([fp, cov]); return { success: true }; },
   };
-  // 只注入视图内部三件
+  // 只注入视图内部三件 + 取词函数 t（本模块不 import i18n.js，见其头注）
   M.setDeps({
+    // 极简 t：直接回显 key 本身，测试断言的是「有没有按键读 + 参数对不对」
+    t: (k, p) => (p ? k + ':' + JSON.stringify(p) : k),
     renderLocalSongs: () => { calls.rendered++; },
     exitSelection: () => { calls.exited++; },
     getSelectedPaths: o.getSelectedPaths || (() => []),
@@ -87,7 +89,7 @@ test('saveEdit：成功 → 写标签(+封面) → 回填 → 重画 → 关窗 
   assert.equal(song.title, '新名', '应回填到对象');
   assert.equal(song.cover, 'data:image/png;base64,BBBB');
   assert.equal(calls.rendered, 1, '保存后重画列表');
-  assert.ok(calls.toast.some(([m]) => /已保存/.test(m)), '成功 toast');
+  assert.ok(calls.toast.some(([m]) => /toast\.localEditSaved/.test(m)), '成功走词典键');
 });
 
 test('saveEdit：失败/异常 → 错误 toast，不崩', async () => {
@@ -96,8 +98,9 @@ test('saveEdit：失败/异常 → 错误 toast，不崩', async () => {
   });
   state.editingSong = { filePath: '/m/a.mp3', cover: null };
   await M.saveEdit();
-  const failMsg = calls.toast.find(([m]) => /E_FAIL/.test(m));
-  assert.ok(failMsg, '应 toast 失败原因');
+  const failMsg = calls.toast.find(([m]) => /toast\.localEditSaveFailed/.test(m));
+  assert.ok(failMsg, '应走 localEditSaveFailed 词典键');
+  assert.ok(/E_FAIL/.test(failMsg[0]), '错误原文应作为 msg 占位符传入');
   assert.equal(failMsg[1], 'error');
 });
 
@@ -106,7 +109,7 @@ test('saveBatchEdit：全空字段直接拒，不空跑', async () => {
   els.editTitle.value = ''; els.editArtist.value = '';
   await M.saveBatchEdit();
   assert.equal(calls.id3Tags.length, 0, '全空不应发任何写请求');
-  assert.ok(calls.toast.some(([, t]) => t === 'warn' && /至少填写一个字段/.test(calls.toast.find(([m]) => /至少填写/.test(m))[0])));
+  assert.ok(calls.toast.some(([m, ty]) => m === 'toast.localEditNeedField' && ty === 'warn'), '全空应走词典键并 warn');
 });
 
 test('saveBatchEdit：只写勾选集 + 逐首回填两个数组 + 完后退回非选择态', async () => {
@@ -124,5 +127,7 @@ test('saveBatchEdit：只写勾选集 + 逐首回填两个数组 + 完后退回�
   assert.equal(state.localFiltered[0].album, 'NewAlbum', 'localFiltered 回填');
   assert.equal(calls.exited, 1, '批量保存完退回非选择态');
   assert.equal(calls.rendered, 1, '保存后重画');
-  assert.ok(calls.toast.some(([m]) => /批量编辑完成/.test(m) && /2 成功/.test(m)));
+  const done = calls.toast.find(([m]) => /toast\.localBatchEditDone/.test(m));
+  assert.ok(done, '应走 localBatchEditDone 词典键');
+  assert.ok(/"ok":2/.test(done[0]) && /"fail":0/.test(done[0]), '成功/失败数应作占位符传入');
 });

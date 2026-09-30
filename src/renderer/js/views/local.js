@@ -311,6 +311,7 @@ const _axes = wireAxes(LOCAL_AXES, () => filterLocalSongs());
 // errBrief 那边直接用 window 全局或 import（见 localEditModal.js 头注）——
 // 注入它们会让 toast-i18n 的欠账判据看不见编辑器里的硬编码中文。
 setEditModalDeps({
+  t,
   renderLocalSongs: () => renderLocalSongs(),
   exitSelection: () => exitLocalSelectionMode(),
   getSelectedPaths: () => Array.from(_selectedLocal),
