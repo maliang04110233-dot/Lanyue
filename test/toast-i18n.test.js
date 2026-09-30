@@ -782,9 +782,10 @@ const PASSTHROUGH = {
   'src/renderer/js/fallbackNotice.js': 2,
   'src/renderer/js/playError.js': 6,
   'src/renderer/js/queueCopy.js': 2,
-  // LEDGER 归零但整文件仍有 47 处 CJK 字面量（弹窗文案 + 剪贴板报告 + title 提示…）。
-  // 本轮只把批量加歌的三个分句接进词典（-3），剩下的**不假装已还清**，如实记账。
-  'src/renderer/js/views/playlist.js': 47,
+  // 47 → 38：歌单详情行内渲染 + 歌单卡片列表 + 详情描述这批界面文案接进词典
+  // （空态、行内按钮 title、歌名/歌手兜底、卡片计数与编辑删除提示）。
+  // 剩下的 38 处属回收站 / 添加歌曲弹层 / 合并歌单 / 跨歌单查重 / 多选工具条，按批推进。
+  'src/renderer/js/views/playlist.js': 38,
 };
 
 function scanPassthrough() {

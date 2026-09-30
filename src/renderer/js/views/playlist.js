@@ -78,13 +78,13 @@ function renderPlaylistList(playlists) {
     container.innerHTML = kw
       ? `<div class="empty-hint" style="grid-column:1/-1;text-align:center;padding:40px 0;">
         <div style="font-size:40px;margin-bottom:12px">🔍</div>
-        <div>没有匹配「${esc(kw)}」的歌单</div>
-        <div style="font-size:12px;margin-top:6px;color:var(--neon-dim);">按名称或描述搜索；清空搜索框看全部</div>
+        <div>${t('pl.card.emptyFiltered', { kw: esc(kw) })}</div>
+        <div style="font-size:12px;margin-top:6px;color:var(--neon-dim);">${t('pl.card.searchHint')}</div>
       </div>`
       : `<div class="empty-hint" style="grid-column:1/-1;text-align:center;padding:40px 0;">
         <div style="font-size:40px;margin-bottom:12px">🎼</div>
-        <div>暂无歌单</div>
-        <div style="font-size:12px;margin-top:6px;color:var(--neon-dim);">点击上方"新建歌单"创建你的第一个歌单</div>
+        <div>${t('pl.card.empty')}</div>
+        <div style="font-size:12px;margin-top:6px;color:var(--neon-dim);">${t('pl.card.emptyHint')}</div>
       </div>`;
     return;
   }
@@ -94,7 +94,7 @@ function renderPlaylistList(playlists) {
       <div class="playlist-card-cover">
         ${pl.cover ? `<img src="${escAttr(pl.cover)}" alt="${esc(pl.name)}" onerror="this.style.display='none'">` : `<div class="playlist-card-placeholder">${pl.system ? HEART_ON : '📋'}</div>`}
         <div class="playlist-card-overlay">
-          <span class="playlist-card-count">${pl.songs?.length || 0} 首</span>
+          <span class="playlist-card-count">${t('pl.count', { n: pl.songs?.length || 0 })}</span>
         </div>
       </div>
       <div class="playlist-card-info">
@@ -104,8 +104,8 @@ function renderPlaylistList(playlists) {
       <div class="playlist-card-actions" onclick="event.stopPropagation()">
         ${pl.system
           ? ''
-          : `<button class="action-btn" onclick="editPlaylist('${escQ(pl.id)}')" title="编辑">✏️</button>
-        <button class="action-btn" onclick="deletePlaylist('${escQ(pl.id)}')" title="删除">🗑️</button>`}
+          : `<button class="action-btn" onclick="editPlaylist('${escQ(pl.id)}')" title="${t('pl.card.edit')}">✏️</button>
+        <button class="action-btn" onclick="deletePlaylist('${escQ(pl.id)}')" title="${t('pl.card.delete')}">🗑️</button>`}
       </div>
     </div>
   `).join('');
@@ -129,7 +129,7 @@ async function openPlaylistDetail(playlistId) {
     _currentDetailSongs = pl.songs || [];
 
     document.getElementById('playlistDetailTitle').textContent = pl.name;
-    document.getElementById('playlistDetailDesc').textContent = pl.desc || '暂无描述';
+    document.getElementById('playlistDetailDesc').textContent = pl.desc || t('pl.detail.noDesc');
     renderPlaylistDetailSongs(pl.songs || []);
 
     document.getElementById('playlistDetailModal').classList.remove('hidden');
@@ -250,7 +250,7 @@ function renderPlaylistDetailSongs(songs) {
 
   if (!songs || songs.length === 0) {
     _plInvalidateRender(); // 作废进行中的分片追加
-    list.innerHTML = '<div class="empty-hint" style="text-align:center;padding:30px 0;">歌单为空，去搜索页添加喜欢的歌曲吧</div>';
+    list.innerHTML = `<div class="empty-hint" style="text-align:center;padding:30px 0;">${t('pl.detail.empty')}</div>`;
     return Promise.resolve();
   }
 
@@ -258,28 +258,28 @@ function renderPlaylistDetailSongs(songs) {
   const reorderable = songs.length > 1 && !_plSortMode; // 排序时展示序≠存储序，禁用拖把手防误持久化
   if (!pairs.length) {
     _plInvalidateRender();
-    const kwPart = _plSongKw.trim() ? `「${esc(_plSongKw.trim())}」` : '';
-    const dlPart = _plDlMode !== 'all' ? (kwPart ? '且符合所选下载状态' : '所选下载状态') : '';
-    list.innerHTML = `<div class="empty-hint" style="text-align:center;padding:30px 0;">没有匹配${kwPart}${dlPart}的歌曲</div>`;
+    const kwPart = _plSongKw.trim() ? t('pl.detail.kwWrap', { kw: esc(_plSongKw.trim()) }) : '';
+    const dlPart = _plDlMode !== 'all' ? (kwPart ? t('pl.detail.filterDlWithKw') : t('pl.detail.filterDl')) : '';
+    list.innerHTML = `<div class="empty-hint" style="text-align:center;padding:30px 0;">${t('pl.detail.emptyFiltered', { kw: kwPart, dl: dlPart })}</div>`;
     return Promise.resolve();
   }
   const rows = pairs.map(({ song, i: idx }) => `
     <div class="song-row" data-pidx="${idx}" ondblclick="playPlaylistSong(${idx})">
-      ${_plSelMode ? `<input type="checkbox" class="pl-sel-chk" ${_plSelKeys.has(plSongKey(song)) ? 'checked' : ''} onclick="event.stopPropagation();togglePlSongSel(${idx}, event)" title="勾选后可一键移出歌单（Shift 连选）" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;margin-right:6px;">` : ''}
-      ${reorderable ? '<span class="pl-drag-handle" draggable="true" title="按住拖动排序">⠿</span>' : ''}
+      ${_plSelMode ? `<input type="checkbox" class="pl-sel-chk" ${_plSelKeys.has(plSongKey(song)) ? 'checked' : ''} onclick="event.stopPropagation();togglePlSongSel(${idx}, event)" title="${t('pl.sel.hint')}" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;margin-right:6px;">` : ''}
+      ${reorderable ? `<span class="pl-drag-handle" draggable="true" title="${t('pl.drag.hint')}">⠿</span>` : ''}
       <span class="song-num" style="color:var(--neon-dim);font-size:12px;width:22px;text-align:right;flex-shrink:0;">${idx + 1}</span>
       <div class="song-info">
-        <div class="song-title" title="${esc(song.title)}">${esc(song.title) || '未知'}</div>
-        <div class="song-meta">${esc(song.artist) || '未知艺术家'}${song.album ? ' · ' + esc(song.album) : ''}</div>
+        <div class="song-title" title="${esc(song.title)}">${esc(song.title) || t('pl.row.unknownTitle')}</div>
+        <div class="song-meta">${esc(song.artist) || t('pl.row.unknownArtist')}${song.album ? ' · ' + esc(song.album) : ''}</div>
       </div>
       ${dlBadgeHtml(song, getState('queueSnapshot') || [])}
       <span class="song-duration">${song.duration ? fmtDuration(song.duration) : '--:--'}</span>
       <div class="song-actions">
         ${heartBtnHtml(song, 'action-btn')}
-        <button class="action-btn" onclick="playPlaylistSong(${idx})" title="播放">▶</button>
-        <button class="action-btn" onclick="downloadPlaylistSong(${idx})" title="加入下载队列">⬇</button>
-        <button class="action-btn" onclick="addPlaylistSongToQueue(${idx})" title="加入播放队列">➕</button>
-        <button class="action-btn" onclick="removeSongFromPlaylist('${escQ(String(song.id))}','${escQ(String(song.source || ''))}')" title="从歌单移除">✕</button>
+        <button class="action-btn" onclick="playPlaylistSong(${idx})" title="${t('pl.row.play')}">▶</button>
+        <button class="action-btn" onclick="downloadPlaylistSong(${idx})" title="${t('pl.row.download')}">⬇</button>
+        <button class="action-btn" onclick="addPlaylistSongToQueue(${idx})" title="${t('pl.row.enqueue')}">➕</button>
+        <button class="action-btn" onclick="removeSongFromPlaylist('${escQ(String(song.id))}','${escQ(String(song.source || ''))}')" title="${t('pl.row.remove')}">✕</button>
       </div>
     </div>
   `);
