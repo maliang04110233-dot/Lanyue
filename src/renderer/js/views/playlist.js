@@ -856,7 +856,7 @@ async function refreshPlTrash() {
   const btn = document.getElementById('plTrashBtn');
   if (btn) {
     btn.style.display = _plTrash.length ? '' : 'none';
-    btn.textContent = `🗑 回收站 ${_plTrash.length}`;
+    btn.textContent = t('pl.trash.btn', { n: _plTrash.length });
   }
   const modal = document.getElementById('playlistTrashModal');
   if (modal && !modal.classList.contains('hidden')) renderPlTrashList();
@@ -867,21 +867,21 @@ function renderPlTrashList() {
   const box = document.getElementById('playlistTrashList');
   if (!box) return;
   if (!_plTrash.length) {
-    box.innerHTML = '<div class="empty" style="padding:24px 0;">回收站是空的</div>';
+    box.innerHTML = `<div class="empty" style="padding:24px 0;">${t('pl.trash.empty')}</div>`;
     return;
   }
   box.innerHTML = _plTrash.map(e => {
     const pl = e.playlist || {};
     const n = Array.isArray(pl.songs) ? pl.songs.length : 0;
     const when = new Date(e.deletedAt || 0);
-    const dateStr = `${when.getMonth() + 1}月${when.getDate()}日`;
+    const dateStr = t('pl.trash.date', { m: when.getMonth() + 1, d: when.getDate() });
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--line);">
       <div style="flex:1;min-width:0;">
-        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${esc(pl.name || '未命名歌单')}</div>
-        <div style="font-size:12px;color:var(--fg-3);">${n} 首歌 · ${dateStr}删除 · 剩余 ${e.daysLeft ?? '?'} 天</div>
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${esc(pl.name || t('pl.trash.unnamed'))}</div>
+        <div style="font-size:12px;color:var(--fg-3);">${t('pl.trash.meta', { n, date: dateStr, days: e.daysLeft ?? '?' })}</div>
       </div>
-      <button class="btn-sm" onclick="restoreTrashedPlaylist('${escQ(pl.id)}')">↩️ 恢复</button>
-      <button class="btn-sm" style="color:var(--c-danger);" onclick="purgeTrashedPlaylist('${escQ(pl.id)}')">彻底删除</button>
+      <button class="btn-sm" onclick="restoreTrashedPlaylist('${escQ(pl.id)}')">${t('pl.trash.restore')}</button>
+      <button class="btn-sm" style="color:var(--c-danger);" onclick="purgeTrashedPlaylist('${escQ(pl.id)}')">${t('pl.trash.purge')}</button>
     </div>`;
   }).join('');
 }
@@ -1120,12 +1120,12 @@ function _ensurePlAddModal() {
   div.innerHTML = `
     <div class="playlist-modal" style="min-width:420px;max-width:560px;max-height:70vh;display:flex;flex-direction:column;">
       <div class="playlist-modal-header">
-        <span class="playlist-modal-title">➕ 添加歌曲到歌单</span>
+        <span class="playlist-modal-title">${t('pl.add.title')}</span>
         <button class="playlist-modal-close" onclick="closePlaylistAddSongs()">✕</button>
       </div>
       <div style="display:flex;gap:8px;padding:12px 16px 4px;">
-        <input type="text" class="setting-input" id="plAddInput" placeholder="输入歌名/歌手，回车搜索" style="flex:1;" onkeydown="if(event.key==='Enter')doPlAddSearch()">
-        <button class="btn-primary" style="flex-shrink:0;padding:6px 14px;" onclick="doPlAddSearch()">🔍 搜索</button>
+        <input type="text" class="setting-input" id="plAddInput" placeholder="${t('pl.add.placeholder')}" style="flex:1;" onkeydown="if(event.key==='Enter')doPlAddSearch()">
+        <button class="btn-primary" style="flex-shrink:0;padding:6px 14px;" onclick="doPlAddSearch()">${t('pl.add.search')}</button>
       </div>
       <div id="plAddResults" class="playlist-modal-body" style="flex:1;min-height:0;overflow-y:auto;padding:8px 16px 16px;"></div>
     </div>`;
@@ -1144,7 +1144,7 @@ function openPlaylistAddSongs() {
   input.focus();
   input.select();
   document.getElementById('plAddResults').innerHTML =
-    '<div class="empty-hint" style="text-align:center;padding:20px;">输入关键词搜索后可逐条添加</div>';
+    `<div class="empty-hint" style="text-align:center;padding:20px;">${t('pl.add.hint')}</div>`;
 }
 
 function closePlaylistAddSongs() {
@@ -1156,19 +1156,19 @@ async function doPlAddSearch() {
   const box = document.getElementById('plAddResults');
   if (!kw) { showToast(t('toast.plKeywordRequired'), 'warn'); return; }
   const reqId = ++_plAddReqId;
-  box.innerHTML = '<div class="empty-hint" style="text-align:center;padding:20px;">搜索中…</div>';
+  box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">${t('pl.add.searching')}</div>`;
   try {
     const r = await api.searchMusic(kw, 'all', 1);
     if (reqId !== _plAddReqId) return; // 慢响应旧请求丢弃
     _plAddSongs = (r && r.songs) || [];
     if (!_plAddSongs.length) {
-      box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">${r && r.error ? '搜索出错：' + esc(r.error) : '没有搜索结果'}</div>`;
+      box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">${r && r.error ? t('pl.add.searchError', { msg: esc(r.error) }) : t('pl.add.noResult')}</div>`;
       return;
     }
     _renderPlAddList();
   } catch (e) {
     if (reqId === _plAddReqId) {
-      box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">搜索失败：${esc(errBrief(e))}</div>`;
+      box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">${t('pl.add.searchFailed', { msg: esc(errBrief(e)) })}</div>`;
     }
   }
 }
@@ -1191,7 +1191,7 @@ function _renderPlAddList() {
       </div>
       <span class="song-duration">${s.duration ? fmtDuration(s.duration) : '--:--'}</span>
       <div class="song-actions">
-        <button class="action-btn" ${added ? 'disabled' : ''} onclick="plAddPick(${i})" title="${added ? '已在歌单中' : '添加到本歌单'}">${added ? '✓' : '➕'}</button>
+        <button class="action-btn" ${added ? 'disabled' : ''} onclick="plAddPick(${i})" title="${added ? t('pl.add.alreadyIn') : t('pl.add.addTo')}">${added ? '✓' : '➕'}</button>
       </div>
     </div>`;
   }).join('');
@@ -1267,7 +1267,7 @@ function _ensurePlMergeModal() {
   div.innerHTML = `
     <div class="playlist-modal" style="min-width:420px;max-width:560px;max-height:70vh;display:flex;flex-direction:column;">
       <div class="playlist-modal-header">
-        <span class="playlist-modal-title">📥 合并其他歌单进本歌单</span>
+        <span class="playlist-modal-title">${t('pl.merge.title')}</span>
         <button class="playlist-modal-close" onclick="closePlaylistMergePicker()">✕</button>
       </div>
       <div id="plMergeList" class="playlist-modal-body" style="flex:1;min-height:0;overflow-y:auto;padding:8px 16px 16px;"></div>
@@ -1283,26 +1283,26 @@ async function openPlaylistMergePicker() {
   const m = _ensurePlMergeModal();
   m.classList.remove('hidden');
   const box = document.getElementById('plMergeList');
-  box.innerHTML = '<div class="empty-hint" style="text-align:center;padding:20px;">加载中…</div>';
+  box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">${t('pl.merge.loading')}</div>`;
   try {
     const all = (await api.getUserPlaylists()) || [];
     const others = all.filter(p => p && p.id && p.id !== _currentPlaylistId);
     if (!others.length) {
-      box.innerHTML = '<div class="empty-hint" style="text-align:center;padding:20px;">没有其他歌单可合并</div>';
+      box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">${t('pl.merge.none')}</div>`;
       return;
     }
     box.innerHTML = others.map(p => `
       <div class="song-row">
         <div class="song-info">
-          <div class="song-title">${esc(p.name) || '未命名'}</div>
+          <div class="song-title">${esc(p.name) || t('pl.merge.unnamed')}</div>
           <div class="song-meta">${(p.songs || []).length} 首${p.desc ? ' · ' + esc(p.desc) : ''}</div>
         </div>
         <div class="song-actions">
-          <button class="action-btn" onclick="mergePlaylistIntoCurrent('${escQ(p.id)}')" title="把该歌单的歌合入当前打开的歌单（重复歌自动跳过）">📥 合入</button>
+          <button class="action-btn" onclick="mergePlaylistIntoCurrent('${escQ(p.id)}')" title="${t('pl.merge.hint')}">${t('pl.merge.do')}</button>
         </div>
       </div>`).join('');
   } catch (e) {
-    box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">加载失败：${esc(errBrief(e))}</div>`;
+    box.innerHTML = `<div class="empty-hint" style="text-align:center;padding:20px;">${t('pl.merge.failed', { msg: esc(errBrief(e)) })}</div>`;
   }
 }
 
