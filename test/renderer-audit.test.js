@@ -161,14 +161,20 @@ test('local.js: 转码选中必须读本视图的 _selectedLocal（selectedSongs
 // ── 批③：播放链竞态（2026-09 第二轮审计 M7/M8/M9 + 定时停止反恢复）──
 
 test('player.js: 恢复进度监听必须先移除旧监听再挂新（once 监听跨歌泄漏，歌A metadata 慢会把歌B seek 到A的位置）', () => {
+  // 根因 2 起，续播 seek 抽到 player/resumeSeek.js：M7 的先删后挂 + loadedmetadata
+  // 先到的补口两件事都在那儿。行为级验证见 test/player-progress-restore.test.js
+  // （对着假 audio 元素真跑竞态），这里只钉"player.js 没绕过模块自己裸挂"。
   const src = read('js', 'player.js');
-  assert.match(src, /function attachResumeSeekListener\(/,
-    'loadAndPlay 两个分支各自裸 addEventListener loadedmetadata，需要统一的先删后挂助手');
-  const uses = src.match(/attachResumeSeekListener\(/g) || [];
-  assert.ok(uses.length >= 3,
-    '助手定义 + 本地分支 + 网络分支至少三处出现，确保两分支都换了');
-  assert.match(src, /removeEventListener\('loadedmetadata', _pendingResumeHandler\)/,
-    '助手内必须先移除上一首歌遗留的监听再挂新的（M7）');
+  const seeker = read('js', 'player', 'resumeSeek.js');
+  assert.match(src, /import\s*\{\s*createResumeSeeker\s*\}/, 'player.js 应从 resumeSeek.js 取续播逻辑');
+  assert.doesNotMatch(src, /addEventListener\('loadedmetadata'/,
+    'loadAndPlay 两个分支又各自裸 addEventListener loadedmetadata，需回到统一助手');
+  const uses = src.match(/_resumeSeeker\.attach\(/g) || [];
+  assert.ok(uses.length >= 2, '本地分支 + 网络分支两处都要接上，实际 ' + uses.length);
+  assert.match(seeker, /cancel\(\)[\s\S]*?removeEventListener\('loadedmetadata'/,
+    'attach 内必须先撤销上一首歌的监听（M7 跨歌泄漏）');
+  assert.match(seeker, /readyState\s*>=\s*HAVE_METADATA/,
+    '根因 2：metadata 先于监听挂载到达时要当场 seek，不能等下一次事件');
 });
 
 test('player.js: 歌词加载必须带请求序号守卫（快速切歌时慢响应的旧歌词覆盖新歌）', () => {

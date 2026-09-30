@@ -20,6 +20,7 @@ import {
   applyLyricFontSize, applyLyricOffset, getLyricOffset,
 } from './player/lyrics.js';
 import { getLyricOverride } from './lyricEditor.js';
+import { createResumeSeeker } from './player/resumeSeek.js';
 
 const audio = document.getElementById('audioPlayer');
 
@@ -196,22 +197,19 @@ async function restorePlayProgress(song) {
 // ── 歌词请求序号（M8）：快速切歌时旧歌词请求不得覆盖新歌 ──
 let _lyricRequestId = 0;
 
-// ── 恢复进度 seek 监听（M7）──────────────────────────
-// once 监听跨歌泄漏：歌 A metadata 迟迟不来时切到歌 B，A 的监听会在 B 加载时
-// 触发，把 B seek 到 A 的进度。模块级持有引用，挂新前先删旧。
-let _pendingResumeHandler = null;
-function attachResumeSeekListener(audio, savedTime) {
-  if (_pendingResumeHandler) {
-    audio.removeEventListener('loadedmetadata', _pendingResumeHandler);
-  }
-  _pendingResumeHandler = () => {
-    if (audio.duration > savedTime) {
-      audio.currentTime = savedTime;
-      showToast(`📍 从 ${Math.floor(savedTime/60)}:${String(Math.floor(savedTime%60)).padStart(2,'0')} 继续播放`, 'info', 2000);
-    }
-  };
-  audio.addEventListener('loadedmetadata', _pendingResumeHandler);
-}
+// ── 恢复进度 seek（根因 2，逻辑在 player/resumeSeek.js）──
+// 两个方向都得治，所以监听要挂两处：
+//   1. 跨歌泄漏（M7）：歌 A 的监听在 B 加载时触发，把 B seek 到 A 的进度。
+//   2. loadedmetadata 先到（根因 2）：`audio.src = url` 之后要 await 两次
+//      getPref 才能拿到进度，这期间媒体就绪、事件已发完，事后挂的监听
+//      永远收不到 —— 表现是从 0 开始播，无报错。
+// 抽成模块是因为这段逻辑无状态、无 DOM 依赖，能对着假 audio 元素真跑竞态；
+// player.js 顶层依赖 audioPlayer 元素和十余个 import，测试里拉不起来。
+const _resumeSeeker = createResumeSeeker({
+  onSeek: (_audio, t) => {
+    showToast(`📍 从 ${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')} 继续播放`, 'info', 2000);
+  },
+});
 
 export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
   if (!song) return;
@@ -263,7 +261,7 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
     // 恢复播放进度
     const savedTime = await restorePlayProgress(song);
     if (savedTime > 0) {
-      attachResumeSeekListener(audio, savedTime);
+      _resumeSeeker.attach(audio, savedTime);
     }
     audio.play().catch(() => {
       showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
@@ -325,7 +323,7 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
     // 恢复播放进度
     const savedTime2 = await restorePlayProgress(song);
     if (savedTime2 > 0) {
-      attachResumeSeekListener(audio, savedTime2);
+      _resumeSeeker.attach(audio, savedTime2);
     }
     audio.play().catch(() => {
       showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
