@@ -730,9 +730,10 @@ const LEDGER = {
   'src/renderer/js/views/history.js': 24,
   'src/renderer/js/views/home.js': 15,
   'src/renderer/js/views/local-stats.js': 11,
-  // 46 → 40：ID3 编辑弹窗整块抽到 js/localEditModal.js（阶段4），editor 里的
-  // 6 处硬编码中文（保存/失败/批量提示等）随之搬走，本文件只减不增。
-  'src/renderer/js/views/local.js': 40,
+  // 40 → 21（阶段5b-1）：扫描/刷新/补全封面/补全歌词/单曲拉封面这 19 处反馈文案
+  // 接进词典（toast.local*），欠账随之减少。剩下的 21 处属查重/重命名/导出/转码/音质，
+  // 留给 5b-2。
+  'src/renderer/js/views/local.js': 21,
   'src/renderer/js/views/nameBatch.js': 8,
   'src/renderer/js/views/search.js': 36,
 };

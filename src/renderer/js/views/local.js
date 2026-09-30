@@ -82,7 +82,7 @@ async function batchFetchCovers() {
   const localSongs = getState('localSongs');
   const needCover = localSongs.filter(s => !s.cover && s.title && s.artist);
   if (!needCover.length) {
-    showToast('✅ 所有歌曲都已有封面，无需补全', 'info');
+    showToast(t('toast.localAllHaveCover'), 'info');
     return;
   }
   _batchCancelled = false;
@@ -120,7 +120,7 @@ async function batchFetchCovers() {
   progressWrap.style.display = 'none';
   progressBar.style.width = '0%';
   renderLocalSongs();
-  showToast(`批量补封面完成：✅ ${ok} 成功  ❌ ${fail} 失败`, ok > 0 ? 'success' : 'warn', 4000);
+  showToast(t('toast.localBatchCoverDone', { ok, fail }), ok > 0 ? 'success' : 'warn', 4000);
 }
 
 function cancelBatchFetch() { _batchCancelled = true; }
@@ -187,12 +187,12 @@ async function _doScanLocalDir() {
       setState('localDirPath', dir);
       await api.setPref('localDirPath', dir);
       const retry = await api.scanLocalLibrary(localDirPath);
-      if (retry.error) { showToast('扫描失败: ' + retry.error, 'error'); return; }
+      if (retry.error) { showToast(t('toast.localScanFailed', { msg: retry.error }), 'error'); return; }
       setState('localSongs', retry.songs || []);
       document.getElementById('localInfo').textContent = `共 ${(retry.songs || []).length} 首 · ${localDirPath}`;
       filterLocalSongs(); // 重扫后必须重套当前筛选（与 refreshLocalLibrary 同一约定）
       const note = await _relinkNote(retry);
-      showToast(`扫描完成，发现 ${(retry.songs || []).length} 首歌曲${note}`, 'success');
+      showToast(t('toast.localScanDone', { count: (retry.songs || []).length, note }), 'success');
       return;
     }
     const localSongs = result.songs || [];
@@ -200,9 +200,9 @@ async function _doScanLocalDir() {
     document.getElementById('localInfo').textContent = `共 ${localSongs.length} 首 · ${localDirPath}`;
     filterLocalSongs(); // 重扫后必须重套当前筛选：直接 setState('localFiltered') 会丢掉收藏/格式/音质/完整度/关键词全部轴
     const note = await _relinkNote(result);
-    showToast(`扫描完成，发现 ${localSongs.length} 首歌曲${note}`, 'success');
+    showToast(t('toast.localScanDone', { count: localSongs.length, note }), 'success');
   } catch (e) {
-    showToast('扫描失败: ' + errBrief(e), 'error');
+    showToast(t('toast.localScanFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -331,9 +331,9 @@ function cycleLocalSort() { _axes.cycle('sort'); }
 // 📋 复制曲单：当前过滤视图一行一首纯文本（歌名 - 歌手）进剪贴板，零新通道
 async function copyLocalListText() {
   const lines = toTrackLines(getState('localFiltered') || []);
-  if (!lines.length) { showToast('当前视图没有可复制的歌曲', 'info'); return; }
+  if (!lines.length) { showToast(t('toast.localCopyEmpty'), 'info'); return; }
   const ok = await copyText(lines.join('\n'));
-  showToast(ok ? `📋 已复制 ${lines.length} 首歌名清单` : '复制失败：剪贴板被占用或无权限', ok ? 'success' : 'error', 2500);
+  showToast(ok ? t('toast.localListCopied', { count: lines.length }) : t('toast.copyFailed'), ok ? 'success' : 'error', 2500);
 }
 
 // ── 曲库目录监听自动刷新（主进程 fs.watch → local-library-changed 推送）──
@@ -353,7 +353,7 @@ async function refreshLocalLibrary() {
       document.getElementById('localInfo').textContent = `共 ${songs.length} 首 · ${dir}`;
       filterLocalSongs(); // 重新套用当前筛选并重渲染（列表/网格都兼顾）
       const note = await _relinkNote(result);
-      if (songs.length !== prevCount || note) showToast(`📂 本地曲库已自动刷新${note}`, 'info', note ? 4500 : 1800);
+      if (songs.length !== prevCount || note) showToast(t('toast.localAutoRefreshed', { note }), 'info', note ? 4500 : 1800);
     }
   } catch (e) {
     logger.warn('[refreshLocalLibrary] 自动刷新失败:', e && e.message);
@@ -592,7 +592,7 @@ async function batchProbeQuality() {
   const localSongs = (typeof getState === 'function' && getState('localSongs')) || [];
   const { targets, cached } = collectProbeTargets(localSongs, _probeCache);
   if (!targets.length) {
-    if (!cached) { showToast('本地库还没有歌曲可扫描，请先「扫描目录」', 'warn', 3500); return; }
+    if (!cached) { showToast(t('toast.localNeedScanFirst'), 'warn', 3500); return; }
     showToast(probeReportLine(summarizeProbe(Array.from(_probeCache.values())), false) + '（全部命中缓存）', 'info', 5500);
     return;
   }
@@ -640,7 +640,7 @@ async function batchFetchLyrics() {
   // 只选有 title + artist 的歌
   const candidates = localSongs.filter(s => s.title && s.artist);
   if (!candidates.length) {
-    showToast('本地库中没有带标题和艺术家的歌曲', 'warn');
+    showToast(t('toast.localNoNamedSongs'), 'warn');
     return;
   }
 
@@ -670,13 +670,13 @@ async function batchFetchLyrics() {
       progressLabel.textContent = `正在补全歌词 (${done}/${total})`;
     }
   } catch (e) {
-    showToast('批量歌词获取失败: ' + errBrief(e), 'error');
+    showToast(t('toast.localBatchLyricFailed', { msg: errBrief(e) }), 'error');
   }
 
   _batchCancelled = false;
   progressWrap.style.display = 'none';
   progressBar.style.width = '0%';
-  showToast(`批量补歌词完成：✅ ${ok} 成功  ❌ ${fail} 失败`, ok > 0 ? 'success' : 'warn', 4000);
+  showToast(t('toast.localBatchLyricDone', { ok, fail }), ok > 0 ? 'success' : 'warn', 4000);
 }
 
 // ── 拉取单曲封面 ─────────────────────────────────────
@@ -685,10 +685,10 @@ async function refetchCover(idx) {
   const s = localFiltered[idx];
   if (!s) return;
   if (!s.title || !s.artist) {
-    showToast('需要歌曲名和歌手才能在线拉取封面', 'warn');
+    showToast(t('toast.localCoverNeedName'), 'warn');
     return;
   }
-  showToast(`🔍 正在搜索《${s.title}》的封面...`, 'info', 1500);
+  showToast(t('toast.localCoverSearching', { title: s.title }), 'info', 1500);
   try {
     const result = await api.fetchOnlineCover(s.title, s.artist);
     if (result && result.success && result.coverBase64) {
@@ -699,15 +699,15 @@ async function refetchCover(idx) {
       if (idx2 >= 0) localSongs[idx2].cover = s.cover;
       renderLocalSongs();
       if (s.cover) {
-        showToast(`✅ 封面已拉取并写入文件（${result.source}）`, 'success');
+        showToast(t('toast.localCoverFetched', { source: result.source }), 'success');
       } else {
-        showToast('❌ 封面写入文件失败，请重试', 'warn', 3000);
+        showToast(t('toast.localCoverWriteFailed'), 'warn', 3000);
       }
     } else {
-      showToast('❌ 未找到匹配的封面：' + (result?.error || '请检查歌名/歌手'), 'warn', 3500);
+      showToast(t('toast.localCoverNotFound', { msg: result?.error || t('toast.localCoverCheckName') }), 'warn', 3500);
     }
   } catch (e) {
-    showToast('拉取失败: ' + errBrief(e), 'error');
+    showToast(t('toast.localCoverFetchFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
