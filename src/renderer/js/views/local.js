@@ -38,7 +38,7 @@ import { copyText } from '../songShare.js';
 import { indexOfPlaying, flashRow } from '../locatePlaying.js';
 import { groupSongsForAlbumWall, normalizeGroupKey, UNKNOWN_ALBUM } from '../artistGroups.js';
 import { t } from '../i18n.js';
-import { isRangeClick, rangeKeys } from '../selectionRange.js';
+import { createListSelection } from '../listSelection.js';
 
 // 统计/查重已拆到 local-stats.js（回调在文件末尾注入）
 import {
@@ -52,6 +52,23 @@ let _localSelectionMode = false;
 const _selectedLocal = new Set(); // 存 filePath
 let _localSelAnchor = null;       // Shift 连选锚点（存 filePath，与选态同身份）
 let _localVirtualScroller = null; // 虚拟滚动实例
+
+// 多选动作逻辑收敛到 listSelection（状态仍由上面三个变量持有，故本文件里
+// 直接读 _selectedLocal / _localSelectionMode 的几十处一行未动）。
+// isRangeClick/rangeKeys 已由本工厂转调 selectionRange.js。
+const _sel = createListSelection({
+  isMode: () => _localSelectionMode,
+  setMode: (v) => { _localSelectionMode = v; },
+  getSet: () => _selectedLocal,
+  getAnchor: () => _localSelAnchor,
+  setAnchor: (k) => { _localSelAnchor = k; },
+  getViewKeys: () => (getState('localFiltered') || []).map((s) => s.filePath),
+  onRender: () => renderLocalSongs(),
+  decodePath: (x) => decodeFilePath(x),
+  barId: 'localSelectionBar',
+  countId: 'localSelectionCount',
+  cbPrefix: 'localcb_',
+});
 
 // ── 批量补封面 ────────────────────────────────────────
 let _batchCancelled = false;
@@ -316,83 +333,24 @@ async function refreshLocalLibrary() {
   }
 }
 
-// ── 选择模式 ─────────────────────────────────────────
-function enterLocalSelectionMode() {
-  _localSelectionMode = true;
-  _selectedLocal.clear();
-  _localSelAnchor = null;
-  renderLocalSongs();
-  updateLocalSelectionBar();
-}
-
-function exitLocalSelectionMode() {
-  _localSelectionMode = false;
-  _selectedLocal.clear();
-  _localSelAnchor = null;
-  renderLocalSongs();
-  updateLocalSelectionBar();
-}
+// ---- 选择模式 ----
+// 动作逻辑全部转调 listSelection（_sel）；状态由上面三个模块级变量持有。
+// 函数名与 window 桥接保持不变——index.html 的 onclick 与测试都按这些名字找。
+function enterLocalSelectionMode() { _sel.enter(); }
+function exitLocalSelectionMode() { _sel.exit(); }
 
 /**
  * 勾选/取消一行；按住 Shift 把「锚点 → 本次点击」整段并进来。
  *
  * 视图序取 state.localFiltered —— 它就是渲染与「全选」用的那一份（过滤+排序后），
  * 所以连选不可能连到没显示的行。i 传进来正是它在该视图里的下标。
- * filePath 从编码态解出来再比对：选中态存的是明文路径。
+ * filePath 从编码态解出来再比对：选中态存的是明文路径（decodePath 钩子做的）。
  */
-function toggleLocalSelect(filePathOrEncoded, idx, e) {
-  // 兼容处理：新版传入 base64 编码路径，旧版传入明文路径
-  const filePath = filePathOrEncoded.length > 200
-    ? decodeFilePath(filePathOrEncoded) // 新版：base64 编码的路径
-    : filePathOrEncoded; // 旧版：明文路径（向后兼容）
-  if (isRangeClick(e)) {
-    const order = (getState('localFiltered') || []).map((s) => s.filePath);
-    if (order.includes(filePath)) {
-      for (const p of rangeKeys(order, _localSelAnchor, idx)) _selectedLocal.add(p);
-      renderLocalSongs(); // 重新高亮
-      updateLocalSelectionBar();
-      return;
-    }
-  }
-  if (_selectedLocal.has(filePath)) {
-    _selectedLocal.delete(filePath);
-  } else {
-    _selectedLocal.add(filePath);
-  }
-  _localSelAnchor = filePath;
-  // 更新 checkbox 状态
-  const cb = document.getElementById('localcb_' + idx);
-  if (cb) cb.checked = _selectedLocal.has(filePath);
-  updateLocalSelectionBar();
-  renderLocalSongs(); // 重新高亮
-}
+function toggleLocalSelect(filePathOrEncoded, idx, e) { _sel.toggle(idx, filePathOrEncoded, e); }
 
-function selectAllLocal() {
-  const localFiltered = getState('localFiltered');
-  localFiltered.forEach(s => _selectedLocal.add(s.filePath));
-  renderLocalSongs();
-  updateLocalSelectionBar();
-}
-
-function deselectAllLocal() {
-  _selectedLocal.clear();
-  _localSelAnchor = null; // 清空整批后，锚点指向的行已不在选态里
-  renderLocalSongs();
-  updateLocalSelectionBar();
-}
-
-function updateLocalSelectionBar() {
-  const bar = document.getElementById('localSelectionBar');
-  const count = document.getElementById('localSelectionCount');
-  if (!bar) return;
-  const n = _selectedLocal.size;
-  if (!_localSelectionMode) {
-    bar.style.display = 'none';
-    return;
-  }
-  count.textContent = n;
-  bar.style.display = 'flex';
-}
+function selectAllLocal() { _sel.selectAll(); }
+function deselectAllLocal() { _sel.deselectAll(); }
+function updateLocalSelectionBar() { _sel.syncBar(); }
 
 // 导出 m3u：选择模式下勾了歌就导勾选，否则导当前过滤/排序视图（所见即所得）
 async function exportLocalM3u() {

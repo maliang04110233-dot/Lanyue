@@ -164,13 +164,25 @@ const LISTS = [
     fn: 'function toggleDlSelect(taskId, e)', anchor: 'let _dlSelAnchor = null;' },
   { name: '本地曲库', src: () => LOCAL, file: 'src/renderer/js/views/local.js',
     call: "onclick=\"event.stopPropagation();toggleLocalSelect('${encodedPath}',${i}, event)\"",
-    fn: 'function toggleLocalSelect(filePathOrEncoded, idx, e)', anchor: 'let _localSelAnchor = null;' },
+    fn: 'function toggleLocalSelect(filePathOrEncoded, idx, e)', anchor: 'let _localSelAnchor = null;',
+    // 连选动作已收敛到 listSelection（状态仍在本视图持有）——本视图不再直接
+    // import selectionRange，改由 listSelection 转调；「跑连选逻辑的那一层必须
+    // 真的 import 到 isRangeClick」这条不变量在下面的 listSelection 断言里钉。
+    imp: 'listSelection.js',
+    impVia: 'src/renderer/js/listSelection.js' },
 ];
 
 for (const L of LISTS) {
   test(`${L.name}：连选接线就位（import + 锚点 + onclick 传 event）`, () => {
     const s = L.src();
-    assert.ok(/from '\.\.?\/selectionRange\.js'/.test(s), `${L.file} 没 import selectionRange —— isRangeClick 会是未定义，onclick 静默失灵`);
+    // 跑连选的那一层必须 import 到 isRangeClick 的来源：默认直接 selectionRange，
+    // 收敛过的（本地曲库）走 listSelection，其自身再转调 selectionRange。
+    const imp = L.imp || 'selectionRange.js';
+    assert.ok(new RegExp(`from '\\.\\.?/${imp}'`).test(s), `${L.file} 没 import ${imp} —— isRangeClick 会是未定义，onclick 静默失灵`);
+    if (L.impVia) {
+      const via = read(L.impVia);
+      assert.ok(/from '\.\/selectionRange\.js'/.test(via), `${L.impVia} 没转调 selectionRange —— 连选区间数学丢了`);
+    }
     assert.ok(s.includes(L.anchor), `${L.name} 缺锚点态`);
     assert.ok(s.includes(L.fn), `${L.name} 的切换函数没接住 event 形参`);
     assert.ok(s.includes(L.call), `${L.name} 的内联处理器没把 event 递给切换函数`);
