@@ -541,5 +541,9 @@
   "aggregate.dupBadgeTitle": "该曲在 {count} 个平台上都有",
   "aggregate.preferPrimary": "同曲首选条目，建议从它下载",
   "aggregate.failedSome": "部分来源不可用：{names}",
-  "aggregate.failedHint": "这些来源拉取失败，已按空列表计入；可检查对应平台的登录状态"
+  "aggregate.failedHint": "这些来源拉取失败，已按空列表计入；可检查对应平台的登录状态",
+  "aggregate.undecidableBadge": "无法判定",
+  "aggregate.undecidableRowHint": "该条目缺少时长或歌手信息，无法判断它与其他平台的是否同一首歌。它不会被标成重复，也没有被跳过。",
+  "aggregate.undecidableSome": "{count} 首无法判定是否跨源同曲（缺少时长或歌手信息）",
+  "aggregate.undecidableHint": "这些条目歌名与其他平台撞上了，但该平台不提供时长（或条目缺歌手），无法确认是否同一首。它们既没被标成重复，也没有被丢弃。"
 }

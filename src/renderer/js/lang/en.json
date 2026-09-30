@@ -541,5 +541,9 @@
   "aggregate.dupBadgeTitle": "Available on {count} platforms",
   "aggregate.preferPrimary": "Preferred copy of a cross-source duplicate",
   "aggregate.failedSome": "Unavailable sources: {names}",
-  "aggregate.failedHint": "These sources failed to load and were counted as empty; check their sign-in state"
+  "aggregate.failedHint": "These sources failed to load and were counted as empty; check their sign-in state",
+  "aggregate.undecidableBadge": "Undecidable",
+  "aggregate.undecidableRowHint": "This entry has no duration or artist, so it cannot be matched against the same track on other platforms. It is neither flagged as a duplicate nor dropped.",
+  "aggregate.undecidableSome": "{count} tracks cannot be matched across sources (no duration or artist)",
+  "aggregate.undecidableHint": "These titles collide with other platforms, but the platform gives no duration (or the entry has no artist), so sameness cannot be confirmed. They are neither flagged as duplicates nor discarded."
 }

@@ -17,12 +17,16 @@ async function loadAggregated(opts = {}) {
     const r = await api.aggregateCrossSource(opts);
     _aggState = {
       songs: Array.isArray(r && r.songs) ? r.songs : [],
-      stats: (r && r.stats) || { total: 0, sources: 0, duplicates: 0, groups: 0 },
+      stats: (r && r.stats) || { total: 0, sources: 0, duplicates: 0, groups: 0, undecidable: 0 },
       failed: Array.isArray(r && r.failed) ? r.failed : [],
     };
   } catch (e) {
     logger.warn('聚合曲库失败:', e && e.message);
-    _aggState = { songs: [], stats: { total: 0, sources: 0, duplicates: 0, groups: 0 }, failed: [] };
+    _aggState = {
+      songs: [],
+      stats: { total: 0, sources: 0, duplicates: 0, groups: 0, undecidable: 0 },
+      failed: [],
+    };
   } finally {
     _aggLoading = false;
     renderAggregated();
@@ -55,7 +59,7 @@ function _aggSourceOptions() {
 }
 
 function _aggStatBar() {
-  const st = (_aggState && _aggState.stats) || { total: 0, sources: 0, duplicates: 0, groups: 0 };
+  const st = (_aggState && _aggState.stats) || { total: 0, sources: 0, duplicates: 0, groups: 0, undecidable: 0 };
   const failed = (_aggState && _aggState.failed) || [];
   const parts = [
     esc(t('aggregate.statTotal', { count: st.total })),
@@ -68,6 +72,12 @@ function _aggStatBar() {
     html += '<span class="agg-failed" title="' + escAttr(t('aggregate.failedHint')) + '">'
       + esc(t('aggregate.failedSome', { names: failed.join(', ') })) + '</span>';
   }
+  // 判据不全的条目：这些歌**在**，只是没法判断是否跨源同曲。
+  // 不说这句，用户会以为该平台没有这首歌。
+  if (st.undecidable > 0) {
+    html += '<span class="agg-undecidable" title="' + escAttr(t('aggregate.undecidableHint')) + '">'
+      + esc(t('aggregate.undecidableSome', { count: st.undecidable })) + '</span>';
+  }
   return html;
 }
 
@@ -77,6 +87,11 @@ function _aggRowHtml(s) {
     ? '<span class="agg-dup-badge" title="' + escAttr(t('aggregate.dupBadgeTitle', { count: s._dupCount })) + '">'
       + esc(t('aggregate.dupBadge', { count: s._dupCount })) + '</span>'
     : '';
+  // 判不了 ≠ 不是重复：逐条点明原因，比只在统计栏给一个总数有用
+  const undecidableTip = s._undecidable
+    ? '<span class="agg-undecidable-badge" title="' + escAttr(t('aggregate.undecidableRowHint')) + '">'
+      + esc(t('aggregate.undecidableBadge')) + '</span>'
+    : '';
   // 只在跨源簇里的非代表条目上提示"优先用另一条"，避免用户下到取不到流的那条
   const primaryTip = (s._crossSource && s._primary === false)
     ? ' title="' + escAttr(t('aggregate.preferPrimary')) + '"' : '';
@@ -85,6 +100,7 @@ function _aggRowHtml(s) {
     + '<span class="agg-title">' + esc(s.title || '') + '</span>'
     + '<span class="agg-artist">' + esc(s.artist || '') + '</span>'
     + badge
+    + undecidableTip
     + '</div>';
 }
 

@@ -24,6 +24,13 @@
  *   跨源同曲 ⇔ 歌名命中 且 歌手归一后相等 且 时长已知且在 5s 容差内
  * 三者缺一不可。这也顺带避免了 score 1（仅歌名命中）被误当成同曲。
  *
+ * 「判不了」与「判出不同曲」是两回事
+ * ---------------------------------
+ * 判据不全时（fivesing / migu 搜索接口不返回时长，duration 恒 0；部分平台条目
+ * 缺歌手），本模块**不标记也不静默**：命中这类情况的条目会带上 _undecidable，
+ * 由聚合页显式告诉用户"这个源没提供时长，无法判断是否同一首"。
+ * 静默不标的代价是用户以为该平台没有这首歌，而事实是该平台的歌一条不少。
+ *
  * 与换源机制的关系
  * ----------------
  * 归一化（normalizeName / normalizeArtists）仍复用 matchMusic —— 那是仓库里
@@ -71,6 +78,30 @@ function durationCompatible(x, y) {
   const b = Number(y);
   if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return false;
   return Math.abs(a - b) <= DURATION_TOLERANCE_MS;
+}
+
+/** 时长是否已知（fivesing / migu 的搜索接口不返回时长，恒为 0） */
+function hasKnownDuration(song) {
+  const d = Number(song && song.duration);
+  return Number.isFinite(d) && d > 0;
+}
+
+/**
+ * 「无法判定是否同一首」的原因
+ *
+ * 与「判定为不同曲」必须分开：
+ *   · 伴奏 / 现场版 —— 判据齐全，**判出来**不是同一首（时长差超容差）；
+ *   · 缺时长 / 缺歌手 —— 判据不全，根本**判不了**。
+ * 后者静默不标重复，用户看到的是「这平台没有这首歌」，与事实相反。
+ * 所以聚合要把它显式回报给界面，而不是当作"没有重复"。
+ *
+ * @returns {'duration'|'artist'|null} null 表示判据齐全
+ */
+function undecidableReason(song) {
+  if (!song) return null;
+  if (!hasKnownDuration(song)) return 'duration';
+  if (!normalizeArtists(song.artist)) return 'artist';
+  return null;
 }
 
 /** 歌手：两侧都存在且归一后相等（多人歌手顺序无关） */
@@ -163,11 +194,13 @@ function isUsableSong(song) {
  * @param {Array<{source:string, songs:Array}>} groups 按来源分组的曲目
  * @param {Object} [opts]
  * @param {boolean} [opts.markDuplicates=true] 是否标记跨源同曲
- * @returns {{songs:Array, stats:{total:number, sources:number, duplicates:number, groups:number}}}
+ * @returns {{songs:Array, stats:{total:number, sources:number, duplicates:number, groups:number, undecidable:number}}}
  *   命中标记的曲目会多出：
  *     _dupOf: string[]     同曲的其他条目 key（跨源重复时才有）
  *     _dupCount: number    同曲条目总数（含自己）
  *     _crossSource: boolean 该曲在多个平台上都有
+ *   判据不全但存在跨源同名候选的曲目会多出：
+ *     _undecidable: 'duration'|'artist'  判不了的原因（界面据此说明）
  */
 function aggregateAcrossSources(groups, opts = {}) {
   const out = [];
@@ -189,6 +222,7 @@ function aggregateAcrossSources(groups, opts = {}) {
     sources: new Set(out.map((s) => s.source)).size,
     duplicates: 0,
     groups: 0,
+    undecidable: 0,
   };
   if (!out.length || opts.markDuplicates === false) return { songs: out, stats };
 
@@ -240,6 +274,31 @@ function aggregateAcrossSources(groups, opts = {}) {
     }
   }
 
+  // ── 判据不全的条目：显式回报，不静默 ────────────────
+  // 为什么不复用上面的桶：clusterKey 含歌手，缺歌手的条目键尾是空的，
+  // 与任何正常条目都不同桶，从头到尾进不了比较循环 —— 而它恰恰最需要被告知。
+  // 所以这里单独按「剥版本词后的歌名」建候选索引，只用它判断
+  // 「别的平台上是否存在同名的潜在重复」，不去改判定本身。
+  const titleBuckets = new Map();
+  for (const s of out) {
+    const t = stripVersionTail(normalizeName(s.title));
+    if (!t) continue;
+    let arr = titleBuckets.get(t);
+    if (!arr) { arr = []; titleBuckets.set(t, arr); }
+    arr.push(s);
+  }
+  for (const arr of titleBuckets.values()) {
+    if (arr.length < 2) continue;
+    if (new Set(arr.map((s) => s.source)).size < 2) continue; // 同源多条不算跨源候选
+    for (const s of arr) {
+      if (s._crossSource || s._undecidable) continue;
+      const reason = undecidableReason(s);
+      if (!reason) continue;
+      s._undecidable = reason;
+      stats.undecidable += 1;
+    }
+  }
+
   return { songs: out, stats };
 }
 
@@ -282,6 +341,8 @@ module.exports = {
   sameTitle,
   sameArtist,
   durationCompatible,
+  hasKnownDuration,
+  undecidableReason,
   clusterKey,
   songKey,
   isUsableSong,

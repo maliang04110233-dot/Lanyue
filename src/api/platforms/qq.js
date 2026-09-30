@@ -916,8 +916,15 @@ async function qqGetPlaylistSongs(id, limit = 200) {
       };
     });
   } catch (e) {
+    // 失败必须向上抛：return [] 会让"接口挂了"与"这个歌单确实是空的"
+    // 在调用方看来完全一样。跨源聚合据此把该源记进 failed 提示用户，
+    // 吞成空列表则用户看到的是"聚合成功，就是没歌"——失败被伪装成了空数据。
     logger.warn('[qqGetPlaylistSongs] 失败:', e.message);
-    return [];
+    const err = new Error(`QQ 歌单拉取失败（歌单 ${id}）：${e && e.message}`);
+    err.source = 'qq';
+    err.playlistId = id;
+    err.cause = e;
+    throw err;
   }
 }
 
