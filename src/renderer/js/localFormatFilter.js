@@ -6,6 +6,10 @@
  * 当前格式随扫描失效时下一击自动回落 all。判定只看 filePath 扩展名，不碰文件内容。
  */
 
+// 收口：格式轴的「在库里就下一档」分支与别处同构，走 cycleValue；
+// 但本轴多一条 'all' → list[0] 的起步分支（'all' 不在 formats 里），
+// 且未知格式要回 'all' 而不是 list[0]，故 fallback 必须显式传。
+
 /** 单曲扩展名（小写，无扩展名回 ''） */
 function extOf(song) {
   const p = String((song && song.filePath) || '');
@@ -28,7 +32,11 @@ function listFormats(songs) {
 /** 循环下一态：all → 格式1 → … → 格式n → all；当前格式已不在曲库则回落 all */
 function nextFmtMode(mode, formats) {
   const list = Array.isArray(formats) ? formats : [];
-  if (mode === 'all') return list.length ? list[0] : 'all';
+  if (!list.length) return 'all';
+  if (mode === 'all') return list[0];
+  // 末档必须回落到基准态 'all'，**不能**用 cycleValue —— 它的
+  // arr[(i + 1) % len] 是「绕回首项」，那是排序轴的语义；格式轴的循环路径是
+  // all → 格式1 → … → 格式n → all，末档落点是基准态而非第一个格式。
   const i = list.indexOf(mode);
   if (i < 0) return 'all';
   return i + 1 < list.length ? list[i + 1] : 'all';
