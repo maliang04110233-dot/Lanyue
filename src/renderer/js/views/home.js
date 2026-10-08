@@ -829,7 +829,11 @@ async function playRecommendSong(song) {
     }
     const playSource = result.source || song.source;
     const referer = playReferer(playSource, result);
-    const proxied = await api.proxyPlay(result.url, referer);
+    const proxied = await api.proxyPlay(result.url, referer, {
+      id: String(result.id ?? song.id),
+      source: playSource,
+      quality,
+    });
     if (!proxied || !proxied.fileUrl) {
       showToast('⚠️ 音源下载失败：' + (proxied?.error || '未知错误'), 'error', 5000);
       return;

@@ -901,7 +901,11 @@ async function playPlaylistModalSong(idx) {
     song._playedQuality = quality;
     const playSource = result.source || song.source;
     const referer = playReferer(playSource, result);
-    const proxied = await api.proxyPlay(result.url, referer);
+    const proxied = await api.proxyPlay(result.url, referer, {
+      id: String(result.id ?? song.id),
+      source: playSource,
+      quality,
+    });
     if (reqId !== _plModalPlayRequestId) return;
     if (!proxied || !proxied.fileUrl) {
       showToast(t('toast.sourceFailed'), 'error', 5000);

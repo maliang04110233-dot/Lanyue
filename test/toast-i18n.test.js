@@ -782,10 +782,10 @@ const PASSTHROUGH = {
   'src/renderer/js/fallbackNotice.js': 2,
   'src/renderer/js/playError.js': 6,
   'src/renderer/js/queueCopy.js': 2,
-  // 47 → 38：歌单详情行内渲染 + 歌单卡片列表 + 详情描述这批界面文案接进词典
-  // （空态、行内按钮 title、歌名/歌手兜底、卡片计数与编辑删除提示）。
-  // 剩下的 38 处属回收站 / 添加歌曲弹层 / 合并歌单 / 跨歌单查重 / 多选工具条，按批推进。
-  'src/renderer/js/views/playlist.js': 38,
+  // 47 → 25：6a（详情行内 + 卡片列表 + 详情描述）与 6b（回收站 / 添加弹层 / 合并弹层）把界面文案接进词典。
+  // 剩下的 25 处是 **logger 诊断文案**（"歌单批量入队失败:"等）与尚未收编的弹窗/剪贴板报告文案，
+  // 按批推进；每收就一处的是数字不是词条。
+  'src/renderer/js/views/playlist.js': 25,
 };
 
 function scanPassthrough() {

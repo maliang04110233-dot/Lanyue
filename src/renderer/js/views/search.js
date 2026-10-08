@@ -1283,7 +1283,11 @@ async function playSong(idx, queueOverride = null) {
     }
     const playSource = result.source || s.source;
     const referer = playReferer(playSource, result);
-    const proxied = await api.proxyPlay(result.url, referer);
+    const proxied = await api.proxyPlay(result.url, referer, {
+      id: String(result.id ?? s.id),
+      source: playSource,
+      quality,
+    });
     if (reqId !== _searchPlayRequestId) return;
     if (!proxied || !proxied.fileUrl) {
       showToast('⚠️ 音源获取失败', 'error', 5000);

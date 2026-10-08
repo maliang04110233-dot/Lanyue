@@ -440,7 +440,11 @@ async function _playFrom(list, idx) {
     }
     const playSource = result.source || song.source;
     const referer = playReferer(playSource, result);
-    const proxied = await api.proxyPlay(result.url, referer);
+    const proxied = await api.proxyPlay(result.url, referer, {
+      id: String(result.id ?? song.id),
+      source: playSource,
+      quality,
+    });
     if (reqId !== _playlistPlayRequestId) return;
     if (!proxied || !proxied.fileUrl) {
       showToast(t('toast.sourceFailed'), 'error', 5000);

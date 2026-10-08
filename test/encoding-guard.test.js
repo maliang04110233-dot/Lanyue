@@ -64,7 +64,7 @@ const SIGNATURE = new RegExp(`[${SIGNATURE_CHARS.join('')}]|${SIGNATURE_WORDS}`)
 
 /** 合法命中：讲到 U+FFFD 本身的注释行。精确到行，过期即红。 */
 const ALLOWED = new Set([
-  'src/main/ipc/library.js:488',
+  'src/main/ipc/library.js:481',
 ]);
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'release', '.backup', '.preview', 'spark-output']);
