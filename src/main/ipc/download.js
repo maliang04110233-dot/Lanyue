@@ -14,24 +14,9 @@ const { queueMove } = require('../queueOrder');
 // 根因 1 起 proxy-play 走 streamProtocol 的流式路径，playCache 的整首落盘
 // 仅保留给诊断/设置页的缓存统计，不再是播放链路的一环。
 const history = require('../../utils/history');
-const { fetchRadioPool } = require('../radioPool');
 const logger = require('../../utils/logger');
 // 主进程即 UI 线程：文件 IO 必须异步
 const fsa = require('../../utils/fsAsync');
-
-/**
- * 3-A 电台：取同歌手候选曲目
- *
- * 只读且无副作用：把 seed 交给 radioPool，由它决定搜什么、怎么降级。
- * 拿不到歌手名 / 搜索失败 / 返回垃圾都在 radioPool 内降级为
- * { songs: [], reason }，这里只做透传 + 最后一道参数守卫。
- */
-handle('radio-pool', async (_, seed, opts) => {
-  if (!seed || typeof seed !== 'object' || Array.isArray(seed)) {
-    return { songs: [], artist: '', reason: 'no-artist' };
-  }
-  return fetchRadioPool(seed, opts);
-});
 
 function register() {
   // 关键：downloadQueue / app / persistQueue / processQueue 都通过 getter 拿，
