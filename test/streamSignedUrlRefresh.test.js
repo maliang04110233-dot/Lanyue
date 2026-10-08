@@ -263,7 +263,7 @@ test('D-35：403 的 HTML 错误页绝不回写给 audio（重取分支也必须
 
 test('D-35：重取回来的 URL 指向内网时被拒，不发起该请求', async () => {
   registry.clearStreams();
-  let asserted = [];
+  const asserted = [];
   const entry = registry.resolveStream(
     registry.registerStream('https://cdn.example.com/old.mp3', '', async () => ({
       url: 'http://127.0.0.1:9/evil',
@@ -478,7 +478,6 @@ test('V1：403 分支整个删掉（回到改造前）会让行为用例失败',
   // 退化的结果必须仍是合法 JS —— 语法错误会让整份文件崩掉，
   // 那证明不了「重取被删」，只证明「文件坏了」
   try {
-    // eslint-disable-next-line no-new-func
     new Function(mutated.replace(/require\(/g, 'void('));
   } catch (e) {
     assert.fail('V1 变异产出的是语法错误而不是行为差异: ' + e.message);
