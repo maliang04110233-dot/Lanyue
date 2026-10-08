@@ -256,9 +256,16 @@
                       <button class="tab tab-neon" id="localSelectBtn" onclick="enterLocalSelectionMode()" data-i18n="local.select">☑ 选择</button>
             <button class="tab tab-neon" id="localViewToggleBtn" onclick="toggleLocalView()" data-i18n="local.grid">▦ 网格</button>
                       <button class="tab" id="localFavBtn" onclick="toggleLocalFavOnly()" title="只看已收藏的本地歌（行右键 ♥ 收藏）">♥ 收藏</button>
-                      <button class="tab" id="localFmtBtn" onclick="cycleLocalFmt()" title="按文件格式过滤：只在曲库实际存在的格式间循环">🎞 格式</button>
-                      <button class="tab" id="localQualBtn" onclick="cycleLocalQual()" title="按音质过滤视图：全部 / 仅标称无损 / 仅实测真无损 / 仅存疑或伪无损 / 仅待验（无损容器未实测）。高亮=正在筛，与格式、收藏、关键词叠加">🧪 音质</button>
-                      <button class="tab" id="localMetaBtn" onclick="cycleLocalMeta()" title="按元数据完整度过滤：全部 / 缺封面 / 缺专辑 / 缺歌手或标题 / 缺内嵌歌词。高亮=正在筛，与格式、音质、收藏、关键词叠加">🏷 完整度</button>
+                      <div class="tb-dropdown">
+                        <button class="tab" id="localFilterBtn" onclick="toggleTbDropdown(event, 'localFilterMenu')" title="三条过滤轴收在一处：点一次走一档、菜单不关可以连着点；正在筛的那几档会显示在工具栏下方一行，点它就单项清掉">🔽 筛选 ▾</button>
+                        <div class="tb-menu" id="localFilterMenu" hidden>
+                          <div class="tb-menu-label">叠加筛选 · 高亮=正在筛 · 生效项见工具栏下方</div>
+                          <button class="tb-menu-item" id="localFmtBtn" onclick="cycleLocalFmt()" title="按文件格式过滤：只在曲库实际存在的格式间循环">🎞 格式</button>
+                          <button class="tb-menu-item" id="localQualBtn" onclick="cycleLocalQual()" title="按音质过滤视图：全部 / 仅标称无损 / 仅实测真无损 / 仅存疑或伪无损 / 仅待验（无损容器未实测）。与收藏、关键词叠加">🧪 音质</button>
+                          <button class="tb-menu-item" id="localMetaBtn" onclick="cycleLocalMeta()" title="按元数据完整度过滤：全部 / 缺封面 / 缺专辑 / 缺歌手或标题 / 缺内嵌歌词。与收藏、关键词叠加">🏷 完整度</button>
+                          <button class="tb-menu-item" onclick="clearLocalFilters();closeTbMenus()" title="三条轴全部回到不过滤（♥ 收藏与关键词不动）">✕ 清空筛选</button>
+                        </div>
+                      </div>
                       <div class="search-input-wrap">
                         <input class="search-input" id="localFilter" placeholder="过滤本地歌曲..."
                           oninput="filterLocalSongs()" onkeydown="if(event.key==='Enter')filterLocalSongs()">
@@ -292,6 +299,8 @@
                       </div>
                       <span class="local-info" id="localInfo" data-i18n="local.notScanned">未扫描</span>
                     </div>
+                    <!-- 生效中的折叠筛选：菜单一关就只剩这一行报实话（由 localFilterSummary 渲染，空则整行隐藏） -->
+                    <div class="filter-chips" id="localFilterChips" hidden></div>
                     <!-- 批量选择操作栏 -->
                     <div id="localSelectionBar" class="local-selection-bar" style="display:none">
                       <span class="local-sel-count">已选 <b id="localSelectionCount">0</b> 首</span>

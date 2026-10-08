@@ -40,6 +40,7 @@ import { groupSongsForAlbumWall, normalizeGroupKey, UNKNOWN_ALBUM } from '../art
 import { t } from '../i18n.js';
 import { createListSelection } from '../listSelection.js';
 import { wireAxes } from '../listAxes.js';
+import { CHIP_AXIS_IDS, activeFilterChips, filterChipsHtml } from '../localFilterSummary.js';
 import {
   setDeps as setEditModalDeps, openEdit, closeEditOnBg, onEditCoverSelect, clearEditCover,
   saveEdit, openBatchEdit, closeEdit, saveBatchEdit, teardownDragCover,
@@ -239,6 +240,9 @@ function filterLocalSongs() {
     );
   }
   setState('localFiltered', _sortL([...songs]));
+  // chip 行紧跟过筛结果刷新，放在列表渲染之前：三种视图模式（列表/网格/专辑墙）
+  // 各有各的渲染路径，渲染万一早退，外面的筛选报数也不能停在上一档。
+  _renderFilterChips();
   if (_localViewMode === 'album') renderLocalAlbumWall();
   else if (_localViewMode === 'grid') renderLocalGrid();
   else renderLocalSongs();
@@ -327,6 +331,58 @@ function cycleLocalQual() { _axes.cycle('qual'); }
 function cycleLocalMeta() { _axes.cycle('meta'); }
 /** 排序循环：默认 → 标题 → 歌手 → 时长↓ → 大小↓ → 播放🔥 → 最近添加↓ → 默认 */
 function cycleLocalSort() { _axes.cycle('sort'); }
+
+/**
+ * 折叠进「🔽 筛选 ▾」的三条轴 ↔ 工具栏下方那一行 chip。
+ *
+ * 菜单一关，chip 行就是"现在到底在筛什么"的唯一外显（.active 藏在菜单里不算）。
+ * 文案直接取轴表的 label(mode)、清档值只有 'all' 一个约定，两处都不另立说法
+ * ——详见 localFilterSummary.js 头注。排序轴不在名单里：它不筛东西，
+ * 把它报成一条筛选是把用户往错的方向带。
+ */
+function _chipSource() {
+  return LOCAL_AXES
+    .filter((a) => CHIP_AXIS_IDS.includes(a.id))
+    .map((a) => ({ id: a.id, mode: a.get(), label: a.label }));
+}
+
+function _renderFilterChips() {
+  const box = document.getElementById('localFilterChips');
+  if (!box) return;
+  const chips = activeFilterChips(_chipSource());
+  box.innerHTML = filterChipsHtml(chips);
+  box.hidden = chips.length === 0;
+}
+
+/**
+ * 单条轴回到关档：写档 → 同步菜单里那一行（文案 + 高亮）→ 重新过筛。
+ *
+ * 只认 CHIP_AXIS_IDS 里的 id。'all' 是这三条轴的关档值，拿它去清排序轴会把
+ * _localSortMode 写成一个不存在的档——表现是"按钮文案看着对、序却是乱的"，
+ * 属于最难查的那类错。同步按钮与清 chip 都不能省：省下的那一趟就是
+ * "菜单里还亮着、外面已经不筛了"。
+ */
+function resetLocalFilterAxis(id) {
+  if (!CHIP_AXIS_IDS.includes(id)) return;
+  const axis = LOCAL_AXES.find((a) => a.id === id);
+  if (!axis) return;
+  axis.set('all');
+  _axes.byId[id].sync();
+  filterLocalSongs();
+}
+
+/** ✕ 清空筛选：三条轴一并回关档，只重新过筛一次（逐条清会连着重画三遍列表） */
+function clearLocalFilters() {
+  let touched = false;
+  for (const id of CHIP_AXIS_IDS) {
+    const axis = LOCAL_AXES.find((a) => a.id === id);
+    if (!axis || axis.get() === 'all') continue;
+    axis.set('all');
+    _axes.byId[id].sync();
+    touched = true;
+  }
+  if (touched) filterLocalSongs();
+}
 
 // 📋 复制曲单：当前过滤视图一行一首纯文本（歌名 - 歌手）进剪贴板，零新通道
 async function copyLocalListText() {
@@ -1361,6 +1417,8 @@ window.toggleLocalFavOnly = toggleLocalFavOnly;
 window.cycleLocalFmt = cycleLocalFmt;
 window.cycleLocalQual = cycleLocalQual;
 window.cycleLocalMeta = cycleLocalMeta;
+window.resetLocalFilterAxis = resetLocalFilterAxis;
+window.clearLocalFilters = clearLocalFilters;
 window.copyLocalListText = copyLocalListText;
 window.refreshLocalLibrary = refreshLocalLibrary;
 window.renderLocalSongs = renderLocalSongs;

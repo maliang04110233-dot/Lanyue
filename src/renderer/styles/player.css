@@ -681,6 +681,30 @@ audio { display: none; }
   font-size: 13px; border-radius: 6px; cursor: pointer;
 }
 .tb-menu-item:hover { background: var(--bg-hover); color: var(--neon-cyan); }
+/* 档位轴折进菜单后，"亮=正在筛"不能再靠 .tab.active 那套渐变（菜单一关就看不见），
+   行上留一份同语义的高亮，点开菜单仍能一眼看出哪几条在起作用。 */
+.tb-menu-item.active {
+  background: var(--accent-soft, rgba(34, 211, 238, 0.14));
+  color: var(--neon-cyan); font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--neon-cyan);
+}
+/* ── 生效筛选外显行 ────────────────────────────────────
+   .local-page 是 gap:14px 的纵向 flex，所以空行必须真 display:none，
+   否则没筛选时也会白占一条缝。 */
+.filter-chips {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  flex-shrink: 0;
+}
+.filter-chips[hidden] { display: none; }
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border-radius: 999px; cursor: pointer;
+  background: var(--bg-hover); border: 1px solid var(--neon-cyan-dim);
+  color: var(--neon-cyan); font-size: 12px; white-space: nowrap;
+}
+.filter-chip:hover { border-color: var(--neon-cyan); color: var(--neon-text); }
+.filter-chip-x { color: var(--neon-dim); font-size: 11px; }
+.filter-chip:hover .filter-chip-x { color: var(--neon-text); }
 .local-list {
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
   padding-right: 4px;
