@@ -190,10 +190,12 @@ function generateRadioCandidates(seed, pool, opts) {
  * @param {Object} args
  * @returns {boolean}
  */
-function shouldAutoContinue(args = {}) {
-  if (!args.enabled) return false;
-  if (Number(args.loopMode) === 2) return false; // 2 = 单曲循环
-  if (!isPlayable(args.seed)) return false;
+function shouldAutoContinue(args) {
+  // 默认参数只挡 undefined；显式传 null（IPC 往返很常见）要自己兜住
+  const a = (args && typeof args === 'object') ? args : {};
+  if (!a.enabled) return false;
+  if (Number(a.loopMode) === 2) return false; // 2 = 单曲循环
+  if (!isPlayable(a.seed)) return false;
   return true;
 }
 

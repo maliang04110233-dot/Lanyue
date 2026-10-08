@@ -14,9 +14,24 @@ const { queueMove } = require('../queueOrder');
 // 根因 1 起 proxy-play 走 streamProtocol 的流式路径，playCache 的整首落盘
 // 仅保留给诊断/设置页的缓存统计，不再是播放链路的一环。
 const history = require('../../utils/history');
+const { fetchRadioPool } = require('../radioPool');
 const logger = require('../../utils/logger');
 // 主进程即 UI 线程：文件 IO 必须异步
 const fsa = require('../../utils/fsAsync');
+
+/**
+ * 3-A 电台：取同歌手候选曲目
+ *
+ * 只读且无副作用：把 seed 交给 radioPool，由它决定搜什么、怎么降级。
+ * 拿不到歌手名 / 搜索失败 / 返回垃圾都在 radioPool 内降级为
+ * { songs: [], reason }，这里只做透传 + 最后一道参数守卫。
+ */
+handle('radio-pool', async (_, seed, opts) => {
+  if (!seed || typeof seed !== 'object' || Array.isArray(seed)) {
+    return { songs: [], artist: '', reason: 'no-artist' };
+  }
+  return fetchRadioPool(seed, opts);
+});
 
 function register() {
   // 关键：downloadQueue / app / persistQueue / processQueue 都通过 getter 拿，
@@ -32,6 +47,35 @@ function register() {
   const safeToken = (v) => {
     const s = String(v ?? '');
     return /^[a-z0-9_-]{1,32}$/i.test(s) ? s : null;
+  };
+
+  /**
+   * 修 R1-3：移除/清空队列前，对在途任务先走一遍与 cancel-download 一致的取消流程。
+   *
+   * 判据与 cancel-download 相同：downloading，或 pending 且协程在途（重试退避期）。
+   * 顺序不能反 —— 置了 _cancelRequested / 打断请求之后才把条目摘出队列，协程才会
+   * 走到 cancelled 终态；反过来的话 requestCancel 已找不到这条任务。
+   * 终态仍由队列引擎落盘（.tmp 由传输层失败路径清理），这里只管"别让它偷偷下完"。
+   *
+   * @param {Object} song 队列条目
+   * @param {function} requestCancelDownload ctx 注入的引擎取消入口
+   */
+  const cancelInFlight = (song, requestCancelDownload) => {
+    if (!song) return false;
+    const inFlight = song.status === 'downloading' || (song.status === 'pending' && song._processing);
+    if (!inFlight) return false;
+    if (typeof requestCancelDownload !== 'function') {
+      // 引擎未就绪：至少置标记，协程在下一轮 attempt 顶部会退出
+      song._cancelRequested = true;
+      return true;
+    }
+    try {
+      requestCancelDownload(song.taskId);
+    } catch (e) {
+      logger.warn('[ipc] 取消在途任务失败:', e.message);
+      song._cancelRequested = true;
+    }
+    return true;
   };
 
   // 获取下载 URL（渲染层位置参数调用：api.getDownloadUrl(id, source, quality)）
@@ -159,11 +203,17 @@ function register() {
   });
 
   // 移除队列项
+  // 修 R1-3：在途任务不能直接 splice。原实现不看 status 就摘掉条目，而协程只在
+  // **下一轮 attempt 顶部**判 includes(song) —— 当前这次传输照常跑完，照样写历史、
+  // 嵌 ID3、置 done（cancel-download 的注释早已识别这点，只是没覆盖本条路径）。
+  // 与 cancel-download 同一套取消流程：先协作式取消（置标记 + 打断在途请求），
+  // 再从数组摘除，让协程落到 cancelled 终态。
   handle('remove-queue-item', (_, taskId) => {
     const downloadQueue = getDownloadQueue();
-    const { persistQueue } = require('../context').getCtx();
+    const { persistQueue, requestCancelDownload } = require('../context').getCtx();
     const idx = downloadQueue.findIndex(s => s.taskId === taskId);
     if (idx === -1) return { removed: false };
+    cancelInFlight(downloadQueue[idx], requestCancelDownload);
     downloadQueue.splice(idx, 1);
     safeSend('queue-updated', downloadQueue);
     persistQueue();
@@ -206,8 +256,11 @@ function register() {
   // 清空全部
   handle('clear-all-queue', () => {
     const downloadQueue = getDownloadQueue();
-    const { persistQueue } = require('../context').getCtx();
+    const { persistQueue, requestCancelDownload } = require('../context').getCtx();
     const before = downloadQueue.length;
+    // 修 R1-3：清空前逐个走取消流程（见 remove-queue-item 的同一说明）——
+    // 直接 length = 0 会留下孤儿协程把在途歌曲下完、写历史、通知前端"下载完成"。
+    for (const s of downloadQueue) cancelInFlight(s, requestCancelDownload);
     downloadQueue.length = 0;
     safeSend('queue-updated', downloadQueue);
     persistQueue();

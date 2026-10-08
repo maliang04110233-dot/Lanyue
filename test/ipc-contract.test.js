@@ -96,12 +96,12 @@ test('契约结构合法（方向、窗口、参数规格）', () => {
 });
 
 test('通道数量钉死（意外增删即失败，逼迫改动者过目契约）', () => {
-  assert.strictEqual(MAIN_INVOKE.size, 102); // +aggregate-cross-source（3-B 跨源聚合） // +ai-cancel-generation（AI 生成中断）；余项：-flush-prefs -flush-history（无人调用的僵尸通道）
+  assert.strictEqual(MAIN_INVOKE.size, 103); // +radio-pool（3-A 电台） // +aggregate-cross-source（3-B 跨源聚合） // +ai-cancel-generation（AI 生成中断）；余项：-flush-prefs -flush-history（无人调用的僵尸通道）
   assert.strictEqual(MAIN_SEND.size, 16);
   assert.strictEqual(MAIN_RECEIVE.size, 26); // 余项：-library-scan-progress（main 发了没人收）
   assert.strictEqual(SEC_SEND.size, 7);
   assert.strictEqual(SEC_RECEIVE.size, 2);
-  assert.strictEqual(Object.keys(METHODS).length, 106); // +aggregateCrossSource（3-B 跨源聚合） // +aiCancelGeneration；余项：-windowToggleFullscreen -closeDesktopLyric（死键）
+  assert.strictEqual(Object.keys(METHODS).length, 107); // +radioPool（3-A 电台） // +aggregateCrossSource（3-B 跨源聚合） // +aiCancelGeneration；余项：-windowToggleFullscreen -closeDesktopLyric（死键）
 });
 
 test('僵尸通道已清除：flush 走 main 直调，扫描进度无人订阅不再空发', () => {

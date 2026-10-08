@@ -6,6 +6,8 @@
  */
 
 import { logger } from './logger.js';
+import { radioContinue } from './radio.js';
+import { trackKey } from './radioCore.js';
 import { resolveQuality, playedQualityLabel } from './quality.js';
 import { createPrefetchStore, prefetchKeyOf, nextPrefetchIdx, shouldPrefetchNow, prefetchRetryAllowed } from './playPrefetch.js';
 import { buildFallbackNotice } from './fallbackNotice.js';
@@ -358,6 +360,22 @@ export async function playQueueIdx(idx) {
   await playSongByIdx(idx, playQueue[idx]);
 }
 
+/**
+ * 已播过的曲目标志（电台去重用）
+ *
+ * 只统计播放位置之前的条目；电台自己续上的曲会在下一轮被算进来，
+ * 于是同一首不会被反复推。
+ */
+function _playedTrackKeys(playQueue, upto) {
+  const keys = [];
+  const end = Math.min(upto, playQueue.length);
+  for (let i = 0; i < end; i++) {
+    const k = trackKey(playQueue[i]);
+    if (k) keys.push(k);
+  }
+  return keys;
+}
+
 export async function nextSong() {
   const playQueue = getState('playQueue');
   if (!playQueue || !playQueue.length) return;
@@ -372,10 +390,20 @@ export async function nextSong() {
   } else {
     // 不循环模式：到末尾则停止
     if (playIdx >= playQueue.length - 1) {
-      updatePlayStatsOnStop();
-      audio.pause();
-      audio.currentTime = 0;
-      return;
+      // 3-A 电台：队列到末尾时先试着续播（顺着同一歌手），取不到再按原样停下。
+      // shouldAutoContinue 会在开关关 / 单曲循环 / 种子不可播时返回 null，
+      // 所以关掉开关时这条路径与改动前完全一致。
+      const seed = playQueue[playIdx];
+      const picked = await radioContinue(seed, { playedKeys: _playedTrackKeys(playQueue, playIdx) });
+      if (picked && picked.length) {
+        // 候选接在队列尾部；playIdx 不动，下一次 nextSong 自然落到新曲
+        playQueue.push(...picked);
+      } else {
+        updatePlayStatsOnStop();
+        audio.pause();
+        audio.currentTime = 0;
+        return;
+      }
     }
     playIdx = playIdx + 1;
   }

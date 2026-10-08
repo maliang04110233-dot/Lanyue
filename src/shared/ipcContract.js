@@ -161,6 +161,9 @@ const CHANNELS = {
   // 3-B 跨源聚合：合并多份来源的曲目并标记跨源同曲（只读聚合层，不新增/修改数据）
   'aggregate-cross-source':   { invoke: MAIN, args: [['opts', t.obj()]] },
 
+  // 3-A 电台：取刚播完那首的同歌手候选曲目（只读，无副作用）
+  'radio-pool':                       { invoke: MAIN, args: [['seed', t.obj()], ['opts', t.obj()]] },
+
   // ── 云同步 / 更新（invoke） ───────────────────────
   'export-all-data':    { invoke: MAIN },
   'import-all-data':    { invoke: MAIN },
@@ -329,6 +332,7 @@ const METHODS = {
   removeFromUserPlaylist: 'remove-from-user-playlist',
   toggleFavorite: 'toggle-favorite',
   aggregateCrossSource: 'aggregate-cross-source',
+  radioPool: 'radio-pool',
   // 云
   exportAllData: 'export-all-data',
   importAllData: 'import-all-data',
