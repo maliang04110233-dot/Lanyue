@@ -75,7 +75,9 @@ const CHANNELS = {
   'export-playlist':        { invoke: MAIN, args: [['params', t.obj()]] },
   'system-power':           { invoke: MAIN, args: [['action', t.enum(['shutdown', 'sleep', 'quit'], 'quit')]] },
   'probe-audio':            { invoke: MAIN, args: [['filePath', t.str(1000)]] },
-  'proxy-play':             { invoke: MAIN, args: [['url', t.str(4000)], ['referer', t.str(4000)]] },
+  // D-35：refresh 是同源重取标识（可选）。主进程据此在 403 时重新取流；
+  // 这里的 source 必须是**实际出流的源**，不由渲染层决定重取走哪个源。
+  'proxy-play':             { invoke: MAIN, args: [['url', t.str(4000)], ['referer', t.str(4000)], ['refresh', t.obj()]] },
   'get-download-templates': { invoke: MAIN },
   'save-download-template': { invoke: MAIN, args: [['template', t.obj()]] },
   'delete-download-template': { invoke: MAIN, args: [['templateId', t.str(64)]] },

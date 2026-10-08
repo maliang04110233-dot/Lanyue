@@ -477,8 +477,15 @@ async function playSongByIdx(idx, song) {
       song._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
       updatePlayerCard(song); // 音质等徽标随实际取流结果刷新
     }
-    const referer = playReferer(result.source || song.source, result);
-    const proxied = await api.proxyPlay(result.url, referer);
+    const playSource = result.source || song.source;
+    const referer = playReferer(playSource, result);
+    // D-35：把实际取流的 (source,id) 带回主进程，签名链接过期时据此同源重取。
+    // 用 result 侧而非 song 侧：换源成功时两者不同，重取要回原来出流的那个源。
+    const proxied = await api.proxyPlay(result.url, referer, {
+      id: String(result.id ?? song.id),
+      source: playSource,
+      quality,
+    });
     if (reqId !== _playRequestId) return;
     if (!proxied || !proxied.fileUrl) {
       showToast('⚠️ 音源获取失败', 'error', 3000);
@@ -515,8 +522,13 @@ function _startPrefetch() {
   const quality = resolveQuality(song.source);
   api.getDownloadUrlSmart(song, quality).then(async (result) => {
     if (!result || !result.url) { markFail(); return; }
-    const referer = playReferer(result.source || song.source, result);
-    const proxied = await api.proxyPlay(result.url, referer);
+    const playSource = result.source || song.source;
+    const referer = playReferer(playSource, result);
+    const proxied = await api.proxyPlay(result.url, referer, {
+      id: String(result.id ?? song.id),
+      source: playSource,
+      quality,
+    });
     if (!proxied || !proxied.fileUrl) { markFail(); return; }
     _prefetch.put(key, {
       fileUrl: proxied.fileUrl,

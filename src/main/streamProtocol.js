@@ -32,11 +32,30 @@
  * 上游不支持 Range（返回 200）时必须如实透传 200 而不是伪造 206：
  * audio 元素遇到 200 会从头顺播，此时 seek 仍会退化为"不可用"，
  * 但那是因为这个源不支持，不是我们伪造的假象。
+ *
+ * 签名 URL 过期重取（D-35）
+ * ----------------------
+ * 会员音源的直链带签名，过期后上游一律 403。403 命中时向登记簿里的
+ * refresh 回调要一条新 URL，然后**用原始请求原样重放**（方法、Range 头、
+ * referer 全部沿用原值）。四条不可退让的规矩：
+ *
+ *   1. 判定点在拿到上游响应之后、Range 分流**之前**。只在 206 分支打补丁
+ *      会漏掉首播与 HEAD —— 实测过期 URL 在七种请求形态下全部 403。
+ *   2. 触发码限死 403。404/410 是资源不存在、401 是凭据问题，重取都无用。
+ *   3. 重取回来的 URL 必须**重新过一次 assertPublicHttpUrl**。它是渲染层
+ *      或平台插件给的，不是"自己解析出来的"就天然可信 —— 漏这一步等于开了一条
+ *      "平台返回什么就请求什么"的通道。
+ *   4. 403 的响应体一律 res.resume() 丢弃，绝不当音频回写给 Chromium。
+ *      上游返的是 HTML 错误页，让 audio 去解码只会得到怪声。
+ *
+ * 重取不是跨源换源：refresh 回调由主进程用 api.getDownloadUrl 在**同一 source**
+ * 内重新解析，自动兜底换源那个产品开关仍保持关闭。
  */
 
 const { Readable } = require('stream');
 const { assertPublicHttpUrl, makePinnedLookup } = require('../utils/urlGuard');
 const logger = require('../utils/logger');
+const registry = require('./streamRegistry');
 
 /** 流式播放用的自定义 scheme（注意与 CSP / will-navigate 白名单的关系） */
 const STREAM_SCHEME = 'lanyue-stream';
@@ -148,6 +167,72 @@ async function requestUpstreamFollowing(u0, ips0, referer, rangeHeader, depth = 
 }
 
 /**
+ * 签名 URL 过期后的回源重取（D-35）
+ *
+ * 返回新的上游响应；拿不到新 URL / 新 URL 过不了校验 / 重取后仍失败时返回 null，
+ * 由调用方落终态失败。**每一次 403 的响应体都在这里 res.resume() 丢弃** ——
+ * 上游给的是 HTML 错误页，让它进 Chromium 只会变成怪声。
+ *
+ * @param {object} entry 登记簿条目（resolveStream 的返回值）
+ * @param {object} deps  { canRefresh, markRefreshed, assertUrl }
+ * @param {string} referer 原请求的 referer
+ * @param {string|null} rangeHeader 原请求的 Range 头，重放时原样沿用
+ * @returns {Promise<import('http').IncomingMessage|null>}
+ */
+async function refreshUpstreamOn403(entry, deps, referer, rangeHeader) {
+  const { canRefresh, markRefreshed, assertUrl } = deps || {};
+  if (typeof canRefresh !== 'function' || !canRefresh(entry)) return null;
+
+  // 额度在这里就占用，而不是等重取成功再占。
+  // 否则「重取后仍然失败」这条路永远不消耗额度，同一条流被反复请求就会
+  // 反复重取 —— 那不是容错，是拿平台接口当重试队列使。
+  markRefreshed(entry, null);
+
+  let next = null;
+  try {
+    next = await entry.refresh();
+  } catch (e) {
+    logger.warn('[stream] 签名链接重取异常:', (e && e.message) || e);
+    return null;
+  }
+  // 重取必须真的产出 URL。空结果照实失败，不拿旧 URL 再试一次（那是无限重取）
+  if (!next || !next.url) return null;
+
+  // 关键：新 URL 也要过 SSRF 校验。它来自渲染层/平台插件，
+  // 不能因为「是自己解析出来的」就当作可信输入。
+  let check = null;
+  try {
+    check = await assertUrl(next.url);
+  } catch (e) {
+    logger.warn('[stream] 重取 URL 校验异常:', (e && e.message) || e);
+    return null;
+  }
+  if (!check || !check.ok) {
+    logger.warn('[stream] 重取 URL 被 SSRF 校验拒绝:', check && check.reason);
+    return null;
+  }
+
+  const nextReferer = next.referer !== undefined ? next.referer : referer;
+  try {
+    const res = await requestUpstreamFollowing(check.url, check.ips, nextReferer, rangeHeader);
+    // 只有「重取回来还是 403」才算重取失败。416/404 等是对**这一次请求**
+    // 的如实回答（例如 seek 越界），必须原样透传给 Chromium —— 抹成 403
+    // 会让音频元素把「越界」误读成「链接过期」。
+    if (res.statusCode === 403) {
+      res.resume();
+      return null;
+    }
+    // 换上新 URL，旧的已确认失效（额度已在发起时占用）
+    entry.url = check.url.toString();
+    if (next.referer !== undefined) entry.referer = String(nextReferer || '');
+    return res;
+  } catch (e) {
+    logger.warn('[stream] 重取后的上游请求失败:', (e && e.message) || e);
+    return null;
+  }
+}
+
+/**
  * 注册流式 scheme
  *
  * @param {object} protocol Electron 的 protocol 模块
@@ -179,9 +264,27 @@ function registerStreamScheme(protocol, resolveMeta) {
       return new Response('upstream failed', { status: 502 });
     }
 
-    // 逐跳响应也要过 SSRF 校验已被 requestUpstreamFollowing 覆盖；这里处理
-    // 非 2xx：非重定向的 4xx/5xx 如实透传状态码，不伪装成音频
-    if (res.statusCode >= 400) {
+    // D-35：签名 URL 过期 → 回源重取 → 用**原始 Range**重放。
+    // 判定必须在 Range 分流之前：只在 206 分支打补丁会漏掉首播与 HEAD。
+    if (res.statusCode === 403) {
+      // 上游的错误页绝不能进 Chromium，先把这次 403 的响应体丢弃
+      res.resume();
+      const deps = {
+        canRefresh: registry.canRefreshStream,
+        markRefreshed: registry.markStreamRefreshed,
+        assertUrl: assertPublicHttpUrl,
+      };
+      const refreshed = await refreshUpstreamOn403(meta, deps, meta.referer, rangeHeader);
+      if (!refreshed) return new Response('upstream 403', { status: 403 });
+      res = refreshed;
+      // 重取成功不代表这一次请求就成立：越界 Range 仍会拿到 416。
+      // 如实透传，落到下面那条 partial 判定之外，绝不伪造成 206/200。
+      if (res.statusCode >= 400) {
+        res.resume();
+        return new Response('upstream ' + res.statusCode, { status: res.statusCode });
+      }
+    } else if (res.statusCode >= 400) {
+      // 非 403 的 4xx/5xx 如实透传状态码，不伪装成音频，也不浪费一次重取
       res.resume();
       return new Response('upstream ' + res.statusCode, { status: res.statusCode });
     }
@@ -250,4 +353,5 @@ module.exports = {
   contentLengthOfRange,
   registerStreamScheme,
   requestUpstream,
+  refreshUpstreamOn403,
 };

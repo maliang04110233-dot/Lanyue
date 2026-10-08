@@ -107,7 +107,8 @@ function register() {
   // 在线播放：把跨域音频以流式代理喂给 audio 元素（根因 1）
   const { assertPublicHttpUrl } = require('../../utils/urlGuard');
   const streamRegistry = require('../streamRegistry');
-  handle('proxy-play', async (_, url, referer) => {
+  const { makeStreamRefresh } = require('../streamRefresh');
+  handle('proxy-play', async (_, url, referer, refresh) => {
 
     // C10: SSRF protection — full guard via urlGuard:
     //   scheme/userinfo 校验 + DNS 全记录解析 + 内网 IP 判定（含
@@ -121,7 +122,11 @@ function register() {
     // duration 由首个响应头给出，seek 从此可用。
     // SSRF 校验在 protocol.handle 里会再做一次（见 streamProtocol.js 头注约束 1），
     // 这一次是为了在登记前就拒掉明显非法的入参、少占一条登记位。
-    const streamUrl = streamRegistry.registerStream(url, referer);
+    // D-35：登记时一并挂上同源重取回调。签名 URL 过期后上游一律 403，
+    // 主进程靠它要一条新 URL 并用原始 Range 重放（见 streamProtocol.js）。
+    // 缺省（老调用方 / 本地曲）不给回调，403 时如实失败。
+    const refreshFn = refresh ? makeStreamRefresh(refresh, refresh.quality) : null;
+    const streamUrl = streamRegistry.registerStream(url, referer, refreshFn);
     if (!streamUrl) return { error: 'no url' };
     return { fileUrl: streamUrl, streaming: true };
   });

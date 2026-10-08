@@ -255,8 +255,24 @@ test('主进程把 scheme 声明为特权（否则 audio 元素不会发 Range �
 test('preload 之外，渲染层拿到的就是 scheme URL（不再等 file://）', () => {
   const DL = read('src/main/ipc/download.js');
   const DLs = strip(DL);
-  assert.match(DLs, /streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*\)/,
-    'proxy-play 应登记流并返回 scheme URL —— 否则 renderer 仍在等整首落盘');
+  // D-35 起登记是三参：(url, referer, refreshFn)。第三参是同源重取回调，
+  // 缺了它签名链接过期就只能如实失败。期望值必须跟着接线走 ——
+  // 但断言意图不变：proxy-play 要登记流并返回 scheme URL，renderer 不得等整首落盘。
+  assert.match(DLs, /streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*\)/,
+    'proxy-play 应登记流（含重取回调）并返回 scheme URL —— 否则 renderer 仍在等整首落盘');
+
+  // 变异自检：把第三参换成别的标识，这道断言必须变红 ——
+  // 否则它会退化成"文件里出现过 registerStream 就算过"的恒真守卫。
+  {
+    const mutated = DLs.replace(
+      /streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*\)/,
+      'streamRegistry.registerStream( url , referer , somethingElse )'
+    );
+    assert.notEqual(mutated, DLs, '变异脚本要真改到东西');
+    assert.ok(
+      !/streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*\)/.test(mutated),
+      '第三参被换掉后断言仍绿 —— 这道守卫已经恒真，形同虚设');
+  }
   assert.match(DLs, /return\s*\{\s*fileUrl:\s*streamUrl\s*,\s*streaming:\s*true\s*\}/,
     '返回体要标明是流式，渲染层据此不再期待 file://');
   // 整首落盘那一层不得再挂在播放链路上
