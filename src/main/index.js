@@ -116,190 +116,27 @@ function createWindow() {
 // 向下兼容的导出
 module.exports = { updateTrayMenu: trayModule.updateTrayMenu };
 
+// ── 启动初始化（已拆到 main/bootstrap.js）─────────────────────────────
+const bootstrap = require('./bootstrap');
+
 app.whenReady().then(async () => {
-  // 流式播放 scheme 就位（根因 1）。旧路径是把整首落盘再给 file://，
-  // 那样整首下完前 audio.duration 恒为 NaN，seek 入口根本不存在。
-  registerStreamScheme(protocol, (u) => streamRegistry.resolveStream(u));
-
-  // 初始化 cookieStore
-  cookieStore.init(app.getPath('userData'));
-  setCookieStore(cookieStore);
-
-  // 初始化 prefs（用户偏好持久化）
-  prefs.init(app.getPath('userData'));
-
-  // 启用日志落盘（P3-1）：生产环境控制台只留 error，而 155 处 logger.warn
-  // 记录的正是所有降级路径（镜像兜底失败、队列丢脏记录、目录模板回落…）——
-  // 用户报障时现场需要这些上下文。落盘异步 + 定时合并，不冻结主进程。
-  try {
-    logger.initLogFile(path.join(app.getPath('userData'), 'logs', 'main.log'));
-  } catch (e) {
-    logger.warn('[main] 日志落盘初始化失败:', e.message);
-  }
-
-  // C1: seed 目录授权注册表 —— prefs 里的目录键是历史会话经原生选器
-  // 选定的结果，默认音乐子目录随应用始终可用
-  for (const k of approvedDirs.DIR_PREF_KEYS) {
-    const v = prefs.get(k);
-    if (v) approvedDirs.approve(v);
-  }
-  approvedDirs.approve(defaultDownloadDir(app.getPath('music')));
-  approvedDirs.approve(defaultDownloadDir(app.getPath('userData')));
-
-  // 初始化下载历史持久化
-  history.init(app.getPath('userData'));
-
-  // ── 装配下载队列引擎（Sprint C：实现见 main/downloadQueue.js）──
-  // 必须在 registerAllIpcHandlers 之前：IPC handler 通过 context.getDownloadQueue()
-  // 拿队列引用，而该引用来自引擎。
-  downloadQueueEngine = createDownloadQueueEngine({
-    userDataDir: () => app.getPath('userData'),
-    // 落盘兜底必须与 get-default-dir（UI 展示）同源，否则用户没设 saveDir 时
-    // 「打开文件夹」看到的和文件真实落点是两个目录
-    getDefaultDownloadDir: () => defaultDownloadDir(app.getPath('music')),
-    safeSend,
-    getDownloadUrlSmart,
-    getLyrics,
-    // C1: 渲染层传入的 saveDir 必须在用户批准目录内，否则回落默认目录
-    isSaveDirAllowed: (p) => approvedDirs.isApprovedDir(p),
-    // 3-C: already_have 规则的判据来源（本地曲库索引）。取数失败已在模块内降级，
-    // 这里不必再包 try；未注入时 downloadQueue 会让该规则自然不命中。
-    getPolicyFacts: getPolicyFactsForQueue,
-    onQueueChanged: () => {
-      // 队列变更时同步托盘菜单（下载进度/数量展示）
-      try { trayModule.updateTrayMenu(); } catch (_e) { /* 托盘未就绪可忽略 */ }
-    },
-    notifier: {
-      notifyDownloadDone: (song, savePath) => {
-        const n = new Notification({
-          title: '下载完成',
-          body: `${song.title} - ${song.artist || '未知艺术家'}`,
-          silent: false,
-        });
-        n.on('click', () => {
-          const { shell } = require('electron');
-          shell.showItemInFolder(savePath);
-        });
-        n.show();
-      },
-    },
+  const result = await bootstrap({
+    app, protocol, session, safeSend,
+    cookieStore, setCookieStore,
+    prefs, history, logger,
+    approvedDirs, defaultDownloadDir,
+    createDownloadQueueEngine,
+    getDownloadUrlSmart, getLyrics, getPolicyFactsForQueue,
+    playCache, setOnlineLrcNotifier,
+    loadPersistedPlayQueue,
+    registerAllIpcHandlers,
+    assertContractCoverage,
+    trayModule, menuModule, taskbarProgress, shortcutsModule, windowManager,
+    subscriptions, clipboardWatch,
+    fsa,
   });
-  // 让共享引用指向引擎内部数组（context / IPC 用的是同一个数组）
-  downloadQueue = downloadQueueEngine.getQueue();
-
-  // 确保默认下载目录存在（如果有用户自定义的 saveDir 则用之，否则用系统默认）
-  const defaultDir = prefs.get('saveDir') || defaultDownloadDir(app.getPath('music'));
-  await fsa.ensureDir(defaultDir); // mkdir recursive 本身幂等，无需先探测
-
-  // 初始化 play_cache 目录 + 清理上次进程遗留的陈旧临时文件
-  // 不 await：清理是尽力而为，不该拖慢启动
-  playCache.cleanupStaleFiles(app.getPath('userData')).catch((e) => {
-    logger.warn('[playCache] 清理陈旧缓存失败:', e.message);
-  });
-
-  // 设置在线拉歌词完成后的 renderer 通知回调
-  setOnlineLrcNotifier(({ filePath, lrc, source }) => {
-    try {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        safeSend('local-lrc-fetched', { filePath, lrc, source });
-      }
-    } catch (e) {
-      logger.warn('[online-lrc] 推送事件失败:', e.message);
-    }
-  });
-
-  // 启动时恢复队列
-  try {
-    await downloadQueueEngine.loadPersistedQueue();
-  } catch (e) {
-    logger.warn('[index] 恢复队列失败:', e.message);
-  }
-
-  // 启动时恢复播放队列
-  try {
-    const saved = await loadPersistedPlayQueue();
-    if (saved && saved.queue && saved.queue.length) {
-      safeSend('play-queue-restored', saved);
-    }
-  } catch (e) {
-    logger.warn('[PlayQueue] 恢复播放队列失败:', e.message);
-  }
-
-  // 注册所有 IPC handler（按职责拆分到 src/main/ipc 下各模块）
-  registerAllIpcHandlers();
-
-  // 初始化自动更新（GitHub Releases）
-  try {
-    const { initUpdater } = require('./updater');
-    initUpdater();
-  } catch (_e) {
-    logger.warn('[Updater] init failed:', _e.message);
-  }
-
-  // 契约 ↔ 注册对账：契约声明却无人注册的通道在此现形（update-* 由上面的 updater 注册）
-  try { assertContractCoverage(); } catch (e) {
-    logger.warn('[ipc] 契约覆盖检查失败:', e.message);
-  }
-
-  // 定期 GC play_cache（10 分钟一次，.unref() 不阻塞进程退出）
-  // cleanupExpired 是异步的：setInterval 不接收返回值，需自带 catch 防未处理拒绝
-  const gcTimer = setInterval(() => {
-    playCache.cleanupExpired().catch((e) => logger.warn('[playCache] GC 失败:', e.message));
-  }, playCache.PLAY_CACHE_GC_INTERVAL);
-  if (gcTimer.unref) gcTimer.unref();
-
-  // 订阅更新周期检查（同为 unref 定时器；首查延迟 30s 避开启动峰值）
-  subscriptions.startScheduler();
-
-  // 剪贴板音乐链接嗅探（unref；prefs.clipboardWatch 每次 tick 现读，设置页即时生效）
-  clipboardWatch.start();
-
-  // 安装自定义应用菜单（屏蔽开发者工具菜单项及其加速键）
-  menuModule.build();
-
-  // CORS 白名单：本地来源 + 各平台 manifest 声明的域名（派生）
-  // ⚠️ 这是本工程唯一的安全边界 —— 它决定哪些源能拿到非 null 的
-  //    Access-Control-Allow-Origin。改动后必须与历史枚举逐条相等，
-  //    由 test/platform-contract.test.js 的集合相等断言守住（不允许新增项）。
-  const LOCAL_ORIGINS = ['http://localhost', 'http://127.0.0.1'];
-  const { origins: platformOrigins, suffixes: platformSuffixes } =
-    require('../api').registry.getAllowedOrigins();
-  const ALLOWED_ORIGINS = new Set([...LOCAL_ORIGINS, ...platformOrigins]);
-  // 部分平台的 CDN 子域是动态的（douyinvod 按地域/节点变化、kugou 音频域有多个前缀），
-  // 精确匹配枚举不完，故额外做后缀匹配。后缀带前导点，
-  // `evil-douyinvod.com` 这类不会以 `.douyinvod.com` 结尾，不会被误放行。
-  const ALLOWED_ORIGIN_SUFFIXES = [...platformSuffixes];
-  const ses = session.defaultSession;
-  ses.webRequest.onHeadersReceived((details, callback) => {
-    // M5 修正：原实现拿 details.url 自身的 origin 判定并回填，等于给每个
-    // 响应写上"它自己"，对本应用（file:// 页 origin 为 null）完全无效，
-    // 还会覆盖上游正确的 ACAO。正确语义：目标是白名单平台源时，把
-    // 「发起方」反射回去 —— 打包后发起方是 file://（null），dev 是本地端口。
-    let targetOrigin = '';
-    try { targetOrigin = new URL(details.url).origin; } catch (_e) { /* noop */ }
-    const isAllowed = ALLOWED_ORIGINS.has(targetOrigin)
-      || ALLOWED_ORIGIN_SUFFIXES.some((sfx) => targetOrigin.endsWith(sfx));
-    const headers = { ...details.responseHeaders };
-    const hasACAO = Object.keys(headers).some(k => k.toLowerCase() === 'access-control-allow-origin');
-    if (isAllowed && !hasACAO) {
-      const initiator = details.initiator && /^https?:\/\//.test(details.initiator)
-        ? new URL(details.initiator).origin
-        : 'null';
-      headers['Access-Control-Allow-Origin'] = [initiator];
-      headers['Access-Control-Allow-Methods'] = ['GET', 'HEAD', 'OPTIONS'];
-      headers['Access-Control-Allow-Headers'] = ['Range', 'Referer'];
-    }
-    callback({ responseHeaders: headers });
-  });
-
-  createWindow();
-  trayModule.createTray();
-  // 任务栏进度/托盘提示的落地目标（context.safeSend 在队列事件时驱动刷新）
-  taskbarProgress.init({
-    getWindows: () => (mainWindow && !mainWindow.isDestroyed() ? [mainWindow] : []),
-    getTray: () => trayModule.getTray(),
-  });
-  shortcutsModule.register();
+  downloadQueueEngine = result.downloadQueueEngine;
+  downloadQueue = result.downloadQueue;
 });
 
 app.on('window-all-closed', () => {

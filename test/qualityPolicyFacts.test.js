@@ -166,9 +166,9 @@ test('端到端：facts 喂给求值器后 already_have 真的会跳过', async 
 
 // ── 生产接线守卫 ───────────────────────────────────────
 
-test('生产接线：main/index.js 把 getPolicyFacts 注入了引擎（漏注入 = 规则空转）', () => {
-  const src = fs.readFileSync(path.join(__dirname, '../src/main/index.js'), 'utf8');
-  assert.match(src, /getPolicyFactsForQueue/, 'index.js 未 require 事实源');
+test('生产接线：main/bootstrap.js 把 getPolicyFacts 注入了引擎（漏注入 = 规则空转）', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../src/main/bootstrap.js'), 'utf8');
+  assert.match(src, /getPolicyFactsForQueue/, 'bootstrap.js 未 require 事实源');
   assert.match(src, /getPolicyFacts:\s*getPolicyFactsForQueue/, '未注入 downloadQueue 工厂');
 });
 

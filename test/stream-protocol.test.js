@@ -228,13 +228,10 @@ test('两个模块的 scheme 常量必须一致（各自写一份就会漂）', 
 
 // ── 8. 接线：主进程确实注册了这个 scheme ─────────────
 
-test('index.js 在 whenReady 里注册流式 scheme（注册时机早于任何窗口加载）', () => {
-  const IDX = strip(read('src/main/index.js'));
-  const ready = IDX.indexOf('app.whenReady()');
-  assert.ok(ready > -1, '未找到 whenReady');
-  const body = IDX.slice(ready, ready + 4000);
-  assert.match(body, /registerStreamScheme|streamProtocol/,
-    'whenReady 块里没看到流式 scheme 注册 —— 旧整首下载路径仍在生效');
+test('bootstrap.js 在启动时注册流式 scheme（注册时机早于任何窗口加载）', () => {
+  const IDX = strip(read('src/main/bootstrap.js'));
+  assert.match(IDX, /registerStreamScheme|streamProtocol/,
+    'bootstrap.js 里没看到流式 scheme 注册 —— 旧整首下载路径仍在生效');
 });
 
 test('主进程把 scheme 声明为特权（否则 audio 元素不会发 Range 请求）', () => {

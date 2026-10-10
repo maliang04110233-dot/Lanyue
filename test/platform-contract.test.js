@@ -230,8 +230,8 @@ test('🔴 安全边界：CORS 后缀 == 冻结 3 条，且都带前导点', () 
 });
 
 test('🔴 安全边界：本地源独立于平台清单，全量白名单恰为 20 条', () => {
-  const src = read('src/main/index.js');
-  assert.ok(/LOCAL_ORIGINS\s*=\s*\[/.test(src), 'main/index.js 应保留 LOCAL_ORIGINS 常量');
+  const src = read('src/main/bootstrap.js');
+  assert.ok(/LOCAL_ORIGINS\s*=\s*\[/.test(src), 'main/bootstrap.js 应保留 LOCAL_ORIGINS 常量');
   const local = [...src.matchAll(/LOCAL_ORIGINS\s*=\s*\[([^\]]*)\]/g)]
     .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]));
   assert.deepStrictEqual(sorted(local), sorted(FROZEN_LOCAL_ORIGINS));
