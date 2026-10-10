@@ -13,9 +13,27 @@ const fs = require('fs');
 const { readFile, writeFile } = require('fs/promises');
 const path = require('path');
 const logger = require('../utils/logger');
+const { assertPublicHttpUrl, makePinnedLookup } = require('../utils/urlGuard');
 
 // MiniMax API 配置
 const MINIMAX_API_BASE = 'https://api.minimaxi.com';
+
+// ── SSRF 防护：AI 模块只允许 MiniMax 官方域名 ──────────
+// 本模块内的 request() 理论上只接受 MINIMAX_API_BASE 派生的 URL，
+// 但防御纵深仍要显式白名单：任何调用（未来可能被重构或新增）都必须过此闸。
+// 允许的后缀：minimaxi.com 及其直接子域（api.minimaxi.com）。
+// 显式列出所有官方 API 端点，避免 api.minimaxi.com.evil.com 这类后缀碰撞。
+const ALLOWED_MINIMAX_HOSTS = new Set([
+  'api.minimaxi.com',
+  'api.minimax.chat',
+  'api.maximagi.com',
+]);
+
+function _assertAllowedMiniMaxHost(hostname) {
+  if (!ALLOWED_MINIMAX_HOSTS.has(hostname)) {
+    throw new Error(`[ai-music] 不允许的 API 域名: ${hostname}（仅允许 ${[...ALLOWED_MINIMAX_HOSTS].join(', ')}）`);
+  }
+}
 
 // 允许上计费接口的模型（其余一律退回默认，见 buildMusicRequestBody）
 const DEFAULT_MUSIC_MODEL = 'music-2.6';
@@ -62,7 +80,25 @@ function _abortError() {
  */
 function request(url, options = {}) {
   return new Promise((resolve, reject) => {
-    const parsedUrl = new URL(url);
+    // SSRF + 域名白名单双重闸（入口就验，不等到 createConnection 才炸）
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch (_e) {
+      return reject(new Error(`[ai-music] URL 格式无效: ${url}`));
+    }
+    try {
+      _assertAllowedMiniMaxHost(parsedUrl.hostname);
+    } catch (e) {
+      return reject(e);
+    }
+    const ssrf = process.env.LANYUE_TEST_NO_SSRF === '1'
+      ? { ok: true, ips: [] }  // 测试环境放行 localhost mock server
+      : assertPublicHttpUrl(url);
+    if (!ssrf.ok) {
+      return reject(new Error(`[ai-music] SSRF 拦截: ${ssrf.reason}`));
+    }
+
     const lib = parsedUrl.protocol === 'https:' ? https : http;
 
     const signal = options.signal || null;
@@ -78,6 +114,9 @@ function request(url, options = {}) {
         ...options.headers,
       },
       timeout: options.timeout || 300000,
+      // SSRF 加固：连接固定到已校验 IP（防 DNS rebinding）
+      lookup: makePinnedLookup(ssrf.ips),
+      servername: parsedUrl.hostname, // TLS SNI 仍用原域名
     };
 
     // H3: 自动重试（最多 3 次，仅对超时/网络错误）

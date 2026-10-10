@@ -14,6 +14,8 @@ const logger = require('../utils/logger');
 const { withRetry } = require('../utils/retry');
 const { getMirrorFeeds, useMirrorFeed, getReleasesPageUrl } = require('./updateMirror');
 const { describeUpdateError, shouldReportEventError, isNetworkFailure } = require('./updateError');
+const { verifyUpdateIntegrity } = require('../utils/updateIntegrity');
+const { OWNER, REPO } = require('../shared/appMeta');
 
 // ── 配置 ──────────────────────────────────────────────
 // 更新源固定为本仓库 GitHub Releases，但**不在这里写 URL**。
@@ -71,8 +73,29 @@ autoUpdater.on('checking-for-update', () => {
   logger.log('[Updater] Checking for updates...');
 });
 
-autoUpdater.on('update-available', (info) => {
+autoUpdater.on('update-available', async (info) => {
   logger.log('[Updater] Update available:', info.version);
+
+  // 双源完整性校验 —— latest.yml vs update-integrity.json
+  // 两者 sha512 列表一致才信任并通知渲染层；不一致则记录错误并跳过本轮更新
+  // （electron-updater 后续 downloadUpdate 不会被渲染层触发）
+  const integrity = await verifyUpdateIntegrity(info, {
+    owner: OWNER,
+    repo: REPO,
+    version: info.version,
+  });
+  if (!integrity.ok) {
+    logger.error(`[Updater] 完整性校验失败，跳过更新 v${info.version}: ${integrity.reason}`);
+    const { BrowserWindow } = require('electron');
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('update-error', {
+        message: `更新完整性校验失败，已拒绝: ${integrity.reason}`,
+        manualUrl: getReleasesPageUrl(),
+      });
+    }
+    return;
+  }
+
   // 通知所有窗口
   const { BrowserWindow } = require('electron');
   for (const win of BrowserWindow.getAllWindows()) {

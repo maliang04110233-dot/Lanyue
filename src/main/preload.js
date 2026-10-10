@@ -85,20 +85,5 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
 });
 
-contextBridge.exposeInMainWorld('miniAPI', {
-  send(channel, ...args) {
-    if (SAFE_CHANNELS_SEND.has(channel)) {
-      ipcRenderer.send(channel, ...args);
-    }
-  },
-  on(channel, callback) {
-    if (SAFE_CHANNELS_RECEIVE.has(channel)) {
-      ipcRenderer.on(channel, (_, data) => callback(data));
-    }
-  },
-  windowClose() { ipcRenderer.send('window-close'); },
-  windowMinimize() { ipcRenderer.send('window-minimize'); },
-  windowMaximize() { ipcRenderer.send('window-maximize'); },
-  get version() { return ipcRenderer.invoke('get-version').then(unwrap); },
-  getVersion() { return ipcRenderer.invoke('get-version').then(unwrap); },
-});
+// miniAPI 只在 preload-secondary.js（迷你播放器/桌面歌词窗口）暴露，
+// 主渲染层统一用 musicAPI，避免两套并行 API 形状漂移。

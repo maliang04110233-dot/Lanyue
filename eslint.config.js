@@ -17,6 +17,14 @@ module.exports = [
       'prefer-const': 'warn',
       'no-console': 'off',
       'no-prototype-builtins': 'off',
+      // 渲染层与前端代码禁止直接 fetch / XMLHttpRequest：
+      // 网络请求必须走主进程 IPC（src/api/request.js 有统一 SSRF 防护）。
+      'no-restricted-globals': [
+        'error',
+        { name: 'fetch', message: '禁止直接使用 fetch，请走主进程 IPC（musicAPI.*）' },
+        { name: 'XMLHttpRequest', message: '禁止直接使用 XMLHttpRequest，请走主进程 IPC（musicAPI.*）' },
+        { name: 'WebSocket', message: '禁止直接使用 WebSocket，请走主进程 IPC（musicAPI.*）' },
+      ],
     },
   },
   {
@@ -25,6 +33,10 @@ module.exports = [
       globals: {
         ...globals.node,
       },
+    },
+    rules: {
+      // 测试文件允许 fetch / WebSocket（MCP 服务等需要真实 HTTP 客户端）
+      'no-restricted-globals': 'off',
     },
   },
   {
