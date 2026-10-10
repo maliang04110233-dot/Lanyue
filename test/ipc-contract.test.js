@@ -277,9 +277,9 @@ test('buildContractArg 序列化结果与 channelsFor 一致（注入即契约�
 });
 
 test('主进程窗口创建处都注入 additionalArguments（漏注入=preload 直接瘫）', () => {
-  const indexSrc = read('src/main/index.js');
+  const winMgrSrc = read('src/main/windowManager.js');
   const windowSrc = read('src/main/ipc/window.js');
-  assert.ok(/buildContractArg\('main'\)/.test(indexSrc), 'index.js createWindow 未注入 main 契约');
+  assert.ok(/buildContractArg\('main'\)/.test(winMgrSrc), 'windowManager.js createWindow 未注入 main 契约');
   assert.strictEqual((windowSrc.match(/buildContractArg\('secondary'\)/g) || []).length, 2,
     'window.js 迷你播放器与桌面歌词两处都要注入 secondary 契约');
 });
