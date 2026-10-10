@@ -370,19 +370,71 @@ export async function nextSong() {
   } else if (loopMode === 1) {
     playIdx = (playIdx + 1) % playQueue.length;
   } else {
-    // 不循环模式：到末尾则停止
+    // 不循环模式：到末尾则尝试心动接力，不行才停
     if (playIdx >= playQueue.length - 1) {
-      updatePlayStatsOnStop();
-      audio.pause();
-      audio.currentTime = 0;
-      return;
+      const relayed = await tryHeartbeatRelay(playQueue, playIdx);
+      if (relayed) {
+        playIdx = playIdx + 1; // 追加的第一首
+      } else {
+        updatePlayStatsOnStop();
+        audio.pause();
+        audio.currentTime = 0;
+        return;
+      }
+    } else {
+      playIdx = playIdx + 1;
     }
-    playIdx = playIdx + 1;
   }
 
   const song = playQueue[playIdx];
   setState('playIdx', playIdx);
   await playSongByIdx(playIdx, song);
+}
+
+/**
+ * 心动接力：队列播完前自动拉 30 首跨平台智能推荐追加到队尾。
+ *
+ * 触发：nextSong() 在非循环模式下发现 playIdx 已经是最后一首时
+ * 返回：true = 已追加并更新 playQueue，调用方可继续 playIdx+1；false = 没追加到
+ *
+ * 边界保护：
+ * - 同一首歌只追一次（_heartbeatFiredFor 记忆最后触发时的队列 id）
+ * - 并发去抖（_heartbeatInFlight）
+ * - 任何异常都 fallback 为 false（让 nextSong 正常停）
+ */
+let _heartbeatInFlight = false;
+let _heartbeatFiredFor = -1; // 上一次接力时 playQueue 的最后一首的 id（防止重复追）
+
+async function tryHeartbeatRelay(playQueue, playIdx) {
+  if (_heartbeatInFlight) return false;
+  if (playQueue.length === 0) return false;
+  // 同一首歌只追一次
+  const lastSong = playQueue[playQueue.length - 1];
+  if (lastSong && lastSong.id === _heartbeatFiredFor) return false;
+
+  _heartbeatInFlight = true;
+  try {
+    const curSong = playQueue[playIdx];
+    const res = await window.api.generateHeartbeat({
+      currentSongId: curSong ? curSong.id : undefined,
+      currentSource: curSong ? curSong.source : undefined,
+    });
+    if (!res || !res.ok || !Array.isArray(res.songs) || res.songs.length === 0) {
+      logger.info('[heartbeat] 心动接力：主进程无返回');
+      return false;
+    }
+    // 追加到队列尾部 + 持久化
+    const newQueue = [...playQueue, ...res.songs];
+    setState('playQueue', newQueue);
+    _heartbeatFiredFor = lastSong ? lastSong.id : -1;
+    showToast(`💓 心动模式追加 ${res.songs.length} 首智能推荐`, 'info', 2500);
+    return true;
+  } catch (e) {
+    logger.warn('[heartbeat] 心动接力异常:', e && e.message);
+    return false;
+  } finally {
+    _heartbeatInFlight = false;
+  }
 }
 
 export async function prevSong() {
