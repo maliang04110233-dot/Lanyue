@@ -1,5 +1,4 @@
 const { app, BrowserWindow, session, Notification, protocol } = require('electron');
-const { handle: ipcHandle, on: ipcOn, assertContractCoverage } = require('./ipc/register');
 const { buildContractArg } = require('../shared/ipcContract');
 const { defaultDownloadDir } = require('../shared/downloadDefaults');
 const path = require('path');
@@ -9,7 +8,8 @@ const { installRejectionGuard } = require('../utils/rejectionGuard');
 const cookieStore = require('../utils/cookieStore');
 const { setOnlineLrcNotifier } = require('../utils/onlineLrc');
 const { getDownloadUrlSmart, getLyrics } = require('../api');
-const { init: initContext, safeSend: ctxSafeSend } = require('./context');
+const { safeSend: ctxSafeSend } = require('./context');
+const { assertContractCoverage } = require('./ipc/register');
 const taskbarProgress = require('./taskbarProgress');
 const { createDownloadQueueEngine } = require('./downloadQueue');
 const playCache = require('./playCache');
@@ -18,32 +18,14 @@ const streamRegistry = require('./streamRegistry');
 const approvedDirs = require('./approvedDirs');
 const history = require('../utils/history');
 const prefs = require('../utils/prefs');
-const { atomicWriteJson, safeReadJson } = require('../utils/atomicFile');
 const { getPolicyFactsForQueue } = require('./qualityPolicyFacts');
 // 主进程即 UI 线程：文件 IO 走异步封装（见 utils/fsAsync.js）
 const fsa = require('../utils/fsAsync');
-const ipcWindow  = require('./ipc/window');
-const ipcSearch  = require('./ipc/search');
-const ipcDownload= require('./ipc/download');
-const ipcCookie  = require('./ipc/cookie');
-const ipcLibrary = require('./ipc/library');
-const ipcPrefs   = require('./ipc/prefs');
-const ipcCheckLocal = require('./ipc/checkLocal');
-const ipcHistory = require('./ipc/history');
-const ipcAiMusic = require('./ipc/ai-music');
-const ipcPlaylist = require('./ipc/playlist');
-const ipcDownloadTemplates = require('./ipc/downloadTemplates');
-const ipcCloudSync = require('./ipc/cloudSync');
-const ipcSubscriptions = require('./ipc/subscriptions');
-const ipcMcp = require('./ipc/mcp');
 const subscriptions = require('./subscriptions');
 const clipboardWatch = require('./clipboardWatch');
-const { createLibraryWatcher } = require('./libraryWatcher');
 
 // 修复 B15：使用 context.js 提供的统一 safeSend，避免代码漂移
 const safeSend = ctxSafeSend;
-
-let libraryWatcher = null;
 
 // ─── 全局未捕获拒绝归口 ─────────────────────────────────
 // 「为什么需要它、为什么按栈帧分流」见 utils/rejectionGuard.js 顶部说明。
@@ -93,75 +75,18 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 
-// ── 下载队列：状态 / 持久化 / 调度已抽到 main/downloadQueue.js ──
-// 本文件只保留「播放队列持久化」与「引擎装配」。
-let playQueuePersistTimer = null;
-const PLAY_QUEUE_FILE = () => path.join(app.getPath('userData'), 'play-queue.json');
-
-// 启动时加载队列（异常关闭后恢复；损坏文件备份 .bak 后放弃）
-// ── 播放队列持久化 ────────────────────────────────────
-let _pendingPlayQueueData = null;
-function persistPlayQueue(data) {
-  _pendingPlayQueueData = data;
-  if (playQueuePersistTimer) return;
-  playQueuePersistTimer = setTimeout(flushPlayQueueNow, 500);
-}
-
-/** 立即落盘挂起的播放队列（退出时防抖窗口内的变更不能丢） */
-function flushPlayQueueNow() {
-  if (playQueuePersistTimer) { clearTimeout(playQueuePersistTimer); playQueuePersistTimer = null; }
-  const latest = _pendingPlayQueueData;
-  _pendingPlayQueueData = null;
-  if (!latest) return;
-  try {
-    // latest = { queue: [...], playIdx: number }
-    const queue = Array.isArray(latest?.queue) ? latest.queue : [];
-    // 剔除 data: 协议的 cover（base64 数据极大，恢复后 player loadAndPlay 会重新获取）
-    const clean = queue.map(song => {
-      if (!song) return song;
-      const s = { ...song };
-      if (typeof s.cover === 'string' && s.cover.startsWith('data:')) {
-        delete s.cover;
-      }
-      return s;
-    });
-    const payload = {
-      queue: clean,
-      playIdx: typeof latest?.playIdx === 'number' ? latest.playIdx : -1,
-      loopMode: typeof latest?.loopMode === 'number' ? latest.loopMode : 0,
-      isShuffled: !!latest?.isShuffled,
-      updatedAt: Date.now(),
-    };
-    atomicWriteJson(PLAY_QUEUE_FILE(), payload);
-  } catch (e) {
-    logger.warn('播放队列持久化失败:', e.message);
-  }
-}
-
-async function loadPersistedPlayQueue() {
-  try {
-    const fp = PLAY_QUEUE_FILE();
-    const res = safeReadJson(fp);
-    if (!res.ok) {
-      logger.warn('播放队列文件损坏，已备份为 play-queue.json.bak，忽略恢复');
-      return null;
-    }
-    if (res.empty) return null;
-    const obj = res.data;
-    if (!obj || !Array.isArray(obj.queue)) return null;
-    logger.log(`[PlayQueue] 从磁盘恢复 ${obj.queue.length} 首歌曲`);
-    return { queue: obj.queue, playIdx: obj.playIdx, loopMode: obj.loopMode, isShuffled: obj.isShuffled, updatedAt: obj.updatedAt };
-  } catch (e) {
-    logger.warn('播放队列加载失败:', e.message);
-    return null;
-  }
-}
-
-// ── 拆出的模块（tray / shortcuts / menu / windowManager）────────────
+// ── 拆出的模块（tray / shortcuts / menu / windowManager / playQueueStore）────
 const createTrayModule = require('./tray');
 const createShortcutsModule = require('./shortcuts');
 const createMenuModule = require('./menu');
 const createWindowManager = require('./windowManager');
+const createPlayQueueStore = require('./playQueueStore');
+
+const playQueueStore = createPlayQueueStore({ getUserDataDir: () => app.getPath('userData') });
+// 向后兼容的别名（registerAllIpcHandlers 和退出清理仍引用原函数名）
+const persistPlayQueue = (d) => playQueueStore.persist(d);
+const flushPlayQueueNow = () => playQueueStore.flush();
+const loadPersistedPlayQueue = () => playQueueStore.load();
 
 const trayModule = createTrayModule({
   getMainWindow: () => mainWindow,
@@ -382,10 +307,9 @@ app.on('window-all-closed', () => {
   try { if (downloadQueueEngine) downloadQueueEngine.dispose(); } catch (e) {
     logger.warn('[index] 队列引擎清理失败:', e.message);
   }
-  try { if (libraryWatcher) libraryWatcher.stop(); } catch (_e) { /* 停止监听允许失败 */ }
-  // 防抖窗口内挂起的播放队列变更立即落盘（只清定时器会把最后一次变更丢掉）
-  try { flushPlayQueueNow(); } catch (e) { logger.warn('[index] 播放队列退出冲刷失败:', e.message); }
-  if (playQueuePersistTimer) { clearTimeout(playQueuePersistTimer); playQueuePersistTimer = null; }
+  try { if (ipcRegister.getLibraryWatcher()) ipcRegister.getLibraryWatcher().stop(); } catch (_e) { /* 停止监听允许失败 */ }
+  // 防抖窗口内挂起的播放队列变更立即落盘（dispose 同时做 flush + clearInterval）
+  try { playQueueStore.dispose(); } catch (e) { logger.warn('[index] 播放队列退出清理失败:', e.message); }
   subscriptions.stopScheduler();
   clipboardWatch.stop();
   shortcutsModule.unregister();
@@ -397,77 +321,20 @@ app.on('window-all-closed', () => {
 });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
-// ─── IPC 处理（按职责拆到 ipc 下的各模块）────────────────────────────────────
-function registerAllIpcHandlers() {
-  // 必须先 init context，再 register（各 handler 通过 getCtx() 拿共享状态）
-  // 关键：传 getter 而不是值，否则 mainWindow / downloadQueue 在 createWindow 之后
-  // 才赋值时，子模块里永远是 undefined。
-  initContext({
-    getMainWindow:    () => mainWindow,
-    app,
-    getDownloadQueue: () => downloadQueue,
-    persistQueue:     () => downloadQueueEngine.persistQueue(),
-    persistPlayQueue,
-    loadPersistedPlayQueue,
-    processQueue:     () => downloadQueueEngine.processQueue(),
-    requestCancelDownload: (taskId) => downloadQueueEngine.requestCancel(taskId),
-    setQueuePaused:   (v) => downloadQueueEngine.setPaused(v),
-    queueIsPaused:    () => downloadQueueEngine.isPaused(),
-    setLibraryWatchDir: (dir) => { if (libraryWatcher) libraryWatcher.setDir(dir); },
-  });
-
-  // 本地曲库目录监听：变动防抖后推送 local-library-changed，渲染层重走增量扫描
-  libraryWatcher = createLibraryWatcher({
-    emit: () => safeSend('local-library-changed', {}),
-    logger,
-  });
-  try { libraryWatcher.setDir(prefs.get('localDirPath')); } catch (_e) { /* 无历史目录则不监听 */ }
-
-  ipcWindow.register();
-  ipcSearch.register();
-  ipcDownload.register();
-  ipcCookie.register();
-  ipcLibrary.register();
-  ipcPrefs.register();
-  ipcCheckLocal.register();
-  ipcHistory.register();
-  ipcAiMusic.register();
-  ipcPlaylist.register();
-  ipcDownloadTemplates.register();
-  ipcCloudSync.register();
-  ipcSubscriptions.register();
-  ipcMcp.register();
-  // MCP 依赖各 ipc 模块已把 handler 挂进注册表，必须在全部 register 之后自启
-  ipcMcp.startIfEnabled().catch(e => logger.warn('[mcp] 自启失败:', e));
-
-  // ── 播放队列持久化 IPC ─────────────────────────────
-  ipcHandle('save-play-queue', (_, data) => {
-    persistPlayQueue(data);
-    return { ok: true };
-  });
-  ipcHandle('load-play-queue', () => {
-    return loadPersistedPlayQueue() || { queue: [] };
-  });
-
-  // ── 系统托盘 IPC ───────────────────────────────────
-  ipcOn('tray-update-play-state', (_, playState) => {
-    trayModule.updateTrayMenu(playState);
-  });
-
-  // ── 全局快捷键开关（设置页实时切换）─────────────────
-  ipcOn('set-global-shortcuts', (_, enabled) => {
-    shortcutsModule.setEnabled(!!enabled);
-    logger.log(`[shortcuts] 全局媒体键: ${enabled ? '已启用' : '已停用'}`);
-  });
-
-  // ── 版本查询 IPC ───────────────────────────────────
-  ipcHandle('get-version', () => {
-    const pkg = require('../../package.json');
-    const version = pkg.version || '1.0.0';
-    const commit = process.env.npm_config_git_commit || '';
-    return commit ? `${version} (${commit.slice(0, 7)})` : version;
-  });
-}
+// ─── IPC 处理（已拆到 main/ipcRegister.js）───────────────────────────
+const createIpcRegister = require('./ipcRegister');
+const ipcRegister = createIpcRegister({
+  app,
+  getMainWindow: () => mainWindow,
+  getDownloadQueue: () => downloadQueue,
+  downloadQueueEngine,
+  persistPlayQueue,
+  loadPersistedPlayQueue,
+  prefs,
+  trayModule,
+  shortcutsModule,
+});
+function registerAllIpcHandlers() { ipcRegister.registerAll(); }
 
 // ⚠️ 新增 IPC 请写进 src/main/ipc 下的模块，并通过 register.js 的 handle/on 注册：
 // 通道与参数规格统一声明在 src/shared/ipcContract.js（契约未声明会启动即抛，

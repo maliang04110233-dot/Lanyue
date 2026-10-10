@@ -83,7 +83,8 @@ test('订阅：歌手检查更新必须透传 platform（否则按 id 形态猜�
 
 test('退出时必须立即落盘挂起的播放队列（防抖窗口内的变更在退出时直接丢）', () => {
   const src = read('main', 'index.js');
-  assert.match(src, /flushPlayQueueNow\(\);/, 'window-all-closed 里要同步冲刷');
+  assert.match(src, /playQueueStore\.dispose\(\)|flushPlayQueueNow\(\);/,
+    'window-all-closed 里要同步冲刷（playQueueStore.dispose 同时 flush + clearInterval）');
 });
 
 // ── 渲染层 ──────────────────────────────────────────────────
