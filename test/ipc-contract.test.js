@@ -96,12 +96,12 @@ test('契约结构合法（方向、窗口、参数规格）', () => {
 });
 
 test('通道数量钉死（意外增删即失败，逼迫改动者过目契约）', () => {
-  assert.strictEqual(MAIN_INVOKE.size, 102); // +aggregate-cross-source（3-B 跨源聚合） // +ai-cancel-generation（AI 生成中断）；余项：-flush-prefs -flush-history（无人调用的僵尸通道）
+  assert.strictEqual(MAIN_INVOKE.size, 103); // +generate-heartbeat（心动模式）
   assert.strictEqual(MAIN_SEND.size, 16);
   assert.strictEqual(MAIN_RECEIVE.size, 26); // 余项：-library-scan-progress（main 发了没人收）
   assert.strictEqual(SEC_SEND.size, 7);
   assert.strictEqual(SEC_RECEIVE.size, 2);
-  assert.strictEqual(Object.keys(METHODS).length, 106); // +aggregateCrossSource（3-B 跨源聚合） // +aiCancelGeneration；余项：-windowToggleFullscreen -closeDesktopLyric（死键）
+  assert.strictEqual(Object.keys(METHODS).length, 107); // +generateHeartbeat
 });
 
 test('僵尸通道已清除：flush 走 main 直调，扫描进度无人订阅不再空发', () => {
@@ -277,9 +277,9 @@ test('buildContractArg 序列化结果与 channelsFor 一致（注入即契约�
 });
 
 test('主进程窗口创建处都注入 additionalArguments（漏注入=preload 直接瘫）', () => {
-  const indexSrc = read('src/main/index.js');
+  const winMgrSrc = read('src/main/windowManager.js');
   const windowSrc = read('src/main/ipc/window.js');
-  assert.ok(/buildContractArg\('main'\)/.test(indexSrc), 'index.js createWindow 未注入 main 契约');
+  assert.ok(/buildContractArg\('main'\)/.test(winMgrSrc), 'windowManager.js createWindow 未注入 main 契约');
   assert.strictEqual((windowSrc.match(/buildContractArg\('secondary'\)/g) || []).length, 2,
     'window.js 迷你播放器与桌面歌词两处都要注入 secondary 契约');
 });

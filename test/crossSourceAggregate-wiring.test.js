@@ -96,11 +96,11 @@ test('主进程：handler 已注册（契约声明却没人注册 ⇒ assertCont
 });
 
 test('主进程：playlist 模块确实被装载（否则 handler 白写）', () => {
-  // ipc/playlist 由 main/index.js require 并调 register()；
+  // ipc/playlist 由 main/ipcRegister.js require 并调 register()；
   // src/main/ipc/register.js 只做契约对账与 envelope 包装，不装载业务模块。
-  const MAIN = read('src/main/index.js');
-  assert.match(MAIN, /require\('\.\/ipc\/playlist'\)/, 'main/index.js 应 require ipc/playlist');
-  assert.match(MAIN, /ipcPlaylist\.register\(\)/, 'main/index.js 应调用 ipcPlaylist.register()');
+  const REG = read('src/main/ipcRegister.js');
+  assert.match(REG, /require\('\.\/ipc\/playlist'\)/, 'ipcRegister.js 应 require ipc/playlist');
+  assert.match(REG, /ipcPlaylist\.register\(\)/, 'ipcRegister.js 应调用 ipcPlaylist.register()');
 });
 
 // ── 4. 只读纪律 ───────────────────────────────────────

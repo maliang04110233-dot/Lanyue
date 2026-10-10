@@ -228,10 +228,14 @@ test(' 恢复默认也会重注册（借道 change 事件，不新开第二个�
 
 test(' 主进程不再自带第二份媒体键清单', () => {
   const m = acc();
-  const code = stripComments(read('src/main/index.js'));
-  assert.ok(/require\('\.\.\/shared\/accelerators'\)/.test(code),
-    '主进程没有走 shared 判据之家');
-  const leaked = m.ALLOWED_ACCELERATORS.filter((a) => code.includes(`'${a}'`));
+  // shortcuts 代码从 index.js 拆到 src/main/shortcuts.js（v1.0.36 架构整理），
+  // 判据之家检查 src/main/ 目录下的任何文件是否从 shared/accelerators 导入
+  const mainShortcutsCode = stripComments(read('src/main/shortcuts.js'));
+  assert.ok(/require\('\.\.\/shared\/accelerators'\)/.test(mainShortcutsCode),
+    '主进程 shortcuts 模块没有走 shared 判据之家');
+  // 兜底：index.js 不应再出现 accelerators 字面量（已迁走）
+  const indexCode = stripComments(read('src/main/index.js'));
+  const leaked = m.ALLOWED_ACCELERATORS.filter((a) => indexCode.includes(`'${a}'`));
   assert.deepStrictEqual(leaked, [],
     '这些 accelerator 字面量又回到 index.js 了（改一处漏一处的老毛病）：' + leaked.join(', '));
 });

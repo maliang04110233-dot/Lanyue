@@ -57,6 +57,8 @@ const ALLOWED_PREF_KEYS = new Set([
   'subscriptionCheckIntervalHours',
   // 下载队列全部完成后的动作（none/quit/sleep/shutdown，渲染层 afterQueueDone.js 读写）
   'afterQueueDone',
+  // 心动模式开关（渲染层 player.js 读写，默认 true；关闭后队列播完会直接停）
+  'heartbeatEnabled',
   // 定时下载任务列表（渲染层 scheduledDownload.js 读写：[{id, at, lines}]）
   'scheduledDownloads',
   // 新手引导已看过标记（渲染层 welcome.js 读写）

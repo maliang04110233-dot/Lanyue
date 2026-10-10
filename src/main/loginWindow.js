@@ -90,11 +90,15 @@ async function openLoginWindow(platform, parentWindow) {
     backgroundColor: '#1a1a2e',
     autoHideMenuBar: true,
     webPreferences: {
+      // ── 显式安全配置（Electron 默认值未来可能变，宁显式不默认）─────────
       nodeIntegration: false,
       contextIsolation: true,
-      // M3: 独立内存会话 —— 原实现共用 defaultSession，clearStorageData
-      // 会无差别清掉所有站点/其他平台登录态；不带 persist: 前缀意味着
-      // 登录 Cookie 只活在本次登录窗口，抓到即弃，不落第二份。
+      webSecurity: true,
+      sandbox: true,
+      preload: undefined,          // sandbox 窗口禁止 require 应用模块
+      spellcheck: false,           // 登录窗口不需要拼写检查
+      devTools: false,             // 禁止打开 DevTools（减少 Cookie 被手动窃取）
+      // 独立内存会话 —— 登录 Cookie 只活在本次窗口，抓到即弃
       partition: `login-${platform}`,
     },
   });
@@ -108,6 +112,22 @@ async function openLoginWindow(platform, parentWindow) {
       logger.warn('[loginWindow] 拒绝越域导航:', url);
       event.preventDefault();
     }
+  });
+
+  // 屏蔽 F12 / Ctrl+Shift+I 等开发者工具快捷键（devTools:false 只禁用自动打开，
+  // 快捷键本身仍触发 BrowserWindow.webContents.openDevTools()）
+  loginWin.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    if (input.key === 'F12') { event.preventDefault(); return; }
+    if (input.control && input.shift && ['I', 'i', 'J', 'j'].includes(input.key)) {
+      event.preventDefault(); return;
+    }
+    if (input.key === 'u' && (input.control || input.meta)) { event.preventDefault(); return; }
+  });
+
+  // 拒绝所有权限请求（登录窗口不需要地理位置/通知/摄像头等）
+  loginWin.webContents.session.setPermissionRequestHandler((wc, permission, callback) => {
+    callback(false);
   });
 
   // 拦截窗口弹出（OAuth跳转时可能被强制新窗口打开）。

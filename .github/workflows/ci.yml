@@ -114,6 +114,15 @@ jobs:
           # 跳过 electron-builder 的代码签名探测（CI 无证书，不跳会报错）
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
+      # 发布完整性文件（双源 sha512 交叉比对，见 src/utils/updateIntegrity.js）
+      # CI 不 publish，所以这步只为了确保脚本语法正确；
+      # 真正的完整性文件由 npm run publish 的 publish-release.cjs 在 publish 阶段生成
+      - name: Generate update integrity (syntax check)
+        run: |
+          # --release-dir 指向 dir unpack 目录而非真正发布目录（CI 无安装包）
+          # 脚本会打印 "0 个资产" 并正常退出，目的是确保脚本不会 parse error
+          node scripts/gen-update-integrity.cjs --release-dir release
+
       - name: Asar smoke test
         run: npm run smoke:asar
 

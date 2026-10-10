@@ -29,7 +29,7 @@ const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8').replace(/\
 // ── 阈值派生：主窗 minWidth 是这份契约的唯一数字来源 ──────────
 
 const MIN_WIDTH = (() => {
-  const m = read('src', 'main', 'index.js').match(/minWidth:\s*(\d+)/);
+  const m = read('src', 'main', 'windowManager.js').match(/minWidth:\s*(\d+)/);
   assert.ok(m, '主窗必须显式声明 minWidth——尺寸契约的锚点不能被删');
   return Number(m[1]);
 })();

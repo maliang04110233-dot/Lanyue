@@ -67,7 +67,9 @@ test('preload 每个 ipcRenderer.invoke 出口都接 unwrap（源码扫描）', 
   const src = fs.readFileSync(path.join(__dirname, '../src/main/preload.js'), 'utf8');
   const invokes = src.match(/ipcRenderer\.invoke\(/g) || [];
   const unwraps = src.match(/\.then\(unwrap\)/g) || [];
-  assert.ok(invokes.length >= 6, `预期至少 6 个 invoke 出口，实得 ${invokes.length}`);
+  // miniAPI 自 preload.js 删至 preload-secondary.js（v1.0.36 死代码清理），
+  // 主 preload 只剩 musicAPI + ipcRenderer 两个桥的 invoke 出口，下限从 6 降至 3
+  assert.ok(invokes.length >= 3, `预期至少 3 个 invoke 出口，实得 ${invokes.length}`);
   assert.strictEqual(unwraps.length, invokes.length,
     'preload 中每个 ipcRenderer.invoke 都必须 .then(unwrap)，否则渲染层会看到信封泄漏');
   assert.match(src, /contract\.envKey/, 'preload 必须从契约 argv 派生 envKey，不得硬编码第二份事实');

@@ -370,19 +370,200 @@ export async function nextSong() {
   } else if (loopMode === 1) {
     playIdx = (playIdx + 1) % playQueue.length;
   } else {
-    // 不循环模式：到末尾则停止
+    // 不循环模式：到末尾则尝试心动接力，不行才停
     if (playIdx >= playQueue.length - 1) {
-      updatePlayStatsOnStop();
-      audio.pause();
-      audio.currentTime = 0;
-      return;
+      const relayed = await tryHeartbeatRelay(playQueue, playIdx);
+      if (relayed) {
+        playIdx = playIdx + 1; // 追加的第一首
+      } else {
+        updatePlayStatsOnStop();
+        audio.pause();
+        audio.currentTime = 0;
+        return;
+      }
+    } else {
+      playIdx = playIdx + 1;
     }
-    playIdx = playIdx + 1;
   }
 
   const song = playQueue[playIdx];
   setState('playIdx', playIdx);
   await playSongByIdx(playIdx, song);
+}
+
+/**
+ * 心动接力：队列播完前自动拉 30 首跨平台智能推荐追加到队尾。
+ *
+ * 触发：nextSong() 在非循环模式下发现 playIdx 已经是最后一首时
+ * 返回：true = 已追加并更新 playQueue，调用方可继续 playIdx+1；false = 没追加到
+ *
+ * 边界保护：
+ * - 同一首歌只追一次（_heartbeatFiredFor 记忆最后触发时的队列 id）
+ * - 并发去抖（_heartbeatInFlight）
+ * - 任何异常都 fallback 为 false（让 nextSong 正常停）
+ */
+let _heartbeatEnabled = null;      // null = 尚未从 prefs 读；bool = 开关态
+let _heartbeatInFlight = false;
+let _heartbeatFiredFor = -1;       // 上一次接力时队列最后一首的 id（防重复）
+let _heartbeatPrefetched = null;    // 预拉缓存: { songs: [], forSongId, forQueueLen }
+const HEARTBEAT_PREFETCH_SECS = 10; // 剩 N 秒时提前预拉
+
+/** 懒加载开关偏好（首次访问才读 prefs） */
+function _ensureHeartbeatEnabled() {
+  if (_heartbeatEnabled !== null) return _heartbeatEnabled;
+  _heartbeatEnabled = true; // 默认开
+  try {
+    if (typeof window.api !== 'undefined' && typeof window.api.getPref === 'function') {
+      window.api.getPref('heartbeatEnabled').then(v => {
+        _heartbeatEnabled = v !== false; // 只认明确 false 关
+      }).catch(() => { /* noop */ });
+    }
+  } catch (_e) { /* noop */ }
+  return _heartbeatEnabled;
+}
+
+/** 手动切换开关（UI 调） */
+export function toggleHeartbeat() {
+  const next = !_ensureHeartbeatEnabled();
+  _heartbeatEnabled = next;
+  try {
+    if (typeof window.api !== 'undefined' && typeof window.api.setPref === 'function') {
+      window.api.setPref('heartbeatEnabled', next).catch(() => {});
+    }
+  } catch (_e) { /* noop */ }
+  return next;
+}
+
+export function isHeartbeatEnabled() { return _ensureHeartbeatEnabled(); }
+
+/**
+ * 心动接力：队列播完前自动拉 30 首跨平台智能推荐追加到队尾。
+ * - 检查开关
+ * - 优先用预拉缓存（剩 10s 时已提前请求）
+ * - 缓存没有才同步调 IPC
+ * - 同一首歌只追一次
+ */
+async function tryHeartbeatRelay(playQueue, playIdx) {
+  if (!_ensureHeartbeatEnabled()) return false;
+  if (_heartbeatInFlight) return false;
+  if (playQueue.length === 0) return false;
+  const lastSong = playQueue[playQueue.length - 1];
+  if (lastSong && lastSong.id === _heartbeatFiredFor) return false;
+
+  const curSong = playQueue[playIdx];
+
+  // 优先用预拉缓存（剩 10s 时已提前请求）
+  let songs = null;
+  if (_heartbeatPrefetched
+      && _heartbeatPrefetched.forSongId === (curSong && curSong.id)
+      && _heartbeatPrefetched.forQueueLen === playQueue.length
+      && Array.isArray(_heartbeatPrefetched.songs)
+      && _heartbeatPrefetched.songs.length > 0) {
+    songs = _heartbeatPrefetched.songs;
+    _heartbeatPrefetched = null;
+  }
+
+  // 没缓存才同步调 IPC
+  if (!songs) {
+    _heartbeatInFlight = true;
+    try {
+      const res = await window.api.generateHeartbeat({
+        currentSongId: curSong ? curSong.id : undefined,
+        currentSource: curSong ? curSong.source : undefined,
+      });
+      if (!res || !res.ok || !Array.isArray(res.songs) || res.songs.length === 0) {
+        logger.info('[heartbeat] 主进程无返回');
+        return false;
+      }
+      songs = res.songs;
+    } catch (e) {
+      logger.warn('[heartbeat] 心动接力异常:', e && e.message);
+      return false;
+    } finally {
+      _heartbeatInFlight = false;
+    }
+  }
+
+  const newQueue = [...playQueue, ...songs];
+  setState('playQueue', newQueue);
+  _heartbeatFiredFor = lastSong ? lastSong.id : -1;
+  logger.info('[heartbeat] 自动接力:', songs.length, '首追加到队尾');
+  return true;
+}
+
+/**
+ * 手动触发心动接力（渲染层 UI 按钮调用）。
+ * - 不要求已到队列末尾（随时可触发）
+ * - 只追加 10 首（避免一次灌太多）
+ * - 30s 冷却（防连点）
+ */
+let _heartbeatManualCooldownUntil = 0;
+export async function triggerHeartbeatManual() {
+  if (!_ensureHeartbeatEnabled()) return { ok: false, reason: 'disabled' };
+  const now = Date.now();
+  if (now < _heartbeatManualCooldownUntil) return { ok: false, reason: 'cooldown' };
+  _heartbeatManualCooldownUntil = now + 30_000; // 30s 冷却
+
+  const playQueue = getState('playQueue');
+  if (!playQueue || !playQueue.length) return { ok: false, reason: 'empty-queue' };
+  const curSong = playQueue[getState('playIdx')] || playQueue[playQueue.length - 1];
+
+  try {
+    const res = await window.api.generateHeartbeat({
+      currentSongId: curSong ? curSong.id : undefined,
+      currentSource: curSong ? curSong.source : undefined,
+    });
+    if (!res || !res.ok || !Array.isArray(res.songs) || res.songs.length === 0) {
+      return { ok: false, reason: 'no-result' };
+    }
+    const toAdd = res.songs.slice(0, 10); // 手动只追加 10 首
+    setState('playQueue', [...playQueue, ...toAdd]);
+    logger.info('[heartbeat] 手动触发:', toAdd.length, '首追加到队尾');
+    return { ok: true, count: toAdd.length };
+  } catch (e) {
+    logger.warn('[heartbeat] 手动触发异常:', e && e.message);
+    return { ok: false, reason: 'error' };
+  }
+}
+
+/**
+ * 预拉钩子（由 updateProgress 在 audio.currentTime 变化时调用）。
+ * - 剩 <=10 秒、当前是队列最后一首时触发
+ * - 一次播放只预拉一次（_heartbeatPrefetched 已存在就不重复）
+ * - 预拉结果存内存缓存，tryHeartbeatRelay 到末尾时优先用
+ */
+export function heartbeatPrefetchTick() {
+  if (!_ensureHeartbeatEnabled()) return;
+  if (!audio || !audio.duration || !isFinite(audio.duration)) return;
+  if (_heartbeatPrefetched) return; // 已预拉过本次播放
+
+  const remaining = audio.duration - audio.currentTime;
+  if (remaining > HEARTBEAT_PREFETCH_SECS) return;
+  if (remaining <= 0) return;
+
+  const playQueue = getState('playQueue');
+  if (!playQueue || !playQueue.length) return;
+  const playIdx = getState('playIdx');
+  if (playIdx < playQueue.length - 1) return; // 不是最后一首才预拉
+
+  const curSong = playQueue[playIdx];
+  if (!curSong) return;
+
+  _heartbeatInFlight = true;
+  window.api.generateHeartbeat({
+    currentSongId: curSong.id,
+    currentSource: curSong.source,
+  }).then(res => {
+    if (res && res.ok && Array.isArray(res.songs) && res.songs.length > 0) {
+      _heartbeatPrefetched = {
+        songs: res.songs,
+        forSongId: curSong.id,
+        forQueueLen: playQueue.length,
+      };
+      logger.info('[heartbeat] 预拉成功:', res.songs.length, '首');
+    }
+  }).catch(e => logger.warn('[heartbeat] 预拉失败:', e && e.message))
+    .finally(() => { _heartbeatInFlight = false; });
 }
 
 export async function prevSong() {
@@ -837,6 +1018,8 @@ export function updateProgress() {
   const total = document.getElementById('timeTotal');
   if (total) total.textContent = fmtTime(audio.duration);
   updateLyric(audio.currentTime);
+  // 心动模式预拉（剩 10s 时提前请求推荐，避免冷启动延迟）
+  heartbeatPrefetchTick();
   // 每 30 秒自动保存播放进度
   const t = Date.now();
   if (t - _lastProgressSave > 30000 && audio.currentTime > 5) {

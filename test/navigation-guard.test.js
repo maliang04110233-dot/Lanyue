@@ -33,51 +33,53 @@ function stripComments(src) {
     .replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 }
 
-const INDEX = stripComments(read('src/main/index.js'));
 const LOGIN = stripComments(read('src/main/loginWindow.js'));
 const WINDOW = stripComments(read('src/main/ipc/window.js'));
+const WIN_MGR = stripComments(read('src/main/windowManager.js'));
+// 主窗口的守卫已从 index.js 拆到 windowManager.js（v1.0.36 架构整理）
+const MAIN_WIN_SRC = WIN_MGR;
 
 // ── 主窗口：will-navigate 守卫 ─────────────────────────────
 test('主窗口：注册了 will-navigate 监听', () => {
   assert.ok(
-    /mainWindow\.webContents\.on\('will-navigate'/.test(INDEX),
+    /mainWindow\.webContents\.on\('will-navigate'/.test(MAIN_WIN_SRC),
     '主窗口 must attach will-navigate；没有它渲染层 location/window.open 可把窗口导向任意 URL',
   );
 });
 
 test('主窗口：非法 URL 分支会 preventDefault', () => {
-  const m = /if\s*\(\s*!u\s*\)\s*\{[^}]*event\.preventDefault\(\)/.exec(INDEX);
+  const m = /if\s*\(\s*!u\s*\)\s*\{[^}]*event\.preventDefault\(\)/.exec(MAIN_WIN_SRC);
   assert.ok(m, 'URL 解析失败时必须 event.preventDefault() 拒绝导航');
 });
 
 test('主窗口：file: 导航经 fileURLToPath + path.relative 收窄到应用包内（M1）', () => {
-  assert.ok(/require\('url'\)/.test(INDEX) && /fileURLToPath/.test(INDEX),
+  assert.ok(/require\('url'\)/.test(MAIN_WIN_SRC) && /fileURLToPath/.test(MAIN_WIN_SRC),
     '必须用 fileURLToPath 把 file: URL 还原成真实路径');
-  assert.match(INDEX, /path\.relative\(\s*path\.resolve\(app\.getAppPath\(\)\)/,
+  assert.match(MAIN_WIN_SRC, /path\.relative\(\s*path\.resolve\(app\.getAppPath\(\)\)/,
     '必须相对 app.getAppPath() 计算，禁止任意本机 file: 路径');
   // 收窄判据：相对路径不以 .. 开头且不是绝对路径
-  assert.match(INDEX, /!rel\.startsWith\('\.\.'\)/, '包外路径（以 .. 开头）必须被排除');
-  assert.match(INDEX, /!path\.isAbsolute\(rel\)/, '跨盘符绝对路径必须被排除');
+  assert.match(MAIN_WIN_SRC, /!rel\.startsWith\('\.\.'\)/, '包外路径（以 .. 开头）必须被排除');
+  assert.match(MAIN_WIN_SRC, /!path\.isAbsolute\(rel\)/, '跨盘符绝对路径必须被排除');
 });
 
 test('主窗口：同源判断不是 u.origin === cur.origin（file: 页 origin 恒为 "null"）', () => {
   // 危险写法：直接比 origin 会把所有 file: 导航（origin==='null'）误判成同源
-  assert.doesNotMatch(INDEX, /u\.origin\s*===\s*cur\.origin/,
+  assert.doesNotMatch(MAIN_WIN_SRC, /u\.origin\s*===\s*cur\.origin/,
     '不能直接比 origin：file: 页的 origin 恒为字符串 "null"，会把越界 file: 导航误放行');
-  assert.match(INDEX, /sameHttpOrigin/,
+  assert.match(MAIN_WIN_SRC, /sameHttpOrigin/,
     '必须有显式的 sameHttpOrigin 白名单（协议+host 都相等，且当前页必须是 http/https）');
-  assert.match(INDEX, /cur\.protocol === 'http:' \|\| cur\.protocol === 'https:'|cur\.protocol === 'https:' \|\| cur\.protocol === 'http:'|cur\.protocol === 'http:'/,
+  assert.match(MAIN_WIN_SRC, /cur\.protocol === 'http:' \|\| cur\.protocol === 'https:'|cur\.protocol === 'https:' \|\| cur\.protocol === 'http:'|cur\.protocol === 'http:'/,
     '当前页必须是 http(s) 才谈得上「同源」（dev 模式 vite 刷新需要）');
 });
 
 test('主窗口：非白名单分支 (!isLocal && !sameHttpOrigin) 会 preventDefault', () => {
-  const m = /if\s*\(\s*!isLocal\s*&&\s*!sameHttpOrigin\s*\)\s*\{[^}]*event\.preventDefault\(\)/.exec(INDEX);
+  const m = /if\s*\(\s*!isLocal\s*&&\s*!sameHttpOrigin\s*\)\s*\{[^}]*event\.preventDefault\(\)/.exec(MAIN_WIN_SRC);
   assert.ok(m, '既不在包内、又不同源的导航必须 preventDefault 拒绝');
 });
 
 // ── 主窗口：setWindowOpenHandler ───────────────────────────
 test('主窗口：setWindowOpenHandler 一律返回 { action: \'deny\' }', () => {
-  const m = /mainWindow\.webContents\.setWindowOpenHandler\(\([^)]*\)\s*=>\s*\{([\s\S]*?)\}\)/.exec(INDEX);
+  const m = /mainWindow\.webContents\.setWindowOpenHandler\(\([^)]*\)\s*=>\s*\{([\s\S]*?)\}\)/.exec(MAIN_WIN_SRC);
   assert.ok(m, '主窗口必须注册 setWindowOpenHandler');
   assert.match(m[1], /deny/, '主窗口不允许任何 window.open 弹出（渲染层被注入时 window.open 可指向钓鱼页）');
   assert.doesNotMatch(m[1], /action:\s*'allow'/, '主窗口绝不允许 allow');
@@ -131,7 +133,7 @@ test('二级窗口：使用最小 preload（preload-secondary），不暴露特�
 
 // ── 守卫自检：扫描器确实能匹配目标（防正则写坏静默失效）──
 test('守卫自检：四个窗口的 will-navigate 计数 = 4（主+登录+歌词+迷你）', () => {
-  const sources = [INDEX, LOGIN, WINDOW];
+  const sources = [MAIN_WIN_SRC, LOGIN, WINDOW];
   let total = 0;
   for (const s of sources) total += (s.match(/\.on\('will-navigate'/g) || []).length;
   assert.strictEqual(total, 4,
@@ -139,7 +141,7 @@ test('守卫自检：四个窗口的 will-navigate 计数 = 4（主+登录+歌�
 });
 
 test('守卫自检：setWindowOpenHandler 计数 = 4', () => {
-  const sources = [INDEX, LOGIN, WINDOW];
+  const sources = [MAIN_WIN_SRC, LOGIN, WINDOW];
   let total = 0;
   for (const s of sources) total += (s.match(/setWindowOpenHandler/g) || []).length;
   assert.strictEqual(total, 4,
