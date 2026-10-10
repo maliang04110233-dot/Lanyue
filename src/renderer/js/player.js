@@ -1165,10 +1165,11 @@ export {
 // 进度条拖动/悬停预览/键盘微调 + 音量拖动锁定/滚轮调节。
 // module script 在 DOM 解析完后执行，但仍加 readyState 守卫以防未来加载位置变动。
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { _initProgressDrag(); _initVolumeUX(); }, { once: true });
+  document.addEventListener('DOMContentLoaded', () => { _initProgressDrag(); _initVolumeUX(); _initHeartbeatIndicator(); }, { once: true });
 } else {
   _initProgressDrag();
   _initVolumeUX();
+  _initHeartbeatIndicator();
 }
 window.loadAndPlay = loadAndPlay;
 window.togglePlay = togglePlay;
@@ -1190,6 +1191,31 @@ window.applyLyricFontSize = applyLyricFontSize;
 window.applyLyricOffset = applyLyricOffset;
 window.getLyricOffset = getLyricOffset;
 window.setCoverAnimation = setCoverAnimation;
+// 心动模式对外暴露
+window._triggerHeartbeatManual = triggerHeartbeatManual;
+window._toggleHeartbeat = toggleHeartbeat;
+window._isHeartbeatEnabled = isHeartbeatEnabled;
+
+// 初始化心动模式指示器（播放队列面板 header 里的小徽章）
+function _initHeartbeatIndicator() {
+  const el = document.getElementById('pqHeartbeatIndicator');
+  if (!el) return;
+  // 等 prefs 异步加载完再显示真实状态
+  setTimeout(() => {
+    const on = isHeartbeatEnabled();
+    el.textContent = on ? '💓 开' : '💓 关';
+    el.style.color = on ? '#ff6b81' : '#888';
+  }, 200);
+  // 设置页切换开关时同步更新指示器（订阅 prefs 变化）
+  if (typeof window.api !== 'undefined' && typeof window.api.onPrefChanged === 'function') {
+    window.api.onPrefChanged?.('heartbeatEnabled', (_key, val) => {
+      const on = val !== false;
+      const e = document.getElementById('pqHeartbeatIndicator');
+      if (e) { e.textContent = on ? '💓 开' : '💓 关'; e.style.color = on ? '#ff6b81' : '#888'; }
+      _heartbeatEnabled = on; // 同步更新懒加载缓存
+    });
+  }
+}
 window.cycleCoverAnimation = cycleCoverAnimation;
 window.updatePlayerCard = updatePlayerCard;
 window.setPlayerState = setPlayerState;

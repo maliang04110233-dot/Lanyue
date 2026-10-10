@@ -505,6 +505,8 @@ const GENERAL_PREFS = {
   subscriptionCheckIntervalHours: { key: 'subscriptionCheckIntervalHours', default: 6, el: 'settingSubCheckInterval' },
   playProgressMemory: { key: 'playProgressMemory', default: true, el: 'settingPlayProgressMemory' },
   globalShortcuts: { key: 'globalShortcuts', default: true, el: 'settingGlobalShortcuts' },
+  // 心动模式（播放队列播完自动拉 30 首智能推荐接力）
+  heartbeatEnabled: { key: 'heartbeatEnabled', default: true, el: 'settingHeartbeatEnabled' },
   // 四个动作各自的 accelerator（候选与出厂值的家在 src/shared/accelerators.js，
   // test/global-shortcuts.test.js 逐字钉住这三侧不许漂）
   shortcutPlayPause: { key: 'shortcutPlayPause', default: 'MediaPlayPause', el: 'settingShortcutPlayPause' },

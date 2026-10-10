@@ -681,6 +681,8 @@
         <button class="pq-clear-btn hidden" id="pqSelRmBtn" style="color:#ff6b81;" onclick="removeCheckedFromQueue()" title="把勾选的行移出播放队列（不删本地文件）">🗑 移除 0</button>
         <button class="pq-clear-btn hidden" id="pqSelPlBtn" onclick="pqSelAddPlaylist()" title="把勾选的歌加进我的歌单（拖入即播的临时行自动跳过）">🎼 歌单 0</button>
         <button class="pq-clear-btn" onclick="clearPlayQueue()" title="清空队列" data-i18n="player.queue.clear">清空</button>
+        <button class="pq-clear-btn pq-heartbeat-btn" id="pqHeartbeatBtn" onclick="window._triggerHeartbeatManual?.()" title="💓 心动模式：立即从当前歌曲和收藏歌单生成 10 首智能推荐追加到队尾">💓 心动</button>
+        <span class="pq-heartbeat-indicator" id="pqHeartbeatIndicator" title="心动模式状态（可在设置页开关）" data-i18n="[data-title]settings.general.heartbeatEnabled" style="color:#888;font-size:12px;">💓 开</span>
       </div>
       <div class="pq-list" id="pqList">
         <div class="pq-empty" id="pqEmpty">
@@ -1065,6 +1067,7 @@
             <div class="setting-checks">
               <label class="setting-check"><input type="checkbox" id="settingPlayProgressMemory" checked><span data-i18n="settings.general.playProgressMemory">记忆播放进度</span></label>
               <label class="setting-check"><input type="checkbox" id="settingGlobalShortcuts" checked><span data-i18n="settings.general.globalShortcuts">全局媒体键</span></label>
+              <label class="setting-check"><input type="checkbox" id="settingHeartbeatEnabled" checked><span data-i18n="settings.general.heartbeatEnabled">心动模式</span></label>
             </div>
             <span class="setting-hint setting-hint--block" data-i18n="settings.general.playbackBehaviorHint">记忆播放进度：下次从断点继续；全局媒体键：用键盘上的 ⏯ ⏮ ⏭ 控制播放</span>
 

@@ -445,6 +445,7 @@
   "player.desktopLyric": "桌面歌词",
   "settings.general.desktopLyricHint": "在屏幕上方的独立置顶窗口显示逐字歌词，支持锁定（鼠标穿透）、拖动、字号缩放",
   "settings.general.globalShortcuts": "全局媒体键（键盘上的 ⏯ ⏮ ⏭ 键控制播放）",
+  "settings.general.heartbeatEnabled": "心动模式（队列播完自动拉 30 首智能推荐接力）",
   "settings.general.playbackBehaviorHint": "记忆播放进度：下次从断点继续；全局媒体键：用键盘上的 ⏯ ⏮ ⏭ 控制播放",
   "settings.sources.probeTitle": "源可用性",
   "settings.sources.probeHint": "检测各音源（即歌曲所在的平台）当前是否可达。下载失败会自动换源，这里显示各源近期取流成功率（换源时优先选择健康的源）。",

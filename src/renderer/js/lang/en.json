@@ -445,6 +445,7 @@
   "player.desktopLyric": "Desktop Lyrics",
   "settings.general.desktopLyricHint": "Floating always-on-top window with karaoke lyrics; supports click-through lock, dragging and font size",
   "settings.general.globalShortcuts": "Global media keys (control playback with ⏯ ⏮ ⏭ keys on your keyboard)",
+  "settings.general.heartbeatEnabled": "Heartbeat Mode (auto-relay 30 smart recommendations when queue ends)",
   "settings.general.playbackBehaviorHint": "Resume progress: continue from where you left off. Global media keys: control playback with ⏯ ⏮ ⏭ on your keyboard",
   "settings.sources.probeTitle": "Source Availability",
   "settings.sources.probeHint": "Check whether each audio source (i.e. the platform a song is on) is reachable. Failed downloads fall back to other sources automatically; this shows each source's recent success rate (healthy sources are preferred when switching).",
