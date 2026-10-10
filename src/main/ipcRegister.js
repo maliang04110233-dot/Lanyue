@@ -25,6 +25,7 @@ const ipcCheckLocal = require('./ipc/check-local');
 const ipcHistory = require('./ipc/history');
 const ipcAiMusic = require('./ipc/ai-music');
 const ipcPlaylist = require('./ipc/playlist');
+const ipcHeartbeat = require('./ipc/heartbeat');
 const ipcDownloadTemplates = require('./ipc/download-templates');
 const ipcCloudSync = require('./ipc/cloud-sync');
 const ipcSubscriptions = require('./ipc/subscriptions');
@@ -77,6 +78,7 @@ module.exports = function createIpcRegister(deps) {
     ipcHistory.register();
     ipcAiMusic.register();
     ipcPlaylist.register();
+    ipcHeartbeat.register();
     ipcDownloadTemplates.register();
     ipcCloudSync.register();
     ipcSubscriptions.register();

@@ -136,6 +136,7 @@ const CHANNELS = {
   // ── 播放队列持久化（invoke，注册在 main/index.js） ─
   'save-play-queue': { invoke: MAIN, args: [['data', t.any()]] },
   'load-play-queue': { invoke: MAIN },
+  'generate-heartbeat': { invoke: MAIN, args: [['currentSongId', t.any()], ['currentSource', t.any()]] },
 
   // ── 历史（invoke） ────────────────────────────────
   'query-history': { invoke: MAIN, args: [['opts', t.obj()]] },
@@ -307,6 +308,7 @@ const METHODS = {
   // 播放队列
   savePlayQueue: 'save-play-queue',
   loadPlayQueue: 'load-play-queue',
+  generateHeartbeat: 'generate-heartbeat',
   // 历史
   queryHistory: 'query-history',
   getHistoryStats: 'history-stats',
