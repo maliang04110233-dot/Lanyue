@@ -85,9 +85,17 @@ jobs:
           fi
 
   # ── 质量闸门：与 CI 同一套（lint / audit / 单测）────────────
+  #
+  # runner 用 windows-latest 而不是 ubuntu-latest（2026-10-13 改）：
+  # 这是**只发 Windows 产物**的项目（下面 build job 也在 windows-latest），
+  # 而单测里有相当一部分直接碰文件系统与平台分支（符号链接复核、目录沙箱、
+  # 路径拼接、媒体探测……）。放在 Ubuntu 上跑，这些用例会走到与用户真实环境
+  # 不同的分支上：CI 从 10-10 起连续红，而同一份代码在 Windows 上 2828 全绿。
+  # 那不是代码的错，是 runner 选错了 —— 门禁红在一个用户永远碰不到的平台上，
+  # 只会训练出「红了就重跑」。
   quality:
     name: Lint & Audit & Test
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: verify-version
     steps:
       - uses: actions/checkout@v4

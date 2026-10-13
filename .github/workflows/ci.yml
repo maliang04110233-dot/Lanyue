@@ -30,7 +30,7 @@ jobs:
   # ── 第一层：ESLint + 单元测试 ──────────────────────────
   lint-test:
     name: Lint & Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -80,7 +80,9 @@ jobs:
       - name: Dead deps check
         run: npm run check:dead-deps
 
-      # 测试全部离线（不触网），故 Ubuntu runner 上可稳定跑通
+      # 测试不触网，但大量用例直接碰文件系统与平台分支（符号链接复核 / 目录沙箱 /
+      # 路径拼接 / 媒体探测），故 runner 与打包、与用户真实环境保持一致：windows-latest
+      # （2026-10-13 改：放在 ubuntu 上时 CI 连续红，而同一份代码在 Windows 上全绿）
       - name: Unit tests
         run: npm test
 
