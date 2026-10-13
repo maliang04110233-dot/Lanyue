@@ -28,6 +28,10 @@ const DIAG_TABLE = {
   VIP_REQUIRED: { cause: '该音质档位为平台 VIP 专享', advice: '在搜索结果右键「以此音质下载」选低一档，或到设置补 VIP 账号的 Cookie', heal: 'settings', tag: { label: '需VIP', color: 'var(--neon-orange)' } },
   AUTH_EXPIRED: { cause: '平台 Cookie 已过期', advice: '到 设置 → 平台 Cookie 更新后点「立即重试」', heal: 'settings', tag: { label: 'Cookie过期', color: 'var(--neon-orange)' } },
   LOGIN_REQUIRED: { cause: '该平台需要登录才能取流', advice: '到 设置 填入已登录的 Cookie 后重试', heal: 'settings', tag: { label: '需登录', color: 'var(--neon-orange)' } },
+  // 2026-10-13 补登：errors.js 定义了它、fallbackCodes 拿它换源、streamFailure 把它归到
+  // auth 类，唯独这张表没有 ⇒ 行内不戴徽标、弹层说「未分类」。更关键的是 AUTH_CODES
+  // 里也没有它，于是「一键重试可恢复任务」会把 Cookie 失效的任务当成可恢复的挨个重试。
+  COOKIE_INVALID: { cause: '平台 Cookie 无效或已过期', advice: '到 设置 → 平台 Cookie 重新获取后点「立即重试」', heal: 'settings', tag: { label: 'Cookie失效', color: 'var(--neon-orange)' } },
   COPYRIGHT_RESTRICTED: { cause: '版权受限（地区限制或曲目下架）', advice: '换其他平台搜索同名版本，一般聚合搜索里会有替代源', heal: null, tag: { label: '版权受限', color: 'var(--neon-purple)' } },
   UNAVAILABLE: { cause: '曲目当前不可用', advice: '稍后重试；持续失败就换源搜索同名版本', heal: 'retry', tag: { label: '不可用', color: 'var(--neon-purple)' } },
   CDN_EMPTY: { cause: '平台 CDN 返回空数据（多为高峰期限流）', advice: '稍后再试，或用「定时下载」错峰到夜间自动入队', heal: null, tag: { label: 'CDN异常', color: 'var(--neon-red)' } },
@@ -53,7 +57,11 @@ const DIAG_TABLE = {
 const KEYWORD_RULES = [
   { re: /ENOSPC|no space|空间不足/i, cause: '磁盘剩余空间不足', advice: '清理磁盘或到设置更换下载目录后重试', heal: 'settings' },
   { re: /timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|网络/i, cause: '网络异常', advice: '检查网络/代理后点「立即重试」', heal: 'retry' },
-  { re: /403|cookie|auth|登录|unauthorized/i, cause: '鉴权失败（Cookie 无效或缺失）', advice: '到 设置 → 平台 Cookie 更新后重试', heal: 'settings' },
+  // 2026-10-13：补「鉴权 / 未登录」—— errors.js 里 AUTH_EXPIRED 的官方文案就是
+  //「XX鉴权已过期」，而这条兜底只认 403/cookie/auth/登录/unauthorized，
+  // 于是那句最常出现的中文偏偏落进「未分类」（实测：classifyFailure(null,'鉴权失败')
+  // 改前返回 UNKNOWN）。带 code 的失败走码表不受影响，这条只兜底丢码的那些。
+  { re: /403|cookie|auth|登录|鉴权|未登录|unauthorized/i, cause: '鉴权失败（Cookie 无效或缺失）', advice: '到 设置 → 平台 Cookie 更新后重试', heal: 'settings' },
   { re: /vip/i, cause: '需要 VIP 权限', advice: '换低一档音质下载，或在设置补 VIP Cookie', heal: 'settings' },
 ];
 
@@ -241,7 +249,9 @@ async function _failureSources() {
 }
 
 /** 鉴权/VIP 类：自动重试没有意义，须先去设置处理（全仓唯一定义处，判定走 isAuthFailure） */
-const AUTH_CODES = ['VIP_REQUIRED', 'AUTH_EXPIRED', 'LOGIN_REQUIRED'];
+// COOKIE_INVALID（2026-10-13 加入）：它同样「不先去设置就重试多少次都没用」，
+// 漏了它 ⇒ 批量重试会把这批任务数进「可恢复」并挨个空跑。
+const AUTH_CODES = ['VIP_REQUIRED', 'AUTH_EXPIRED', 'LOGIN_REQUIRED', 'COOKIE_INVALID'];
 
 /**
  * 纯判定：这个码是不是「重试也没用，得先去设置」。

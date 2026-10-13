@@ -63,6 +63,20 @@ const QUEUE_STATUSES = new Set(['pending', 'downloading', 'done', 'error']);
 const MAX_RESTORED_TASKS = 20000;
 
 /**
+ * 下载进度上报的最小间隔（毫秒）。
+ *
+ * P2-1（2026-10-13 复审）：旧实现每个 data chunk 都 safeSend 一次
+ * download-progress，而 src/main/context.js 在每条 download-progress 上还会触发
+ * taskbarProgress.refresh() —— 那是一次**对整个队列的 O(n) 扫描**。无限速时单个
+ * 任务每秒能产生数百次回调，并发 N 首线性放大，渲染层还要逐条重渲染进度条。
+ *
+ * 120ms 约等于 8 fps：进度条与速度/ETA 的观感毫无差别，IPC 量降一到两个数量级。
+ * 另外补一条：进度达到 100 时**总是**发，否则最后一个包到达就被节流吃掉，界面
+ * 停在 99% 直到终态推送。
+ */
+const PROGRESS_THROTTLE_MS = 120;
+
+/**
  * 清洗文件名（去掉路径分隔符与非法字符，限长 200）
  * @param {string} name
  * @returns {string}
@@ -337,6 +351,54 @@ function createDownloadQueueEngine({
   }
 
   /**
+   * 恢复之后把待下载任务重新推上调度器（2026-10-13 复审 P0-1）。
+   *
+   * 为什么必须是独立方法而不是顺手塞进 loadPersistedQueue：
+   * 加载是「读盘 + 清洗 + 入队」的纯数据动作，调度是**行为**动作 —— 合成
+   * 一个方法既没法单测「恢复后到底开没开跑」，也让「只加载不启动」这种
+   * 合法用法（例如先看一眼队列再决定）变得不可能。
+   *
+   * 旧实现的洞：全仓 processQueue() 只在「新增单曲 / 重试 / 批量入队 /
+   * 订阅自动下载 / 内部重入」这些**用户动作**里被调用，重启后恢复的 pending
+   * 没人推一把 —— 界面显示「排队中 N 首」，实际一首都不下，直到用户手动
+   * 加一首歌或切一次暂停/继续；只等着的用户，这些任务 24 小时后还会被
+   * STALE_PENDING_MS 判死。
+   *
+   * error 状态**不**自动重试：失败任务的语义是「等用户决定」，
+   * 自动重跑会把用户主动取消/失败的结果悄悄翻掉。
+   *
+   * @returns {number} 本次推上调度器的任务数
+   */
+  function resumeRestoredQueue() {
+    const pending = downloadQueue.filter(s => s && s.status === 'pending').length;
+    if (!pending) return 0;
+    logger.log(`[Queue] 恢复后自动调度 ${pending} 个待下载任务`);
+    // processQueue 自带 finally 复位，理论上不 reject；仍兜一层，
+    // 免得调度器里任何未来的抛错变成未处理拒绝把主进程掀翻。
+    Promise.resolve()
+      .then(() => processQueue())
+      .catch(e => logger.warn('[Queue] 恢复后调度失败:', e && e.message));
+    return pending;
+  }
+
+  /**
+   * 任务是否已不该继续：用户取消，或已被移出队列（移除/清空/批量操作）。
+   *
+   * 2026-10-13 复审 P1-4：旧实现在**每轮 attempt 顶部**查一次
+   * `_cancelRequested || !downloadQueue.includes(song)`，而 attempt 内部是一串
+   * 长 await（取流 → 下载 → 歌词 → 嵌标签 → 写历史）。取消只能打断已登记到
+   * _inflightReqs 的那个请求，其余阶段形同虚设 ⇒ 被移除的歌会跑完带宽、落到
+   * 正式文件名、嵌标签、写 history done、弹桌面通知，而这些对用户全都不可见
+   * （对象已 splice）。于是磁盘上出现用户没要过的文件，历史里多一条他没下过的记录。
+   *
+   * 抽成函数是为了让「什么时候该停」只有一个事实来源，日志、返回、终态分支
+   * 用的是同一条判据。
+   */
+  function shouldAbort(song) {
+    return !!(song && song._cancelRequested) || !downloadQueue.includes(song);
+  }
+
+  /**
    * 处理单个下载任务（含重试循环 + 致命错误短路）。
    * _processing 标记协程全程在途（含 403 重试退避窗口，此时 status 是 pending），
    * 调度器据此跳过，杜绝同一首歌两个协程并发写同一目标文件（审计 H1）。
@@ -386,6 +448,11 @@ function createDownloadQueueEngine({
         }
 
         const urlInfo = await getDownloadUrlSmart(song, song.quality || 'standard');
+        // 检查点 1：取流是一跳网络往返，期间用户完全可能已经取消或移除。
+        if (shouldAbort(song)) {
+          lastError = Object.assign(new Error('下载已取消'), { cancelled: true });
+          break;
+        }
         logger.log('[processOneSong]   urlInfo keys =', urlInfo ? Object.keys(urlInfo).join(',') : 'null', 'hasUrl =', !!(urlInfo && urlInfo.url));
         if (!urlInfo || !urlInfo.url) {
           // 修复 B7：fatal 错误（VIP/Auth/Audio 流缺失）直接退出，不进重试循环
@@ -473,10 +540,19 @@ function createDownloadQueueEngine({
         // 读取限速设置（KB/s → bytes/s）
         const speedLimitKB = prefs.get('speedLimit') || 0;
         const speedLimit = speedLimitKB > 0 ? speedLimitKB * 1024 : 0;
+        // 节流状态（每个任务一份）。song.progress 每次都更新（队列摘要直接读它），
+        // 只有跨进程的那条 download-progress 事件被时间窗合并。
+        const prog = { lastAt: 0 };
         await downloadFileWithRetry(urlInfo.url, savePath, (progress, bytes) => {
           // 取消后底层回调可能迟到一拍：不得再写进度/推送事件（UI 闪烁来源）
           if (song._cancelRequested) return;
           song.progress = progress;
+          const now = Date.now();
+          // 100% 必须发出去（否则界面停在 99% 直到终态推送），其余按时间窗合并。
+          // 注意判据是「距上次上报多久」，**不是**「百分比有没有变」：后者等于
+          // 没节流 —— 每个 chunk 的百分比几乎都是新的。
+          if (progress < 100 && now - prog.lastAt < PROGRESS_THROTTLE_MS) return;
+          prog.lastAt = now;
           const payload = { id: song.taskId, progress };
           if (bytes) {
             const r = speedMeter.nextSpeed(speedStates[song.taskId], Date.now(), bytes.receivedBytes, bytes.totalBytes);
@@ -488,6 +564,27 @@ function createDownloadQueueEngine({
           }
           safeSend('download-progress', payload);
         }, extraHeaders, { speedLimit, token: cancelToken });
+
+        // 检查点 2：传输层收尾。此处是最后一道闸 —— 过了它就会嵌标签、写历史、
+        // 弹通知，而任务可能早已不在队列里（那些动作对用户不可见）。
+        //
+        // 为什么不删已落盘的文件：文件此刻已经是**完整**的（传输层刚 rename 过），
+        // 用户移除队列项的语义是「别再下了」，不是「把已下好的删掉」。删掉反而是
+        // 不可逆的数据丢失。所以保留文件、只停掉后续副作用。
+        if (shouldAbort(song)) {
+          logger.log('[processOneSong] 传输完成时任务已被取消/移除：保留已落盘文件，'
+            + '但不再嵌标签、写历史或通知 —', song.title);
+          delete speedStates[song.taskId];
+          notifyQueueChanged(true);
+          if (!downloadQueue.includes(song)) return;   // 已被移出队列：无需终态
+          // 仍在队列里（用户取消）：**必须**落到终态，否则它会永远停在「下载中」——
+          // 调度器只把 status 为 downloading/pending 的条目算作在途，卡住不落终态
+          // 连带让并发槽与重排逻辑失真。
+          song.status = 'error';
+          song.error = '下载已取消';
+          song._cancelRequested = false;
+          return;
+        }
 
         // 歌词（换源成功时优先用匹配源的 id 同源拿，更准）
         let lrc = '';
@@ -593,6 +690,15 @@ function createDownloadQueueEngine({
       if (!song.errorCode) {
         const netCode = transportCode(lastError);
         if (netCode) song.errorCode = netCode;
+      }
+      // 检查点 3：终态落笔前。取消/移除发生在取流或传输之后时，走到这里 lastError
+      // 不是 cancelled 的形态（旧代码只在循环顶部查过），于是会往 history 里塞一条
+      // 用户根本没下过的 error 记录，并弹一个他看不见的 toast。
+      if (!downloadQueue.includes(song)) {
+        logger.log('[processOneSong] 任务已被移出队列，跳过失败历史与错误通知 —', song.title);
+        delete speedStates[song.taskId];
+        notifyQueueChanged(true);
+        return;
       }
       // 写历史：失败
       try {
@@ -719,6 +825,7 @@ function createDownloadQueueEngine({
     // 持久化
     persistQueue,
     loadPersistedQueue,
+    resumeRestoredQueue,
     // 调度
     processQueue,
     requestCancel,

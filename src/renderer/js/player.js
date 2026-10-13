@@ -258,13 +258,20 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
     _applyTitleMarquee();
 
     audio.src = localUrl;
-    // 恢复播放进度
-    const savedTime = await restorePlayProgress(song);
-    if (savedTime > 0) {
-      _resumeSeeker.attach(audio, savedTime);
-    }
+    // 首播延迟（2026-10-13）：**先发起播放**，进度恢复并行做。
+    //
+    // 旧顺序是 `await restorePlayProgress()` → `audio.play()`，而前者内部是两次
+    // 串行 getPref IPC（playProgressMemory + playProgressMap）。也就是说出声被
+    // 两个主进程往返硬生生推后 —— 主进程忙时更久，用户感知就是「点了播放要等一下」。
+    //
+    // 为什么可以并行：audio.play() 不需要 metadata 就能发起（进入 buffering），
+    // 而 _resumeSeeker 本来就监听 loadedmetadata / readyState 两个时机做 seek
+    // （见 player/resumeSeek.js 与上方「根因 2」注释）—— 晚一点拿到进度完全来得及。
     audio.play().catch(() => {
       showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
+    });
+    restorePlayProgress(song).then((savedTime) => {
+      if (savedTime > 0) _resumeSeeker.attach(audio, savedTime);
     });
 
     // 加载歌词
@@ -320,13 +327,12 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
   // 如果有预获取的 URL（来自 proxyPlay），则播放音频
   if (localUrl) {
     audio.src = localUrl;
-    // 恢复播放进度
-    const savedTime2 = await restorePlayProgress(song);
-    if (savedTime2 > 0) {
-      _resumeSeeker.attach(audio, savedTime2);
-    }
+    // 与上面同一处修正：播放先发起，进度恢复并行（少两个 IPC 往返的首播延迟）
     audio.play().catch(() => {
       showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
+    });
+    restorePlayProgress(song).then((savedTime2) => {
+      if (savedTime2 > 0) _resumeSeeker.attach(audio, savedTime2);
     });
   }
 

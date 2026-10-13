@@ -186,9 +186,12 @@ async function _fetchSongs(entry) {
 /**
  * 把新增歌曲排进下载队列。与 add-to-queue 相同的两级去重：
  * 队列内在途任务 + 历史记录（文件仍在磁盘）。
- * @returns {number} 实际入队数
+ *
+ * P2-9：第二级去重改用异步判活（findDownloadedAsync），所以本函数是 async ——
+ * 逐首同步 existsSync 在网络盘上会把主进程卡住一整轮。调用方必须 await。
+ * @returns {Promise<number>} 实际入队数
  */
-function _autoEnqueue(entry, fresh) {
+async function _autoEnqueue(entry, fresh) {
   let ctx;
   try {
     ctx = require('./context').getCtx();
@@ -203,7 +206,8 @@ function _autoEnqueue(entry, fresh) {
     const inQueue = downloadQueue.some(s =>
       s && String(s.id) === String(song.id) && s.source === song.source && s.status !== 'done');
     if (inQueue) continue;
-    if (history.findDownloaded(song.id, song.source)) continue;
+    // P2-9：同上，订阅轮询也是逐首循环，用异步判活
+    if (await history.findDownloadedAsync(song.id, song.source)) continue;
     downloadQueue.push({
       ...song,
       id: String(song.id),
@@ -248,7 +252,8 @@ async function runCheck(force = false) {
         const songs = await _fetchSongs(entry);
         const r = applyCheckToEntry(entry, songs, Date.now());
         Object.assign(entry, r.entry);
-        if (r.toEnqueue.length) _autoEnqueue(entry, r.toEnqueue);
+        // await：_autoEnqueue 现在是 async（第二级去重走异步判活）
+        if (r.toEnqueue.length) await _autoEnqueue(entry, r.toEnqueue);
         newTotal += r.freshCount;
         changed = true;
       } catch (e) {

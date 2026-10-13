@@ -15,6 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,14 +25,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ── 最小 DOM 桩：两条 toast 实现真用到的面（getElementById/createElement/
 //    appendChild/remove/children/click 监听/style）─────────────────
 
+/**
+ * 最小 DOM 桩。
+ *
+ * ⚠ 这里刻意**不提供 `parent` 字段**（2026-10-13 移除）。真实 DOM 的元素没有
+ * `parent` 属性，只有 `parentElement` / `parentNode`；此前桩里恰好有个 parent，
+ * 于是 `el.parent` 在测试里为真、在生产里恒为 undefined —— 实现因此写出
+ * `if (!el || !el.parent) return;`，真机上每次到期都提前返回，**toast 永不离场**。
+ * 桩比真实 DOM 多给一个字段，等于替实现把 bug 藏起来。现在字段名用 owner，
+ * 谁再写 el.parent 会**当场** undefined 而红。
+ */
 function stubEl(tag) {
   return {
-    tag, parent: null, children: [], className: '', textContent: '', style: {}, _l: {},
-    appendChild(c) { c.parent = this; this.children.push(c); return c; },
+    tag, owner: null, children: [], className: '', textContent: '', style: {}, _l: {},
+    appendChild(c) { c.owner = this; this.children.push(c); return c; },
     remove() {
-      if (this.parent) this.parent.children = this.parent.children.filter((x) => x !== this);
-      this.parent = null;
+      if (this.owner) this.owner.children = this.owner.children.filter((x) => x !== this);
+      this.owner = null;
     },
+    // contains 是真实 DOM 的 API（Node.contains），toast.js 用它判"这条还在屏上吗"
+    contains(el) { return this.children.includes(el); },
     addEventListener(type, fn) { (this._l[type] ||= []).push(fn); },
     click() { (this._l.click || []).forEach((fn) => fn({ type: 'click', target: this })); },
   };
@@ -115,4 +128,62 @@ test('未知 type 回落 info 皮；tone 只认两族：默认 warn、177 庆祝
   assert.equal(warnEl.className, 'toast toast-warn toast-action');
   assert.equal(okEl.className, 'toast toast-success toast-action');
   warnEl.remove(); okEl.remove(); // 收摊：不等 6 秒默认 ttl
+});
+
+// ── ⑤ 同文案合并（刷屏防护，2026-10-13）────────────────────
+// 现场：自动跳曲时一句失败文案两三秒内连来十几条，整个界面被糊住、不可操作。
+
+test('同文案在屏时重复 → 合并成「原文 ×N」，不新起一条', async () => {
+  container.children.length = 0;
+  showToast('连着失败', 'warn', 300);
+  showToast('连着失败', 'warn', 300);
+  showToast('连着失败', 'warn', 300);
+  assert.equal(container.children.length, 1, '同文案只许占一条，否则就是刷屏');
+  assert.equal(container.children[0].textContent, '连着失败 ×3', '重复次数要看得见');
+  await sleep(700);
+  assert.equal(container.children.length, 0, '合并后的那条照常到期自散（合并不等于永驻）');
+});
+
+// ── ⑥ 在屏上限 ─────────────────────────────────────────────
+
+test('不同文案超过 6 条 → 踢掉最早的（反馈不是许愿池）', async () => {
+  container.children.length = 0;
+  for (let i = 1; i <= 10; i++) showToast(`上限测试${i}`, 'warn', 60);
+  assert.equal(container.children.length, 6, '在屏上限 6 条');
+  assert.equal(container.children[0].textContent, '上限测试5', '被踢的该是最早那四条');
+  await sleep(500); // 等 TTL 收摊，不留定时器给后续用例
+  assert.equal(container.children.length, 0);
+});
+
+// ── ⑦ 离场后同文案要能重新起一条 ─────────────────────────────
+
+test('上一条已离场 → 同文案重新起新条（去重不得把文案永久锁死）', async () => {
+  container.children.length = 0;
+  showToast('复发测试', 'warn', 30);
+  await sleep(400); // 等它走完退场
+  showToast('复发测试', 'warn', 30);
+  assert.equal(container.children.length, 1, '离场后同文案必须能再来一次');
+  assert.equal(container.children[0].textContent, '复发测试', '新的一条不该带 ×2 的历史计数');
+  await sleep(400);
+});
+
+// ── 桩与真实 DOM 同步（2026-10-13 加；本轮第三次的同一类坑）────────────────
+// 同一个错误当天踩了三次：登记簿 key（测试用 registerStream 的返回值原样回查，
+// 真机传的是 Chromium 规范化后的形态）、CSP（扫到了注释里的 <audio> 字样）、
+// 以及这里的 el.parent（桩多给了一个真实 DOM 没有的字段）。
+// 共同点：**测试环境比真实运行时"更友好"，于是把 bug 藏起来**。
+// 这条门禁把「看似合理、实则不存在」的 DOM 属性钉死。
+
+test('toast 家族不许用真实 DOM 里不存在的属性（el.parent 是本轮踩过的坑）', () => {
+  for (const f of ['toast.js', 'utils.js']) {
+    // 剥注释再扫：toast.js 的注释里**故意**留着 el.parent 的反例说明
+    const code = fs.readFileSync(path.join(R(), 'js', f), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').map((l) => l.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n');
+    assert.ok(
+      !/\.parent\b/.test(code),
+      `js/${f} 用了 .parent：真实 DOM 只有 parentElement / parentNode，没有 parent。`
+      + '在测试桩上它为真、在真机上恒为 undefined，会让"到期离场"永远提前 return。',
+    );
+  }
 });

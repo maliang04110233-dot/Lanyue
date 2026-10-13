@@ -16,6 +16,46 @@ const TYPE_CONFIG = {
 };
 
 /**
+ * 刷屏防护（2026-10-13）
+ *
+ * 此前 showToast 无条件 appendChild，到期才逐条移除 ⇒ **同时在屏条数无上限**。
+ * 自动跳曲场景下一句失败文案会在两三秒内连来十几条（用户截图实证：整个界面被
+ * toast 糊住、不可操作）。两条闸：
+ *   ① 同文案在同一条还在屏上时重复 → 合并成「原文 ×N」，不新起一条；
+ *   ② 超过 MAX_VISIBLE 条 → 立即踢掉最早那条（被挤掉的没有资格慢慢退场）。
+ *
+ * 两条闸都只动"重复的/多余的"，单条 toast 的到期退场契约一字未改
+ * （test/toast-timing.test.js 的 ①②③④ 仍绿）。
+ */
+const MAX_VISIBLE = 6;
+const _recent = new Map(); // msg -> { el, count, timer }
+
+/** 从去重表里摘掉某个元素（元素已离场必须摘，否则同文案会被误判成"还在屏上"） */
+function _forget(el) {
+  for (const [k, v] of _recent) {
+    if (v.el === el) { clearTimeout(v.timer); _recent.delete(k); }
+  }
+}
+
+/**
+ * 到期退场：先挂退场动画，250ms 后真移除（契约①，见 test/toast-timing.test.js）
+ *
+ * 刻意**不做"是否还在屏上"的前置判断**：remove() 本身幂等，对已离场的元素再调
+ * 一次无害。此前这里写的是 `if (!el || !el.parent) return;` —— 真实 DOM 的元素
+ * **没有 parent 属性**（只有 parentElement / parentNode），于是每次到期都
+ * `undefined` 提前返回，**toast 永远不会消失**（2026-10-13 用户实测发现）。
+ *
+ * 之所以能一路绿灯：测试桩 stubEl 恰好带一个 parent 字段。真实运行时与桩不一致，
+ * 是本轮第三次踩同一类坑（登记簿 key 归一化、CSP 注释字样、这里的 parent）。
+ */
+function _dismiss(el) {
+  if (!el) return;
+  _forget(el);
+  el.style.animation = 'toast-out .25s ease forwards';
+  setTimeout(() => el.remove(), 250);
+}
+
+/**
  * 显示 Toast 通知
  * @param {string} msg - 消息内容
  * @param {string} [type='info'] - info | success | warn | error
@@ -29,17 +69,34 @@ function showToast(msg, type = 'info', duration) {
   const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.info;
   const container = document.getElementById('toastContainer');
   if (!container) return;
+  const dur = duration !== undefined ? duration : cfg.duration;
+
+  // ① 同文案重复 → 合并计数，不新起一条。
+  //    判据用 container.contains() 而不是 el.parent —— 后者在真实 DOM 里不存在，
+  //    会让"这条还在屏上吗"永远答否（要么永不合并，要么永不消失）。
+  const prev = _recent.get(msg);
+  if (prev && prev.container && prev.container.contains(prev.el)) {
+    prev.count += 1;
+    prev.el.textContent = `${msg} ×${prev.count}`;
+    clearTimeout(prev.timer);
+    prev.timer = setTimeout(() => _dismiss(prev.el), dur);
+    return;
+  }
 
   const el = document.createElement('div');
   el.className = `toast ${cfg.className}`;
   el.textContent = msg;
   container.appendChild(el);
+  const rec = { el, count: 1, timer: null, container };
+  rec.timer = setTimeout(() => _dismiss(el), dur);
+  _recent.set(msg, rec);
 
-  const dur = duration !== undefined ? duration : cfg.duration;
-  setTimeout(() => {
-    el.style.animation = 'toast-out .25s ease forwards';
-    setTimeout(() => el.remove(), 250);
-  }, dur);
+  // ② 在屏上限：踢最早的（立即移除，不等退场动画）
+  while (container.children.length > MAX_VISIBLE) {
+    const oldest = container.children[0];
+    _forget(oldest);
+    oldest.remove();
+  }
 }
 
 /**

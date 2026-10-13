@@ -98,3 +98,16 @@ music-downloader/
 ## 声明
 
 本项目仅供学习研究使用，请遵守各平台服务条款。
+
+---
+
+## 文档
+
+| 文档 | 什么时候读它 |
+|---|---|
+| [架构全景](docs/architecture/OVERVIEW.md) | **第一次读这个仓库**；或要改某个链路但不确定边界在哪 |
+| [贡献指南](CONTRIBUTING.md) | 第一次提交前（「铁律」一节是重点，不是风格偏好） |
+| [安全策略](SECURITY.md) | 报告漏洞前；想知道自己暴露面在哪 |
+| [更新日志](CHANGELOG.md) | 用户可感知的变化 |
+| 平台接入 / 插件契约 | [ADD-A-PLATFORM](docs/architecture/ADD-A-PLATFORM.md) · [platform-plugin-v3](docs/architecture/platform-plugin-v3.md) |
+| 代码复审报告 | [2026-10-13](docs/CODE_REVIEW_2026-10-13.md)（含历史对账与修复记录）· [2026-09-28](docs/CODE_REVIEW_2026-09-28.md) · [2026-09-17](docs/CODE_REVIEW_2026-09-17.md) |

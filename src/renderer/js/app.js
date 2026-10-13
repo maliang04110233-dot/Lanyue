@@ -17,6 +17,7 @@ import './toast.js';
 import './utils.js';
 import { buildFallbackNotice } from './fallbackNotice.js';
 import { describePlayError, playFailureRetry, playFailureRetryText } from './playError.js';
+import { createPlayFailGuard } from './playFailGuard.js';
 import { retryAfterPlayFailure } from './playRetry.js';
 import { pickQueueCopyRows, queueCopyToastText } from './queueCopy.js';
 import { toTrackLines } from './songListText.js';
@@ -250,6 +251,8 @@ let _audio = null;
 // 25s 加载超时守卫状态（事件绑定区使用）
 let _loadWatchSince = 0;
 let _loadWatchTimer = null;
+// 连续播放失败熔断器（模块级单例：跨 error / playing / 超时守卫三处共用一份计数）
+const _playFailGuard = createPlayFailGuard();
 
 // ── 初始化 ─────────────────────────────────────────────
 async function init() {
@@ -398,6 +401,15 @@ async function init() {
       _audio.addEventListener('error', () => {
         const cur = getState('currentPlaying');
         if (!cur || !_audio.error) return;
+        // 连续失败熔断：循环模式下 nextSong 是无限循环，一次失败会被放大成
+        // toast 糊满整屏（截图实证）。到线就停在这里，并把计数让给用户的手动操作。
+        const guard = _playFailGuard.fail();
+        if (guard.tripped) {
+          _playFailGuard.reset();
+          _audio.pause();
+          showToast(t('toast.playFailStreak', { n: guard.threshold }), 'warn', 6000);
+          return;
+        }
         const e = describePlayError(cur, _audio.error.code);
         // 本地文件行播不出来 = 盘和记录的引用断了，就地给一口「⬇ 重新下载」，
         // 不必让人翻到下载历史页去找那一行。判据（哪些行真有源可下）在 playError.js。
@@ -421,6 +433,14 @@ async function init() {
           if (!_loadWatchSince) _loadWatchSince = now;
           if (now - _loadWatchSince > 25000) {
             _loadWatchSince = 0;
+            // 超时也是"起不来"，走同一条熔断：不接进来，超时这条侧门会继续刷屏
+            const g2 = _playFailGuard.fail();
+            if (g2.tripped) {
+              _playFailGuard.reset();
+              _audio.pause();
+              showToast(t('toast.playFailStreak', { n: g2.threshold }), 'warn', 6000);
+              return;
+            }
             showToast(t('toast.streamTimeout'), 'warn', 3000);
             if (typeof window.nextSong === 'function') window.nextSong();
           }
@@ -432,7 +452,10 @@ async function init() {
       window.addEventListener('beforeunload', () => {
         if (_loadWatchTimer) clearInterval(_loadWatchTimer);
       });
-      _audio.addEventListener('playing', () => { _loadWatchSince = 0; });
+      _audio.addEventListener('playing', () => {
+        _loadWatchSince = 0;
+        _playFailGuard.succeed(); // 真响过一次：熔断计数归零，偶发失败别拖垮整轮
+      });
       _audio.addEventListener('pause', () => { _loadWatchSince = 0; });
       _audio.addEventListener('pause', () => {
         const icon = document.getElementById('btnPlayIcon');
@@ -880,7 +903,6 @@ async function playPlaylistModalSong(idx) {
   const song = songs[idx];
   if (!song) { showToast(t('toast.songNotFound'), 'warn'); return; }
   const quality = resolveQuality(song.source);
-  showToast(t('toast.preparingSource', { title: song.title }), 'info');
   const reqId = ++_plModalPlayRequestId;
   try {
     const result = await api.getDownloadUrlSmart(song, quality);
@@ -915,7 +937,6 @@ async function playPlaylistModalSong(idx) {
     setState('playIdx', idx);
     setState('currentPlaying', song);
     await loadAndPlay(song, proxied.fileUrl, true);
-    showToast(t('toast.nowPlaying', { title: song.title }), 'success', 2500);
   } catch (e) {
     if (reqId === _plModalPlayRequestId) {
       logger.warn('弹层播放失败:', e);
@@ -1116,11 +1137,9 @@ function addPlModalToPlaylist() {
 }
 
 async function downloadSongFromList(s) {
-  showToast(t('toast.fetchingLink', { title: s.title }), 'info', 2000);
   try {
     const result = await api.getDownloadUrl(s.id, s.source, 'standard');
     if (result && result.url) {
-      showToast(t('toast.linkReady'), 'success', 4000);
       document.getElementById('searchInput').value = `${s.title} ${s.artist}`;
       switchTab('search');
     } else {

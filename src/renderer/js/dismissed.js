@@ -127,7 +127,7 @@ function _renderManager() {
         <button class="btn-sm" id="dismClearAll">🗑 清空全部</button>
       </div>` +
       _list.map((x, i) => `
-        <div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.05);">
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--stroke-1);">
           <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(x.title)}${x.artist ? ' - ' + _esc(x.artist) : ''}</span>
           <button class="btn-sm" data-restore="${i}">↩ 恢复</button>
         </div>`).join('');

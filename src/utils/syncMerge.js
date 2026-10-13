@@ -31,14 +31,34 @@ function _ts(x, field = 'updatedAt') {
 // 渲染层会把条目 id 用作 data-id / onclick 实参，外来快照（NAS/备份文件）的
 // id 可任意 —— 非法形状的 id 一律换成安全生成 id（条目保留），封堵存储型 XSS。
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-let _fixedSeq = 0;
+
+// P2-6（2026-10-13 复审）：修复后的 id 必须**确定性**，不能用模块级递增计数。
+//
+// 旧实现是 `_fixedSeq++`：412 冲突重试时，cloudSyncCore 会拿「首次合并结果」当
+// local 再合一次 remote2。首次合并把 remote1 里的坏 id 修成 ..._seqA；而首次
+// PUT 因 412 并未写入远端，所以 remote2 里那条仍是原始坏 id，第二次修成
+// ..._seqB。mergePlaylists 按 id 做并集 ⇒ 同一条目变成两条，并随下次同步继续扩散。
+//
+// 改成「原始 id 的哈希」后：同一条坏 id 无论被修几次都得到同一个新 id，
+// 并集自然收敛回一条，且结果与合并次数、与本进程先修过什么无关。
+function _hashId(s) {
+  return require('crypto').createHash('sha1').update(s).digest('hex').slice(0, 16);
+}
+
 function repairIds(list, prefix) {
-  return _arr(list).filter(x => x && typeof x === 'object').map((item, i) => {
+  // 同列表内的重复计数：只用来保证「同一个列表里两个相同坏 id」不撞车。
+  // 它不破坏确定性 —— 同一份输入列表每次算出的计数序列都一样。
+  const dupCount = new Map();
+  return _arr(list).filter(x => x && typeof x === 'object').map((item) => {
     if (item.id == null) return item;
     const id = String(item.id);
     if (SAFE_ID_RE.test(id)) return item;
-    const seq = _fixedSeq++;
-    return { ...item, id: `${prefix}_fixed_${i}_${seq}` };
+    const base = _hashId(id);
+    const n = dupCount.get(base) || 0;
+    dupCount.set(base, n + 1);
+    const fixed = n === 0 ? `${prefix}_fixed_${base}` : `${prefix}_fixed_${base}_${n}`;
+    // 结果形如 pl_fixed_<16 hex>，天然满足 SAFE_ID_RE ⇒ 不会被再次修复
+    return { ...item, id: fixed };
   });
 }
 

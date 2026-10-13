@@ -718,6 +718,15 @@ async function doNaturalSearch() {
     if (qs.length > 1 || (qs.length === 1 && qs[0] !== keyword)) {
       showToast('AI 关键词：' + qs.join('、'), 'success', 4000);
     }
+    // P2-13：并行扇出里有关键词失败/超时要说出来。否则界面只给一份「看起来很完整」
+    // 的结果，用户会把「3 个关键词挂了 2 个」误读成「LLM 就改写出这几首」。
+    // 成功的结果照常展示，这里只补一条可操作的提示（可重试 / 换网络）。
+    const failed = (r && r.failedQueries) || [];
+    if (failed.length) {
+      const names = failed.map(f => f.query).join('、');
+      showToast(`AI 搜索：${failed.length}/${qs.length} 个关键词没搜到结果（${names}），结果可能不全`,
+        'warn', 5000);
+    }
   } catch (e) {
     clearLoading();
     showLoadError(errBrief(e));
@@ -1262,7 +1271,6 @@ async function playSong(idx, queueOverride = null) {
   const s = songs[idx];
   if (!s) { showToast('未找到歌曲', 'warn'); return; }
   const quality = resolveQuality(s.source);
-  showToast(`正在准备音源：${s.title}`, 'info');
   const reqId = ++_searchPlayRequestId;
   try {
     const result = await api.getDownloadUrlSmart(s, quality);
@@ -1301,7 +1309,6 @@ async function playSong(idx, queueOverride = null) {
     // 也是 audio error 守卫与 25s 加载超时守卫的前置条件，缺失会导致取流失败后静默卡死
     setState('currentPlaying', s);
     await loadAndPlay(s, proxied.fileUrl, true);
-    showToast('▶ 正在播放：' + s.title, 'success', 2500);
   } catch (e) {
     if (reqId === _searchPlayRequestId) {
       logger.warn('播放失败:', e);

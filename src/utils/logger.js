@@ -36,6 +36,7 @@
 
 const fsp = require('fs').promises;
 const path = require('path');
+const { redactText } = require('./redact');
 
 const _isProduction = process.env.NODE_ENV === 'production';
 
@@ -76,6 +77,23 @@ function formatLine(level, args) {
   let text = args.map(stringifyArg).join(' ');
   if (text.length > MAX_LINE_CHARS) text = text.slice(0, MAX_LINE_CHARS) + '…[截断]';
   return `${ts} [${level.toUpperCase()}] ${text}\n`;
+}
+
+/**
+ * 落盘前的一行 = 格式化 + **脱敏**。
+ *
+ * 为什么脱敏放在这里而不是每个调用点：平台 API 把鉴权态塞在 URL 查询串里
+ * （网易云 data/sign、QQ sign、B 站 token…），而这些 URL 在 downloader、soda、
+ * migu、kuwo、resolveTrack 等处都被直接打印。逐点自觉必然漏 —— 之前只有
+ * src/api/request.js 自己做了一份局部 redact，其余全是裸奔。
+ *
+ * 落盘日志是要交给用户贴进 issue 的，也常被存进网盘/工单系统，所以「已脱敏」
+ * 必须是系统级保证：调用点漏了也没关系，这里兜住。
+ *
+ * 代价是一层正则；开发环境不落盘（_sink 直接 return），所以零开销。
+ */
+function redactLine(level, args) {
+  return redactText(formatLine(level, args));
 }
 
 /** 当前日志文件是否已达上限（取不到大小按未超处理，绝不因统计失败挡日志） */
@@ -152,7 +170,7 @@ function _scheduleFlush() {
  */
 function _sink(level, args) {
   if (!_enabled || _disabledByError) return;
-  _buffer.push(formatLine(level, args));
+  _buffer.push(redactLine(level, args));
   // 缓冲触顶：立刻冲刷而不等定时器（日志风暴时优先保证不丢关键上下文）
   if (_buffer.length >= MAX_BUFFER_LINES) {
     _flush().catch(() => { /* 同上 */ });

@@ -342,6 +342,20 @@ async function convertAudioFile({
       if (poll) { clearInterval(poll); poll = null; }
     };
 
+    /**
+     * 失败/取消时删掉已写出的半成品（P2-8）。
+     *
+     * 同步 unlink 是有意的：这里跑在主进程，但删一个刚被 ffmpeg 放弃的输出
+     * 文件是一次系统调用，且只在失败路径发生 —— 与「主线程不做文件 IO」的
+     * 规矩相比，这个代价换「不留残件」很划算。句柄未释放时 unlink 会 EPERM，
+     * 那就留着（下面的 close 回调晚于进程真正退出，正常不会发生）。
+     */
+    const removeOutput = () => {
+      try {
+        if (outputPath && fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      } catch (_e) { /* 删不掉就留给用户手动清 */ }
+    };
+
     let proc;
     try {
       // -progress pipe:1 让进度以机器可读行输出到 stdout（out_time_ms=...）
@@ -391,16 +405,25 @@ async function convertAudioFile({
     proc.on('close', (code) => {
       clearTimeout(timer);
       cleanup();
-      if (aborted) return settle(aborted);
+      if (aborted) {
+        removeOutput();      // 取消：同样不留半成品
+        return settle(aborted);
+      }
       if (code === 0 && fs.existsSync(outputPath)) {
         return settle({ success: true, path: outputPath });
       }
+      // P2-8（2026-10-13 复查）：ffmpeg 以 -y 直写 outputPath（没有 tmp+rename），
+      // 失败时会把 0 字节或半截文件留在输出目录；再次转换时 resolveOutputPath
+      // 因 existsSync 命中而改成 _1 命名，于是残件一份份堆下去，还会被本地曲库
+      // 扫描当成曲目收进来。失败即清理。
+      removeOutput();
       settle({ error: `转换失败: ${stderr.slice(0, 200) || `ffmpeg 退出码 ${code}`}` });
     });
 
     proc.on('error', (err) => {
       clearTimeout(timer);
       cleanup();
+      removeOutput();
       settle({ error: `转换失败: ${err.message}` });
     });
   });

@@ -28,6 +28,14 @@
  */
 
 const logger = require('../utils/logger');
+// 取流失败的分类归一（2026-10-13）。只挂在 getUrl 的出口，不参与任何策略判定 ——
+// 「是否换源 / 是否重试」仍在 resolveTrackService 与 downloadQueue，职责不越界。
+const { annotateStreamError } = require('./services/streamFailure');
+// 取流链路的 HTTP 状态旁路记录：平台**零改动**就能拿到「是不是签名过期」
+// （request() 向后兼容地只返回 body，403 更是压根不走 reject —— 见 request.js
+//   里的那段注释）。这是让「CDN 签名过期就换源」这条出口对全部 8 个源生效的
+//   前提；逐个平台改 catch 分支拿不到它，因为 status 在 request() 里已被丢弃。
+const { runWithHttpStatusContext } = require('./request');
 
 /**
  * 空返回值约定：与既有消费方历史行为逐条对齐。
@@ -159,12 +167,18 @@ function createPlatformGateway({ registry, getCookie = () => '' } = {}) {
     if (!plugin || typeof plugin.getUrl !== 'function') {
       return { error: `未知数据源: ${platformId}`, code: 'UNKNOWN_SOURCE' };
     }
-    // safeRun 的 fallback 形态与原 getDownloadUrl 的 catch 分支保持一致
-    return safeRun(
+    // safeRun 的 fallback 形态与原 getDownloadUrl 的 catch 分支保持一致。
+    //
+    // runWithHttpStatusContext 包住整条插件调用链（含降级链里的多次请求），
+    // 于是出口处能知道「这条链最后一次响应是什么状态」，而平台本身不用改一行。
+    const { result: raw, lastStatus } = await runWithHttpStatusContext(() => safeRun(
       `${plugin.name} 获取下载URL`,
       () => plugin.getUrl(id, quality, cookieFor(platformId)),
       { error: `平台 ${platformId} 取流异常` },
-    );
+    ));
+    // 2026-10-13：出口统一挂上 category / status（见 services/streamFailure.js 头注）。
+    // 增量式：没有任何 status 信号时 classify 不产生新结论，既有行为逐字节不变。
+    return annotateStreamError(raw, { platform: platformId, httpStatus: lastStatus });
   }
 
   /**

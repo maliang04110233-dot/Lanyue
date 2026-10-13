@@ -125,7 +125,32 @@ async function kugouGetUrl(id, quality = 'standard') {
     return { url: playUrl, ext };
   } catch (e) {
     logger.warn('[kugou] getPlayUrl 失败:', e.message);
-    return { error: e.message || '请求失败' };
+    // 2026-10-13：这里原先是 `return { error: e.message }` —— 既无 code 也无 fatal，
+    // 是取流成功率上的一个黑洞：既不触发跨源换源（无 code 可匹配白名单），
+    // 也不被判为 fatal，队列会拿它去重试 maxAttempts 次，而网络故障重试是对的，
+    // 反爬/接口变更重试是白跑。
+    //
+    // 现在补上 code（与 shared/errors 的码表对齐，勿另造字符串）：
+    //   · 有 HTTP 状态 ⇒ 那条链的状态码本身就是最有价值的分类线索（403 = 签名
+    //     过期，换源有意义；404/410 = 资源没了；5xx/429 = 网络侧，重试有意义）
+    //   · 否则按 netClass 判是不是传输故障
+    const status = Number(e && e.statusCode) || null;
+    const isTransport = (() => {
+      try { return require('../../shared/netClass').isTransportFailure(e); } catch (_x) { return false; }
+    })();
+    if (status === 403) {
+      // 实测形态：取流直链签名过期时上游一律 403。换个源通常能拿到新链。
+      return { error: '酷狗：直链已过期或需要鉴权', code: 'AUTH_EXPIRED', status, fatal: false };
+    }
+    if (status === 404 || status === 410) {
+      return { error: '酷狗：音源不存在或已移除', code: 'UNAVAILABLE', status, fatal: false };
+    }
+    return {
+      error: e.message || '请求失败',
+      code: isTransport ? 'NETWORK_ERROR' : 'PLATFORM_CHANGED',
+      status,
+      fatal: !isTransport,
+    };
   }
 }
 

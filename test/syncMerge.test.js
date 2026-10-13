@@ -139,6 +139,26 @@ test('repairIds: 非对象条目过滤、非法 id 换成带前缀的安全 id �
   assert.strictEqual(out.length, 3);
   assert.strictEqual(out[0].id, 12345, '纯数字 id 视为安全');
   const fixed = out.slice(1).map(t => t.id);
-  assert.ok(fixed.every(id => /^tpl_fixed_\d+_\d+$/.test(String(id))), '修复 id 形如 tpl_fixed_*');
-  assert.strictEqual(new Set(fixed).size, 2, '修复后的 id 不得撞车');
+  assert.ok(fixed.every(id => /^tpl_fixed_[0-9a-f]{16}(_\d+)?$/.test(String(id))),
+    '修复 id 形如 tpl_fixed_<哈希>（可选去重后缀）');
+  assert.strictEqual(new Set(fixed).size, 2, '同一列表内的相同坏 id 不得撞车');
+});
+
+test('repairIds 确定性：同一坏 id 无论修几次都得到同一个新 id', () => {
+  const { repairIds } = require('../src/utils/syncMerge');
+  const first = repairIds([{ id: "a');alert(1);//" }], 'pl')[0].id;
+  const second = repairIds([{ id: "a');alert(1);//" }], 'pl')[0].id;
+  assert.strictEqual(first, second,
+    '修复必须与「本进程此前修过什么」无关，否则 412 重试会把同一条目拆成两条');
+});
+
+test('P2-6：412 重试的二次合并不会把一个条目变成两个', () => {
+  // 复现旧缺陷：首次合并修出 ..._seqA，冲突重试时远端仍是原始坏 id，
+  // 再修出 ..._seqB，并集按 id 合并 ⇒ 一条变两条。
+  const { mergePlaylists } = require('../src/utils/syncMerge');
+  const bad = [{ id: "evil');x", name: '同一条', updatedAt: 5, songs: [] }];
+  const afterFirst = mergePlaylists([], bad);              // 首次合并
+  const afterSecond = mergePlaylists(afterFirst, bad);     // 412 后重合并（远端内容未变）
+  assert.strictEqual(afterSecond.length, 1,
+    '同一逻辑条目在重试合并后仍只有一条（旧实现会变成两条并持续扩散）');
 });

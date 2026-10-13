@@ -76,26 +76,45 @@ test('probeHint：index.html 行内默认值与 zh.json 逐字相等（一个文
     'HTML 默认值与词典分叉：applyTranslations 后用户看到词典版，行内那份就成了谎话');
 });
 
-// ── ③ 流语境的「音源」不许被误伤 ───────────────────────────
+// ── ③ 播放流程只有报错才提示（2026-10-13）────────────────────
+// 原先这里钉的是另一件事：「播放取流 toast 的『音源』不许被无差别替换改成『平台』」
+// （防病句被误伤）。产品决策变成「只有报错才提示」后，那两条正常态提示
+// （正在准备音源 / 正在播放）与它们的词条一起被删掉，钉子的前提不复存在。
+//
+// 于是把它改写成一条**约束力更强**的钉子：播放与取链接这两条自动流程里，
+// 不许再出现任何正常态 toast。原来的钉子防"文案被改坏"，现在这条防"提示被加回来"
+// —— 后者正是用户实际抱怨的东西（每切一首歌弹两条，糊住半屏）。
+//
+// 保留的仍是「用户主动操作的回执」（已复制 / 已删除 / 下载完成…）：那些是
+// "你点的那一下到底生效没有"的答案，不是自动流程的播报。判据写在这里，
+// 免得下一次又有人按"提示越少越好"把它们一起清掉。
 
-test('播放取流 toast 的「音源」原样保留（防无差别替换把病句钉死）', () => {
-  // 已收编进语言包的两处（app.js 、playlist.js）：源码只许留键名，
-  // 词典值单独钉（见下）。两处都钉 —— 只钉词典，源码可以悄悄换键；只钉源码，词典可以悄悄改词。
-  for (const [f, owner] of [
-    [['js', 'app.js'], 'app.js'],
-    [['js', 'views', 'playlist.js'], 'playlist.js'],
-  ]) {
-    assert.ok(read(...f).includes("t('toast.preparingSource'"),
-      `${owner} 不再取 toast.preparingSource 键（取词旁路了？）`);
-  }
-  // home/search 还没收编（LEDGER 在账），仍是字面量 —— 字面量这一侧继续钉「音源」不许被改成「平台」
+test('播放/取链接流程不得再弹正常态 toast（只有报错才提示）', () => {
+  const BANNED = ['toast.preparingSource', 'toast.nowPlaying',
+    'toast.fetchingLink', 'toast.linkReady'];
   for (const f of [
+    ['js', 'app.js'],
     ['js', 'views', 'home.js'],
     ['js', 'views', 'search.js'],
+    ['js', 'views', 'playlist.js'],
   ]) {
-    assert.ok(read(...f).includes('正在准备音源：'),
-      `${f.join('/')} 的「正在准备音源」被误改了`);
+    const src = read(...f);
+    for (const key of BANNED) {
+      assert.ok(!src.includes(key), `${f.join('/')} 又出现了 ${key}：自动流程不该播报正常态`);
+    }
+    // 字面量那一侧同样：早先 home/search 用的是中文字面量，不是词典键。
+    // 匹配前必须剥注释 —— app.js 里有一条**注释**叫「队列面板定位正在播放：…」，
+    // 直接扫原文会命中那段说明文字而误报（同本仓"注释中的 :hover 被计入统计"那一类坑）。
+    const code = src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').map((l) => l.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n');
+    for (const lit of ['正在准备音源', '正在播放：', '正在获取', '已获取下载链接']) {
+      assert.ok(!code.includes(lit), `${f.join('/')} 又出现了「${lit}」这条自动流程播报`);
+    }
   }
-  assert.ok(dict('zh')['toast.preparingSource'].includes('音源'),
-    'toast.preparingSource 的「音源」被无差别替换改成了「平台」（病句）');
+  // 词条也必须清干净（toast-i18n 的孤儿词条门禁会再兜一层，这里先说清意图）
+  for (const key of BANNED) {
+    assert.strictEqual(dict('zh')[key], undefined, `zh.json 仍留着已废弃的 ${key}`);
+    assert.strictEqual(dict('en')[key], undefined, `en.json 仍留着已废弃的 ${key}`);
+  }
 });

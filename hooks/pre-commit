@@ -1,12 +1,194 @@
-#!/usr/bin/env bash
-# MusicDL pre-commit hook
-# 自动递增 package.json version（patch）
+#!/usr/bin/env node
+/**
+ * pre-commit 质量闸门
+ *
+ * ── 为什么要重写这个文件 ─────────────────────────────────────
+ *
+ * 原实现（bash）内容是「每次提交自动递增 package.json 版本号（patch）」。两个问题：
+ *
+ *  1. **版本号不该由提交驱动**。一次功能改动往往要多次提交（拆 commit、重构、
+ *     改文案），每提交一次就 bump 一次，发出去的历史里会带着一串根本没发布的
+ *     版本号；而且 tag 与 package.json 的对应关系会被搅乱。版本号应当由**发版**
+ *     这一显式动作驱动（见 scripts/version-bump.js 与 docs/RELEASING.md）。
+ *  2. **它从未真正生效过**。Git 不会自动使用仓库里的 `hooks/` 目录，必须显式配置
+ *     `core.hooksPath`（或复制到 .git/hooks）。而 version-bump.js 的文件头注释
+ *     写着「没有任何 git hook 在调用本脚本」—— 事实如此。这是一条**死规则**，
+ *     与 .gitignore 里那个 `C*Users*` 属于同一类问题：看着在工作，实际从不执行。
+ *
+ * 所以这里换成**提交前的质量闸门**：都是快检，不修改任何文件。
+ * 安装：`npm run setup:hooks`（见 scripts/setup-hooks.js）
+ *
+ * ── 检查项（按耗时排序，前面的失败就别跑后面的）─────────────
+ *
+ *   1. 敏感/本机文件      —— 凭据、私有配置绝不能进库（毫秒级）
+ *   2. 暂存文件的换行     —— CRLF 会让「正则断言 \n」的测试在 Windows 上必红
+ *   3. 编码守卫           —— 复用 test/encoding-guard 的特征字符扫描
+ *   4. ESLint（仅暂存的 js/html/css）—— 可用 SKIP_HOOKS_LINT=1 跳过
+ *
+ * 逃生阀：SKIP_HOOKS=1 完全跳过（紧急修复用）。前置钩子的目的是「少返工」，
+ * 不是「拦人」—— 任何一条都能通过环境变量绕过，所以它不该成为阻碍。
+ */
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+'use strict';
 
-# 如果 package.json 没有变化，跳过
-if ! git diff --cached --name-only | grep -q '^package.json$'; then
-  node "$REPO_ROOT/scripts/version-bump.js" 2>/dev/null
-fi
+const { execFileSync, spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
-exit 0
+const ROOT = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+
+function die(msg, hints = []) {
+  console.error(`\n✖ pre-commit 拒绝提交：${msg}`);
+  for (const h of hints) console.error(`  · ${h}`);
+  console.error('\n（确需跳过：SKIP_HOOKS=1 git commit ...）\n');
+  process.exit(1);
+}
+
+/** 暂存区新增/修改的文件（相对仓库根，正斜杠） */
+function stagedFiles() {
+  const out = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], { encoding: 'utf8' });
+  return out.split('\n').map((s) => s.trim()).filter(Boolean);
+}
+
+function readStaged(file) {
+  return execFileSync('git', ['show', `:${file}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+}
+
+// ── 1. 敏感 / 本机文件 ──────────────────────────────────────
+const FORBIDDEN = [
+  { re: /(^|\/)(prefs|cookies|credentials|secrets)\.json$/i, why: '含凭据/本机状态，只能由应用在 userData 下生成' },
+  { re: /(^|\/)\.env(\.|$)/i, why: '环境变量含密钥' },
+  { re: /\.(pem|p12|pfx|key)$/i, why: '证书/私钥' },
+  { re: /(^|\/)id_rsa(\.pub)?$/i, why: 'SSH 私钥' },
+  { re: /(^|\/)(main|renderer)\.log$/i, why: '运行日志（含用户路径与歌名）' },
+  { re: /^bench-baseline\.json$/, why: '性能基线是本机数字，入库会误导他人' },
+  { re: /\.mp3$|\.flac$|\.m4a$/i, why: '二进制媒体文件不该进仓库' },
+];
+
+function checkForbidden(files) {
+  const bad = files.filter((f) => {
+    const hit = FORBIDDEN.find((r) => r.re.test(f));
+    return hit ? hit : null;
+  }).map((f) => ({ f, why: FORBIDDEN.find((r) => r.re.test(f)).why }));
+  if (bad.length) {
+    die(`暂存区里有不该进库的文件（${bad.length}）`,
+      bad.map((b) => `${b.f} —— ${b.why}`));
+  }
+}
+
+// ── 2. 换行：校验「规则本身」，而不是逐个文件 ────────────────
+//
+// 这里踩过两次坑，值得写下来：
+//
+//   第一版「读暂存区内容、有 CRLF 就拒」—— **永远拦不住**：
+//   `.gitattributes` 的 `* text=auto eol=lf` 已在入库时把内容规范化成 LF，
+//   `git show :file` 拿到的必然是 LF。一条永远为真的检查比没有检查更糟，
+//   它让人以为换行有第二道保险。
+//
+//   第二版「逐文件查 check-attr 是否声明了 text/eol」—— **同样拦不住**：
+//   `* text=auto` 会让 git 对任何文件都回 set，新增类型也是 set。
+//
+// 结论：换行规范的权威是 `.gitattributes`，能真正伤到它的只有「规则被改坏或被删」。
+// 所以这里检查的是**规则本身**：根兜底行在不在、显式清单里那些关键类型还在不在。
+// 逐文件的 CRLF 排查交给 CI 的 encoding-guard（那里扫的是工作树，不受规范化影响）。
+const CRLF_EXEMPT = /\.(bat|cmd|ps1)$/i;
+
+/** .gitattributes 里必须始终存在的行（删掉任何一条都会让换行规范退化） */
+const REQUIRED_ATTR_RULES = [
+  { re: /^\*\s+text=auto\s+eol=lf\s*$/m, why: '根兜底：所有文本文件一律按 LF 入库与检出' },
+  { re: /^\*\.js\s+text\s+eol=lf\s*$/m, why: '源码（js）显式锁 LF' },
+  { re: /^\*\.md\s+text\s+eol=lf\s*$/m, why: '文档（md）显式锁 LF' },
+  { re: /^\*\.bat\s+text\s+eol=crlf\s*$/m, why: 'bat 必须保留 CRLF（cmd.exe 处理不稳，这是有意例外）' },
+];
+
+function checkLineEndings() {
+  let raw;
+  try {
+    raw = fs.readFileSync(path.join(ROOT, '.gitattributes'), 'utf8');
+  } catch (_e) {
+    return; // 没有该文件：无约定可言，交给 CI 的 encoding-guard 兜
+  }
+  const missing = REQUIRED_ATTR_RULES.filter((r) => !r.re.test(raw));
+  if (missing.length) {
+    die('换行规范被改坏或删减（.gitattributes）', [
+      ...missing.map((m) => `缺少规则：${m.why}`),
+      '为什么这条闸门存在：2026-09 曾出现「一个用例在 Linux 绿、Windows 必红」，',
+      '根因就是工作树被检出成 CRLF 而测试用正则硬编码了 \\n。',
+      '修法：把上述规则补回 .gitattributes（必要时对照 git show 0be2a99:.gitattributes）',
+    ]);
+  }
+}
+
+// ── 3. 编码守卫（乱码特征字符）──────────────────────────────
+const SIG = /[\uFFFD\uE000\uF8FF\u951B\u9226\u9225\u922B\u20AC\u3089\u308A\u3088\u3041\u3043\u3045\u3005\u3223]/;
+
+
+/** 值得逐行扫的文本类型（与 .gitattributes 的显式清单一致） */
+const TEXTLIKE = /\.(js|cjs|mjs|json|html|css|md|yml|yaml|py|txt|svg|bat|cmd|ps1)$/i;
+
+function checkEncoding(files) {
+  const bad = [];
+  for (const f of files) {
+    if (!TEXTLIKE.test(f)) continue;
+    let buf;
+    try {
+      buf = readStaged(f);
+    } catch (_e) {
+      continue;
+    }
+    // 逐行找，避免单行超长导致的正则回溯问题
+    buf.split('\n').forEach((line, i) => {
+      if (SIG.test(line)) bad.push(`${f}:${i + 1}`);
+    });
+  }
+  if (bad.length) {
+    die(`暂存内容含编码损坏特征字符（${bad.length} 处）`, [
+      ...bad.slice(0, 10),
+      '成因通常是 PowerShell 按 ANSI 码页读写（Get-Content/Set-Content 未指定 -Encoding utf8）',
+      '测试全绿时它不会自己暴露，只能靠静态扫描拦。用编辑器改，或显式 -Encoding utf8',
+    ]);
+  }
+}
+
+// ── 4. ESLint（仅暂存的源码文件）───────────────────────────
+function checkLint(files) {
+  if (process.env.SKIP_HOOKS_LINT === '1') return;
+  const targets = files.filter((f) => /\.(js|cjs|mjs)$/i.test(f));
+  if (!targets.length) return;
+  const r = spawnSync('npx', ['eslint', ...targets], { cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32' });
+  if (r.status !== 0) {
+    die('ESLint 未通过（仅检查本次暂存的 js 文件）', [
+      (r.stdout || '').trim().split('\n').slice(0, 20).join('\n  · '),
+      '只看暂存文件是刻意的：全量 lint 要 10s+，每次提交都等不现实',
+    ]);
+  }
+}
+
+// ── 主流程 ──────────────────────────────────────────────────
+if (process.env.SKIP_HOOKS === '1') {
+  process.exit(0);
+}
+
+let staged;
+try {
+  staged = stagedFiles();
+} catch (e) {
+  process.exit(0); // 不在 git 仓库里（例如打包脚本调用）：不拦
+}
+
+if (!staged.length) process.exit(0);
+
+// 文档/资产大批量改动时不做无谓打扰：只查源码类
+const sourceLike = staged.filter((f) => /\.(js|cjs|mjs|json|html|css|md|yml|yaml)$/i.test(f));
+
+try {
+  checkForbidden(staged);
+  checkLineEndings();
+  checkEncoding(sourceLike);
+  checkLint(staged);
+} catch (e) {
+  if (e && e.code === 'ENOENT') process.exit(0);  // node/git 不在 PATH
+  throw e;
+}
+
+process.exit(0);

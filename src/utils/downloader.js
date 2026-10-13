@@ -410,7 +410,31 @@ function _downloadFileInner(url, savePath, onProgress, extraHeaders = {}, redire
 
       // 限速流
       const throttle = speedLimit > 0 ? createThrottleStream(speedLimit) : null;
-      const dataStream = throttle ? res.pipe(throttle) : res;
+      const dataStream = throttle || res;
+
+      // P0-2（2026-10-13 复审）：源流必须自己挂 error 监听。
+      //
+      // 旧实现只挂 dataStream，而 Node 的 pipe 既不转发源流的 error、也不会因为
+      // 源流被销毁而结束下游。开启限速时 dataStream === throttle，于是 res 中途
+      // 断流既到不了 reject，throttle 也等不到 end ⇒ writeStream 永不 'finish'
+      // ⇒ downloadFileWithRetry 的 Promise 永不 settle ⇒ 调用方 processOneSong 的
+      // .finally 永不执行 ⇒ activeDownloads 不减、_processing 不清 ⇒ 并发槽泄漏到
+      // 攒满，整个队列彻底停摆，且该任务在界面上永久「下载中」。
+      //
+      // 为什么不用 stream.pipeline：它在任一环出错时会**销毁其余所有流**，其中包括
+      // 目标 writeStream —— 已写进 .tmp 的那段前缀会被一起丢掉，断点续传随即失效
+      // （test/downloader.test.js 的「瞬时中断后保留 .tmp，重试带 Range 断点续传」
+      // 就是这么红的）。续传要的就是「出错时把已经落盘的字节留住」，所以这里坚持
+      // 手工接线：只让错误**通知**调用方，不让错误**摧毁**已落盘的数据。
+      const failTransfer = (e) => {
+        if (e && req._cancelled) e.cancelled = true;
+        reject(e);
+      };
+      res.on('error', failTransfer);                       // 源流（限速与否都挂）
+      if (throttle) throttle.on('error', failTransfer);   // 限速流自身出错
+      dataStream.on('error', failTransfer);
+
+      dataStream.pipe(writeStream);
 
       dataStream.on('data', (chunk) => {
         downloaded += chunk.length;
@@ -420,20 +444,25 @@ function _downloadFileInner(url, savePath, onProgress, extraHeaders = {}, redire
         }
       });
 
-      // 瞬时网络错误保留 .tmp：downloadFileWithRetry 会按 .tmp 大小发 Range
-      // 续传；删掉它等于让断点续传功能彻底失效。永久性失败（HTTP 状态码/
-      // HTML 错误页/重定向失败/落盘错误）仍清理。
-      dataStream.on('error', (e) => { reject(e); });
-      dataStream.pipe(writeStream);
-
       writeStream.on('finish', () => {
+        // P1-5（2026-10-13 复审）：短包不算成功。
+        // 服务端给了 Content-Length 却没写够（提前 end、中间有 CDN 截断）时，旧实现
+        // 照样 rename 成正式文件 → 嵌 ID3 → 记 history done ⇒ 用户拿到播一半就断的
+        // 歌，且去重与历史都会认为「已下载」，再也不会重下。这里按缺字节数报错，
+        // 且**保留 .tmp**：downloadFileWithRetry 正是拿 .tmp 大小发 Range 续传。
+        if (fullSize > 0 && downloaded < fullSize) {
+          const e = new Error(`下载不完整：收到 ${downloaded} 字节，应为 ${fullSize} 字节`);
+          e.shortRead = true;
+          reject(e);
+          return;
+        }
         fs.rename(tmpPath, savePath, (err) => {
           if (err) { cleanupTmp(); reject(err); }
           else resolve(savePath);
         });
       });
 
-      // 修复 P1-9：writeStream 出错时清理 .tmp
+      // 落盘侧失败（磁盘满 / 权限 / 句柄坏）：重试没有意义，.tmp 留着只占地方
       writeStream.on('error', (e) => { cleanupTmp(); reject(e); });
     });
 
@@ -618,13 +647,23 @@ function downloadFileWithRetry(url, savePath, onProgress, extraHeaders = {}, opt
   const maxRetry = (typeof options.maxRetry === 'number' && options.maxRetry >= 0) ? options.maxRetry : 2;
   let attempt = 0;
   let resumeOffset = 0; // 瞬时错误重试时带上已落盘的 .tmp 偏移，从断点续传而非从零重下
+  // P2-14（2026-10-13 复审）：.tmp 只对**本次调用内**的重试有意义 ——
+  // resumeOffset 是这里的局部变量，下一次任务（新的一次调用）一律从 0 开始，
+  // 请求不带 Range，写入用 'w' 覆盖。所以重试耗尽（或用户取消）之后，这个 .tmp
+  // 再没有主人，却会一直躺在下载目录里。终态把它删掉：不丢任何数据（本来就没人
+  // 会去续它），只是不再留垃圾。
+  const tmpPath = savePath + '.tmp';
+  const dropTmp = () => fsa.removeQuiet(tmpPath).catch(() => {});
   const tryOnce = async () => {
     try {
       const opts = { ...options, resumeOffset };
       const result = await downloadFile(url, savePath, onProgress, extraHeaders, 0, opts);
       return result;
     } catch (e) {
-      if (e && e.cancelled) throw e; // 用户取消：绝不续传重试
+      if (e && e.cancelled) {
+        await dropTmp();          // 用户取消：半截文件同样没有主人
+        throw e;
+      }
       attempt++;
       // 判据搬到 src/shared/netClass.js。原先这里手抄了一份只列 Node socket 码的
       // 正则，Chromium 抛的 net::ERR_* 一族一条都不匹配 —— 断网时的传输失败既不退避
@@ -641,6 +680,7 @@ function downloadFileWithRetry(url, savePath, onProgress, extraHeaders = {}, opt
         await new Promise(r => setTimeout(r, delay));
         return tryOnce();
       }
+      await dropTmp();            // 重试耗尽：别给下载目录留残件
       throw e;
     }
   };

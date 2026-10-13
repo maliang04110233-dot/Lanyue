@@ -56,9 +56,20 @@ function makeKey() {
  *        同源重取回调：签名 URL 403 时由主进程调用，拿一条新的上游 URL。
  *        缺省表示这条流没有重取能力（本地 file:// 或旧调用方），
  *        403 时如实失败，不做别的动作。
+ * @param {{url:URL, ips:string[]}} [check]
+ *        调用方**已经完成**的那次 SSRF 校验结果（ipc/download.js 的 proxy-play
+ *        在登记前就校验过同一个 URL）。带上它是为了省掉流代理里的第二次校验 ——
+ *        此前同一次播放要解析两次 DNS，而第一次的结果被丢掉了（见 streamProtocol
+ *        与本文件的 lastUsed 注释）。
+ *
+ *        安全等价性：连接本来就用 `makePinnedLookup(check.ips)` 固定到**校验时**
+ *        解析出的 IP，所以「校验一次」与「校验两次后用第二次的 IP」在连接层面
+ *        等价；而固定住 IP 反而更抗 DNS rebinding（域名后续被改指内网也不影响，
+ *        因为我们根本不再重新解析）。真正会改变上游 URL 的只有 refresh 回调，
+ *        那条路径在 streamProtocol 里会独立重新校验。
  * @returns {string} 放进 audio.src 的 scheme URL
  */
-function registerStream(url, referer, refresh) {
+function registerStream(url, referer, refresh, check) {
   if (!url) return null;
   const key = makeKey();
   const stamp = Date.now();
@@ -66,20 +77,86 @@ function registerStream(url, referer, refresh) {
     url,
     referer: referer || '',
     at: stamp,
+    // lastUsed 与 at 分开：at 是「登记时刻」（决定重取额度是否还在窗口内），
+    // lastUsed 是「最近一次被播放器取用」（决定淘汰顺序）。seek 会不断产生新的
+    // scheme 请求 —— 每次都刷新 lastUsed，于是**正在播放的那条流不会被淘汰**。
+    // 此前淘汰只看登记顺序，播放中途被淘汰就会得到 `404 no stream meta`，
+    // 表现为「歌播到一半突然停住」。
+    lastUsed: stamp,
+    // 被取用次数：淘汰时「取用过」的条目一律优先于「还没用过」的。
+    // 只靠 lastUsed 排序在同毫秒内不可靠 —— 批量登记 20 条时它们的时间戳可能
+    // 完全相同，此时「谁在播」只能靠这个计数区分。
+    usedCount: 0,
+    check: check && check.ips && check.ips.length ? check : null,
     refresh: typeof refresh === 'function' ? refresh : null,
     refreshCount: 0,
   });
   if (_entries.size > MAX_ENTRIES) {
-    // 插序 map：第一个即最旧
-    const oldest = _entries.keys().next().value;
-    _entries.delete(oldest);
+    // 淘汰策略（2026-10-13）：
+    //   1. **绝不淘汰刚登记的这条**。这条错起来最直接 —— 调用方拿到 scheme URL
+    //      立刻就 audio.src，而它若已被淘汰，protocol.handle 会回
+    //      `404 no stream meta`，表现是「刚点播放就没声音」。之前第一版实现
+    //      恰好踩了这个：候选池里只有它自己（其余条目都被取用过），于是它把自己
+    //      删了 —— 是 test/stream-protocol.test.js 抓出来的。
+    //   2. 优先淘汰**从未被取用**的条目（「预取了但没播」的登记最该回收）。
+    //   3. 若每条都在用（长时间循环播放），退化为按最近取用时间淘汰最旧的那条。
+    //
+    // 为什么不能简单按登记顺序淘汰：正在播放的流一旦被淘汰，audio 元素下一次
+    // Range 请求就会拿到 404，表现为「歌播到一半突然停住」。
+    const pool = [];
+    const neverUsed = [];
+    for (const [k, v] of _entries) {
+      if (k === key) continue;
+      pool.push(k);
+      if ((Number(v.usedCount) || 0) === 0) neverUsed.push(k);
+    }
+    const candidates = neverUsed.length ? neverUsed : pool;
+    let victimKey = null;
+    let victimUsed = Infinity;
+    for (const k of candidates) {
+      const used = Number(_entries.get(k).lastUsed) || 0;
+      if (used < victimUsed) { victimUsed = used; victimKey = k; }
+    }
+    if (victimKey != null) _entries.delete(victimKey);
   }
   return `${STREAM_SCHEME}://${key}`;
 }
 
+/**
+ * 从 scheme URL 里取出登记簿 key。
+ *
+ * **为什么必须归一化（2026-10-13 现场教训）**
+ * --------------------------------------------------
+ * registerStream 交给 audio.src 的是 `lanyue-stream://kabc`（没有尾斜杠），
+ * 但 standard scheme 的 URL 会被 Chromium 规范化 —— host 之后补上 `/`，
+ * 回传的 request.url 多半是 `lanyue-stream://kabc/`。key 多一个斜杠就
+ * 查不到条目。
+ *
+ * 而查不到的后果格外隐蔽：那条 404 分支不写任何日志，于是现场表现为
+ * 「所有网络歌都播不出来」+「主进程日志一片干净」—— 没有 4xx、没有告警，
+ * 只有渲染层 audio 的 error 事件刷一屏 toast。上一轮修 CSP 时就被它误导过：
+ * CSP 确实是真 bug（已修），但修完现象不变，因为真正挡在前面的是这一层。
+ *
+ * 为什么既有测试没抓到：它们全部用 `registerStream` 的**返回值原样**回查
+ * （`resolveStream(k)`），而真实链路传进来的是 Chromium 规范化后的形态。
+ * 测试用理想输入，于是永远绿。`?query` / `#hash` 一并截掉：key 只由 makeKey
+ * 生成（`k` + 时间戳 + 随机串），不可能含这三者，截断不会误伤。
+ */
+function normalizeKey(schemeUrl) {
+  return String(schemeUrl || '')
+    .replace(/^[a-z-]+:\/\//i, '')
+    .replace(/[/?#].*$/, '');
+}
+
 function resolveStream(schemeUrl) {
-  const key = String(schemeUrl || '').replace(/^[a-z-]+:\/\//i, '');
-  return _entries.get(key) || null;
+  const key = normalizeKey(schemeUrl);
+  const entry = _entries.get(key) || null;
+  // 取用即刷新 lastUsed 并累加计数：正在播放/正在 seek 的流因此不会被淘汰
+  if (entry) {
+    entry.lastUsed = Date.now();
+    entry.usedCount = (Number(entry.usedCount) || 0) + 1;
+  }
+  return entry;
 }
 
 /**
@@ -125,6 +202,7 @@ module.exports = {
   REFRESH_WINDOW_MS,
   registerStream,
   resolveStream,
+  normalizeKey,
   canRefreshStream,
   markStreamRefreshed,
   clearStreams,

@@ -152,7 +152,7 @@ function _renderPanel(groups, songs) {
 
   if (_activeFolder) {
     const clear = document.createElement('div');
-    clear.style.cssText = 'padding:6px 4px;margin-bottom:4px;cursor:pointer;border:1px dashed rgba(255,255,255,.25);border-radius:6px;font-size:12px;';
+    clear.style.cssText = 'padding:6px 4px;margin-bottom:4px;cursor:pointer;border:1px dashed var(--stroke-2);border-radius:6px;font-size:12px;';
     clear.textContent = '🗂 全部文件夹（清除当前过滤）';
     clear.addEventListener('click', () => _apply(null));
     body.appendChild(clear);
@@ -161,14 +161,14 @@ function _renderPanel(groups, songs) {
   const max = groups.reduce((a, g) => Math.max(a, g.count), 0);
   for (const g of groups) {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 4px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);';
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 4px;cursor:pointer;border-bottom:1px solid var(--stroke-1);';
     row.title = `${g.dir || '(未知位置)'}\n只看此文件夹`;
     const name = document.createElement('span');
     name.style.cssText = 'flex:0 0 30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     name.textContent = g.label;
     if (_activeFolder === g.dir) name.textContent = '● ' + g.label;
     const barWrap = document.createElement('span');
-    barWrap.style.cssText = 'flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;';
+    barWrap.style.cssText = 'flex:1;height:8px;border-radius:4px;background:var(--stroke-1);overflow:hidden;';
     const bar = document.createElement('span');
     bar.style.cssText = `display:block;height:100%;width:${groupBarPct(g.count, max)}%;background:var(--accent, #4f8cff);border-radius:4px;`;
     barWrap.appendChild(bar);

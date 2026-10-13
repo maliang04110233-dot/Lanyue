@@ -79,7 +79,11 @@ test('syncOnce: 远端文件来自其它应用 → 拒绝，不推不回写', as
   assert.strictEqual(calls.apply.length, 0);
 });
 
-test('syncOnce: 412 冲突 → 重拉重并再推（不再带 etag），最终回写含双方', async () => {
+test('syncOnce: 412 冲突 → 重拉重并再推（必须带重拉到的 etag）', async () => {
+  // 2026-10-13 复审 P2-4：旧实现第二次 pushSnapshot 传 {}，webdav.js 因
+  // opts.etag 为空省略 If-Match ⇒ 无锁覆盖。此刻若还有第三台设备在写，它的修改
+  // 被静默吞掉且不产生任何冲突提示（最后一写赢）。既然重拉了，就该拿重拉到的
+  // ETag 当新的前置条件 —— 原来的断言「重试为无条件 PUT」正是把缺陷钉成了规范。
   const remote1 = {
     exists: true, etag: '"stale"',
     snapshot: { app: 'music-downloader', version: 2, data: { userPlaylists: [{ id: 'r1', updatedAt: 1, songs: [] }] } },
@@ -99,9 +103,29 @@ test('syncOnce: 412 冲突 → 重拉重并再推（不再带 etag），最终�
   const r = await syncOnce(d);
   assert.strictEqual(r.success, true);
   assert.strictEqual(r.conflictRetried, true);
-  assert.strictEqual(calls.push[1].opts.etag, undefined, '重试为无条件 PUT');
+  assert.strictEqual(calls.push[0].opts.etag, '"stale"', '首次 PUT 带的是第一次拉到的 etag');
+  assert.strictEqual(calls.push[1].opts.etag, '"newer"',
+    '412 重试必须带**重拉后**的 etag，否则等于无锁覆盖第三方的写入');
   const ids = calls.apply[0].userPlaylists.map(p => p.id).sort();
   assert.deepStrictEqual(ids, ['a', 'r1', 'r2']);
+});
+
+test('syncOnce: 412 重试时远端已被删除 ⇒ 退回无条件 PUT（无对象可锁）', async () => {
+  const remote1 = {
+    exists: true, etag: '"stale"',
+    snapshot: { app: 'music-downloader', version: 2, data: { userPlaylists: [{ id: 'r1', updatedAt: 1, songs: [] }] } },
+  };
+  let n = 0;
+  const { d, calls } = deps({
+    fetchSnapshot: async () => (n++ === 0 ? remote1 : { exists: false }),
+    pushSnapshot: async (cfg, snapshot, opts) => {
+      calls.push.push({ snapshot, opts });
+      return calls.push.length === 1 ? { ok: false, conflict: true } : { ok: true };
+    },
+  });
+  const r = await syncOnce(d);
+  assert.strictEqual(r.success, true);
+  assert.strictEqual(calls.push[1].opts.etag, undefined, '远端已不存在时没有可锁的对象');
 });
 
 test('syncOnce: 推送抛错（如 403）→ 失败返回，本地不回写', async () => {

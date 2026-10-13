@@ -810,7 +810,6 @@ async function playRecommendById(sec, idx, songId) {
 async function playRecommendSong(song) {
   if (!song) return;
   const quality = resolveQuality(song.source);
-  showToast(`正在准备音源：${song.title}`, 'info');
   try {
     const result = await api.getDownloadUrlSmart(song, quality);
     if (!result || !result.url) {
@@ -844,7 +843,6 @@ async function playRecommendSong(song) {
     setState('playIdx', 0);
     setState('currentPlaying', song);
     await loadAndPlay(song, proxied.fileUrl, true);
-    showToast('▶ 正在播放：' + song.title, 'success', 2500);
   } catch (e) {
     logger.warn('播放推荐歌曲失败:', e);
     showToast('⚠️ 播放失败：' + errBrief(e), 'error', 4000);

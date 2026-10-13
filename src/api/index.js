@@ -175,9 +175,14 @@ function getSourceHealthMap(sources) {
   return sourceHealth.getHealthMap(sources);
 }
 
-// 主动探针结果记入滑动窗口（与被动下载结果共用同一分数）
+// 主动探针结果记入**独立**的探测窗口（P2-7）。
+//
+// 原实现与被动下载共用同一分数，于是设置页里「点一次源可用性实测」会把全部源
+// 一起打进换源排序的窗口 —— 弱网下这一下就把所有源降到末尾：用户为了诊断点的
+// 按钮，反而把所有源都降权了。现在探测只用于展示（healthMap 的 probe 字段），
+// 排序仍只看真实下载的表现。
 function recordProbeResult(source, ok) {
-  sourceHealth.recordResult(source, !!ok);
+  sourceHealth.recordProbeResult(source, !!ok);
 }
 
 

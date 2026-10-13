@@ -3,7 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: http: https:; media-src 'self' data: blob: http: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws:; font-src 'self' data:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: http: https:; media-src 'self' data: blob: http: https: lanyue-stream:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https: ws:; font-src 'self' data:;">
+<!-- media-src 里的 lanyue-stream: 是**在线播放能否工作的开关**，不是可选项（2026-10-13）：
+
+     在线歌曲的 audio.src 走自定义 scheme —— src/main/streamProtocol.js 注册
+     `lanyue-stream://<key>`，在 protocol.handle 里做 SSRF 校验 / Range 转发 /
+     403 同源重取；特权注册处还显式 `bypassCSP: false`（不绕过 CSP）。
+
+     所以一旦 media-src 不放行它，Chromium 会在**发出请求之前**就按 CSP 拦下，
+     protocol.handle 一次都不会被调用 —— 表现为「所有网络歌都播不出来」，而
+     主进程日志**一条记录都不会留下**（既没有 [stream] 告警，也没有取流失败），
+     现场只能看到 audio 的 error 事件刷出一屏 toast。这就是本条被漏掉时的样貌。
+
+     同一名单里的 http: https: 是历史遗留：改用 scheme 代理之前音频是直连，
+     CSP 收紧时没把 scheme 补进来，于是整套流式架构被一行策略静默废掉。
+
+     钉在 test/csp-stream-scheme.test.js：改 scheme 名或收紧 CSP 都会红。 -->
 <title>揽乐</title>
 <script>
   // 全局错误捕获：onclick 调用未定义函数时弹 toast 而不是静默
@@ -31,9 +46,9 @@
 <svg width="0" height="0" style="position:absolute">
   <defs>
     <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00ffc8"/>
-      <stop offset="50%" stop-color="#a78bfa"/>
-      <stop offset="100%" stop-color="#00ffc8"/>
+      <stop offset="0%" style="stop-color:var(--neon-cyan)"/>
+      <stop offset="50%" style="stop-color:var(--neon-purple)"/>
+      <stop offset="100%" style="stop-color:var(--neon-cyan)"/>
     </linearGradient>
   </defs>
 </svg>
@@ -678,7 +693,7 @@
         <button class="pq-clear-btn" onclick="saveQueueAsPlaylist()" title="把当前播放队列整体保存为「我的歌单」，名称自动带时间，之后可在歌单编辑器改名">💾 存为歌单</button>
         <button class="pq-clear-btn" onclick="locatePlayingInQueue()" title="滚动到队列中正在播放的歌并闪烁标记（面板未开会先展开）">🎯 定位</button>
         <button class="pq-clear-btn" id="pqSelBtn" onclick="togglePqSelMode()" title="多选模式：点行勾选，一次移出多首（选态跟歌走，拖拽排序也不误伤）">☑ 多选</button>
-        <button class="pq-clear-btn hidden" id="pqSelRmBtn" style="color:#ff6b81;" onclick="removeCheckedFromQueue()" title="把勾选的行移出播放队列（不删本地文件）">🗑 移除 0</button>
+        <button class="pq-clear-btn hidden" id="pqSelRmBtn" style="color:var(--c-danger);" onclick="removeCheckedFromQueue()" title="把勾选的行移出播放队列（不删本地文件）">🗑 移除 0</button>
         <button class="pq-clear-btn hidden" id="pqSelPlBtn" onclick="pqSelAddPlaylist()" title="把勾选的歌加进我的歌单（拖入即播的临时行自动跳过）">🎼 歌单 0</button>
         <button class="pq-clear-btn" onclick="clearPlayQueue()" title="清空队列" data-i18n="player.queue.clear">清空</button>
       </div>
@@ -1407,7 +1422,7 @@
       <button class="btn-sm" id="plDlFilterBtn" style="flex-shrink:0;" title="切换下载状态过滤（仅视图）：全部 / 只看未下载（顺手补下）/ 只看已下载（本地能播的）" onclick="cyclePlDlFilter()">⬇ 全部状态</button>
       <button class="btn-sm" id="plSelModeBtn" style="flex-shrink:0;" title="多选模式：行首出现勾选框，一次把多首歌移出本歌单（不影响歌曲本身）" onclick="togglePlBulkMode()">☑ 多选</button>
       <button class="btn-sm hidden" id="plSelAllBtn" style="flex-shrink:0;" title="勾选/取消当前过滤视图的全部歌曲" onclick="plSelectAllVisible()">☑ 全选</button>
-      <button class="btn-sm hidden" id="plSelRemoveBtn" style="flex-shrink:0;color:#ff6b81;" title="把勾选的歌从本歌单移除" onclick="removeCheckedFromPlaylist()">🗑 移除</button>
+      <button class="btn-sm hidden" id="plSelRemoveBtn" style="flex-shrink:0;color:var(--c-danger);" title="把勾选的歌从本歌单移除" onclick="removeCheckedFromPlaylist()">🗑 移除</button>
       <button class="btn-sm hidden" id="plSelDlBtn" style="flex-shrink:0;" title="把勾选的歌批量加入下载队列（已在队列/已下载过的自动跳过）" onclick="plSelDownload()">⬇ 下载</button>
       <button class="btn-sm hidden" id="plSelPlayBtn" style="flex-shrink:0;" title="把勾选的歌单独组成播放队列，从第一首起连播" onclick="plSelPlay()">▶ 播放</button>
     </div>

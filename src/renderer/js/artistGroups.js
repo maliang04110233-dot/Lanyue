@@ -152,13 +152,13 @@ function _renderPanel({ id, heading, groups, field, unknownLabel, songsOf }) {
   for (const g of groups) {
     const label = g[field];
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 4px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);';
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 4px;cursor:pointer;border-bottom:1px solid var(--stroke-1);';
     row.title = `过滤：${label}`;
     const name = document.createElement('span');
     name.style.cssText = 'flex:0 0 30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     name.textContent = label;
     const barWrap = document.createElement('span');
-    barWrap.style.cssText = 'flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;';
+    barWrap.style.cssText = 'flex:1;height:8px;border-radius:4px;background:var(--elev-2);overflow:hidden;';
     const bar = document.createElement('span');
     bar.style.cssText = `display:block;height:100%;width:${groupBarPct(g.count, max)}%;background:var(--accent, #4f8cff);border-radius:4px;`;
     barWrap.appendChild(bar);

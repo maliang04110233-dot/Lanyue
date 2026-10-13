@@ -39,6 +39,20 @@ const { normalizeDisabledPlatforms, filterDisabledCandidates } = require('./fall
 const FALLBACK_HTTP_RE = /HTTP\s*(403|404|410)/i;
 
 /**
+ * 值得跨源换源的 HTTP 状态（403 签名过期 / 404·410 资源不存在）。
+ *
+ * 2026-10-13：这条出口此前**实际是死的**。`src/api/request.js` 只把 5xx/429
+ * 包成错误 reject，403 是 resolve 掉的；平台插件拿到 body 后多半只返回一句笼统
+ * 中文文案，于是既没有 code、也没有 "HTTP 403" 文本 → 下面那条文本正则永远
+ * 不命中 —— 一个专门为「CDN 签名过期就换源」预留的出口，就这么白挂了。
+ *
+ * 现在：平台若在返回值里透出 `status`（gateway 已统一挂 category），换源就能
+ * 认出这条链只是过期了。**没有 status 时行为与从前完全一致**，所以对尚未接入
+ * status 的平台是零回归。
+ */
+const { FALLBACK_HTTP_STATUSES } = require('./streamFailure');
+
+/**
  * 判定一次失败的取流结果是否值得跨源重试。
  *
  * 抽成导出的纯函数是刻意的：这是换源机制的**核心决策**，
@@ -52,6 +66,9 @@ function shouldFallbackToOtherSource(result) {
   if (isTrackSuccess(result)) return false;
   // 优先使用新模块的判定（白名单集中管理）
   if (shouldFallbackByCode(result && result.code)) return true;
+  // 结构化状态优先于文本匹配：平台透出 status 时不必再猜文案里有没有那个数字
+  const st = Number(result && result.status);
+  if (Number.isFinite(st) && FALLBACK_HTTP_STATUSES.has(st)) return true;
   // 无 code 的失败（如 HTTP 403/404/410 CDN 签名过期）也换源重试
   if (result && FALLBACK_HTTP_RE.test(String(result.error || ''))) return true;
   // 未知数据源（B 站 id 传错等）不换——歌本身可能不存在

@@ -68,6 +68,7 @@ const MIGRATIONS = [
 let _db = null;
 let _userDataPath = null;
 let _count = 0; // history 行数缓存（避免每次 add 都全表 count）
+let _volatile = false; // 当前句柄是内存库（本次会话不落盘），见 _openDb
 
 /** 主键归一：数字/字符串 id 视为同一条（B 站 id 可能是数字） */
 function _keyId(id) {
@@ -92,6 +93,7 @@ function _migrate(db) {
 }
 
 function _openDb(file) {
+  _volatile = (file === ':memory:');
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA busy_timeout = 2000');
@@ -128,7 +130,22 @@ function _importLegacy(db, jsonPath) {
   try {
     if (!fs.existsSync(jsonPath)) return;
     const res = safeReadJson(jsonPath);
-    if (!res.ok || res.empty || !Array.isArray(res.data)) return;
+    if (!res.ok) {
+      // P2-10：损坏的 history.json 永不自愈。
+      // safeReadJson 遇到解析失败只把它 copyFileSync 成 .bak，**原名原样留着** ⇒
+      // 每次冷启动都重演一遍「整文件读 + 复制」，坏文件与 .bak 长期共存，那段历史
+      // 永远进不了库。这里把它改名隔离（.bak 仍在，用户可手工抢救），下次启动就干净了。
+      const quarantine = `${jsonPath}.corrupt-${Date.now()}`;
+      try {
+        fs.renameSync(jsonPath, quarantine);
+        logger.warn('[history] 旧 history.json 损坏，已备份为 .bak 并隔离为 '
+          + path.basename(quarantine) + '（如需抢救请手工检查该文件）');
+      } catch (_e) {
+        logger.warn('[history] 旧 history.json 损坏且隔离改名失败（下次启动会再试一次）');
+      }
+      return;
+    }
+    if (res.empty || !Array.isArray(res.data)) return;
     arr = res.data;
   } catch (e) {
     logger.warn('[history] 旧历史读取失败（不影响新库使用）:', e.message);
@@ -189,7 +206,20 @@ function _ensure() {
       _db = _openDb(':memory:');
     }
   }
-  _importLegacy(_db, path.join(_userDataPath, 'history.json'));
+  // P1-2（2026-10-13 复审）：内存库这一态**不迁移**旧 history.json。
+  //
+  // 旧实现无条件调 _importLegacy，而它末尾会把 history.json 改名成 .imported。
+  // 内存库不落盘 ⇒ 进程退出即丢；可旧文件已经被改名、不再被任何代码读取 ⇒
+  // 下次启动只剩一个空库加一个无人认领的 .imported，历史**永久消失**
+  // （触发条件：userData 只读 / 杀软锁住 -wal / DB 损坏且备份重命名也失败）。
+  //
+  // 这一态下旧文件是磁盘上唯一的幸存副本，必须原样留着。
+  if (_volatile) {
+    logger.warn('[history] 当前退化为内存历史，本次会话不落盘；'
+      + '旧 history.json 保持原样（不改名），以便环境恢复后仍可迁移');
+  } else {
+    _importLegacy(_db, path.join(_userDataPath, 'history.json'));
+  }
   _count = _db.prepare('SELECT count(*) AS c FROM history').get().c;
 }
 
@@ -256,19 +286,56 @@ function _likePattern(keyword) {
  * @returns {Object|null} 命中条目（历史已淘汰时由索引合成最小形状，savePath/finishedAt 恒在）
  */
 function findDownloaded(id, source) {
+  const hit = _findDownloadedRow(id, source);
+  if (!hit) return null;
+  // P2-9：这里原本是 fs.existsSync。逐首同步判活放进批量循环（批量入队、订阅轮询）
+  // 后，网络盘/离线 NAS 上一次 stat 可达数十毫秒，几百首批量时窗口直接卡住 ——
+  // 而仓库自己的规矩就写在 src/main/ipc/history.js:14：「主进程即 UI 线程：判活必须
+  // 异步 stat」。批量路径请改用 findDownloadedAsync。
+  if (!hit.asset.save_path || !fs.existsSync(hit.asset.save_path)) {
+    _db.prepare('DELETE FROM assets WHERE key_id = ? AND key_source = ?').run(hit.kid, hit.ks);
+    return null;
+  }
+  if (hit.hist) return JSON.parse(hit.hist.data);
+  return {
+    id: hit.kid, source: hit.ks, savePath: hit.asset.save_path,
+    finishedAt: hit.asset.finished_at, status: 'done',
+  };
+}
+
+/**
+ * 异步版 findDownloaded（批量路径用这个）。
+ *
+ * 与同步版语义完全一致，只把「文件还在吗」换成 fsa.exists —— 同样的自愈逻辑
+ * （文件已不在 ⇒ 回收 assets 行，让徽标与去重随之失效）。SQLite 侧同步查询保留：
+ * 那是内存内的库，不占事件循环。
+ * @returns {Promise<Object|null>}
+ */
+async function findDownloadedAsync(id, source) {
+  const hit = _findDownloadedRow(id, source);
+  if (!hit) return null;
+  const fsa = require('./fsAsync');
+  if (!hit.asset.save_path || !(await fsa.exists(hit.asset.save_path))) {
+    _db.prepare('DELETE FROM assets WHERE key_id = ? AND key_source = ?').run(hit.kid, hit.ks);
+    return null;
+  }
+  if (hit.hist) return JSON.parse(hit.hist.data);
+  return {
+    id: hit.kid, source: hit.ks, savePath: hit.asset.save_path,
+    finishedAt: hit.asset.finished_at, status: 'done',
+  };
+}
+
+/** 两版共用的查库部分（同步 SQLite 查询，不碰事件循环） */
+function _findDownloadedRow(id, source) {
   if (id == null || id === '' || !source) return null;
   _ensure();
   const kid = _keyId(id);
   const ks = String(source);
   const asset = _db.prepare('SELECT save_path, finished_at FROM assets WHERE key_id = ? AND key_source = ?').get(kid, ks);
   if (!asset) return null;
-  if (!asset.save_path || !fs.existsSync(asset.save_path)) {
-    _db.prepare('DELETE FROM assets WHERE key_id = ? AND key_source = ?').run(kid, ks);
-    return null;
-  }
   const hist = _db.prepare('SELECT data FROM history WHERE key_id = ? AND key_source = ?').get(kid, ks);
-  if (hist) return JSON.parse(hist.data);
-  return { id: kid, source: ks, savePath: asset.save_path, finishedAt: asset.finished_at, status: 'done' };
+  return { kid, ks, asset, hist };
 }
 
 /** 组装查询条件（列过滤走索引，keyword 对 title/artist/album 做小写 LIKE） */
@@ -336,8 +403,17 @@ function importEntries(entries) {
   if (!Array.isArray(entries)) return 0;
   const valid = entries.filter(e => e && typeof e === 'object' && (e.id || e.title));
   let added = 0;
-  const minSeq = (_db.prepare('SELECT min(seq) AS m FROM history').get().m) || 1;
-  let below = minSeq;
+  // P2-5（2026-10-13 复审）：导入的新条目必须排在**当前最大 seq 之后**。
+  //
+  // 旧实现取 min(seq) 再往下递减，把导入条目放到最旧的一侧；而 _trim() 按
+  // `ORDER BY seq DESC LIMIT MAX_ENTRIES` 保留最新 ⇒ 本机历史已满 5000 条时，
+  // 刚导入的条目会被 _trim 第一个删掉，同时 added 照加 ⇒ 同步页提示
+  // 「下载历史：导入 N 条」，实际一条都没留下。
+  //
+  // 顺带一个好处：sqlite 的 AUTOINCREMENT 只增不减，显式写入比当前最大值还大
+  // 的 seq 之后，后续正常 add() 的自增值仍然稳定大于所有导入条目。
+  const maxRow = _db.prepare('SELECT max(seq) AS m FROM history').get();
+  let above = (maxRow && Number(maxRow.m)) || 0;
   const sel = _db.prepare('SELECT seq, data FROM history WHERE key_id = ? AND key_source = ?');
   for (const e of valid) {
     const kid = _keyId(e.id);
@@ -350,17 +426,19 @@ function importEntries(entries) {
         .run(row[2], row[3], row[4], row[5], row[6], row[7], row[8], existing.seq);
       _syncAsset(_db, kid, ks, merged);
     } else {
-      below -= 1;
+      above += 1;
       const row = _rowOf(e);
       _db.prepare(`
         INSERT INTO history(key_id, key_source, title, artist, album, status, save_path, finished_at, seq, data)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], below, row[8]);
+      `).run(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], above, row[8]);
       _syncAsset(_db, kid, ks, e);
       _count += 1;
       added += 1;
     }
   }
+  // 先裁剪再报数：added 必须等于「导入后真的还在库里」的条数。
+  // 上限淘汰掉的是本机最旧的条目（不是刚导入的），所以这里只可能裁掉旧数据。
   _trim();
   return added;
 }
@@ -471,7 +549,8 @@ function destroy() {
 }
 
 module.exports = {
-  init, add, query, stats, flush, clear, remove, destroy, importEntries, findDownloaded,
+  init, add, query, stats, flush, clear, remove, destroy, importEntries,
+  findDownloaded, findDownloadedAsync,
   relinkPath, donePathRefs,
   MAX_ENTRIES,
 };

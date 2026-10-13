@@ -419,7 +419,6 @@ async function _playFrom(list, idx) {
   const song = songs[idx];
   if (!song) { showToast(t('toast.songNotFound'), 'warn'); return; }
   const quality = resolveQuality(song.source);
-  showToast(t('toast.preparingSource', { title: song.title }), 'info');
   const reqId = ++_playlistPlayRequestId;
   try {
     const result = await api.getDownloadUrlSmart(song, quality);
@@ -456,7 +455,6 @@ async function _playFrom(list, idx) {
     // currentPlaying 驱动托盘/迷你播放器/播放器卡片，也是 audio error 守卫的前置条件
     setState('currentPlaying', song);
     await loadAndPlay(song, proxied.fileUrl, true);
-    showToast(t('toast.nowPlaying', { title: song.title }), 'success', 2500);
   } catch (e) {
     if (reqId === _playlistPlayRequestId) {
       logger.warn('播放失败:', e);
@@ -879,7 +877,7 @@ function renderPlTrashList() {
     const n = Array.isArray(pl.songs) ? pl.songs.length : 0;
     const when = new Date(e.deletedAt || 0);
     const dateStr = t('pl.trash.date', { m: when.getMonth() + 1, d: when.getDate() });
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--line);">
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--stroke-1);">
       <div style="flex:1;min-width:0;">
         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${esc(pl.name || t('pl.trash.unnamed'))}</div>
         <div style="font-size:12px;color:var(--fg-3);">${t('pl.trash.meta', { n, date: dateStr, days: e.daysLeft ?? '?' })}</div>
@@ -1420,7 +1418,7 @@ function showDedupeModal(groups) {
       </div>
       <div class="playlist-modal-body" style="max-height:60vh;overflow-y:auto;">
         ${groups.map((g, i) => `
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--stroke-1);">
             <div style="min-width:0;">
               <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(g.title)}${g.artist ? ` <span style="opacity:0.6;font-weight:400;font-size:12px;">${esc(g.artist)}</span>` : ''}</div>
               <div style="font-size:12px;color:var(--neon-dim);">${g.where.map(w => esc(w)).join('、')}</div>

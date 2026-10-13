@@ -48,14 +48,16 @@ function createUpdateToast() {
     right: 20px;
     width: 320px;
     padding: 16px;
-    background: linear-gradient(135deg, var(--bg-elevated, #1a1a2e), var(--bg-overlay, #16213e));
-    border: 1px solid var(--neon-cyan, #00d4ff);
+    /* 原写死深蓝紫渐变 + 青色光晕：7 套主题里只有默认/赛博说得通，
+       换到浅色主题就是一枚突兀的深色块。改用语义表面令牌，换主题自动跟随。 */
+    background: linear-gradient(135deg, var(--elev-1), var(--elev-2));
+    border: 1px solid var(--accent-line);
     border-radius: 12px;
-    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    box-shadow: var(--shadow-lg);
     z-index: 10000;
     font-family: inherit;
     font-size: 14px;
-    color: var(--text-primary, #e0e0e0);
+    color: var(--fg-1);
     display: none;
     animation: slideInRight 0.3s ease;
   `;
@@ -126,7 +128,7 @@ async function downloadUpdate() {
   showUpdate(`
     <div style="padding:4px 0;">
       <div style="margin-bottom:6px;">📥 正在下载更新...</div>
-      <div style="height:6px;background:rgba(0,212,255,0.15);border-radius:3px;overflow:hidden;">
+      <div style="height:6px;background:var(--neon-cyan-dim);border-radius:3px;overflow:hidden;">
         <div id="update-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--neon-cyan),var(--neon-green));transition:width 0.3s;"></div>
       </div>
       <div id="update-progress-text" style="font-size:12px;color:var(--text-dim);margin-top:4px;">0%</div>
@@ -179,7 +181,7 @@ function handleUpdateAvailable(version, releaseNotes) {
       ${safeNotes ? `<div style="font-size:12px; color:var(--text-dim); margin-bottom:10px; max-height:80px; overflow-y:auto;">${safeNotes}</div>` : ''}
       <div style="display:flex; gap:8px;">
         <button onclick="window.downloadUpdate()" style="flex:1;padding:8px;background:var(--neon-cyan);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">下载更新</button>
-        <button onclick="window.closeUpdateToast()" style="padding:8px 12px;background:transparent;border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;cursor:pointer;">稍后</button>
+        <button onclick="window.closeUpdateToast()" style="padding:8px 12px;background:transparent;border:1px solid var(--stroke-2);color:var(--fg-2);border-radius:6px;cursor:pointer;">稍后</button>
       </div>
     </div>
   `);
@@ -205,7 +207,7 @@ function handleUpdateDownloaded(version) {
       </div>
       <div style="display:flex; gap:8px;">
         <button onclick="window.restartAndInstall()" style="flex:1;padding:8px;background:var(--neon-green);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">立即重启安装</button>
-        <button onclick="window.closeUpdateToast()" style="padding:8px 12px;background:transparent;border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;cursor:pointer;">稍后</button>
+        <button onclick="window.closeUpdateToast()" style="padding:8px 12px;background:transparent;border:1px solid var(--stroke-2);color:var(--fg-2);border-radius:6px;cursor:pointer;">稍后</button>
       </div>
     </div>
   `);

@@ -197,9 +197,29 @@ test('登记簿：上限淘汰 + 可解析 + 可清空', () => {
   }
   assert.ok(registry.streamCount() <= registry.MAX_ENTRIES,
     '登记簿无上限会把签名 URL 无限堆在内存里');
-  assert.equal(registry.resolveStream(a), null, '最旧的应被淘汰');
+  // 淘汰策略 2026-10-13 起变了：优先淘汰「从未被取用」的条目。
+  // 本用例里的 a 刚被 resolveStream 取用过（第 191 行），它代表的正是
+  // 「正在播放 / 正在 seek 的流」—— 被淘汰会让 audio 元素拿到
+  // `404 no stream meta`，表现为歌播到一半突然停住。
+  assert.ok(registry.resolveStream(a),
+    '正在被取用的流不该被优先淘汰');
   registry.clearStreams();
   assert.equal(registry.streamCount(), 0);
+});
+
+test('登记簿：豁免不是无限的 —— 所有条目都被取用过后，上限依然生效', () => {
+  registry.clearStreams();
+  const urls = [];
+  for (let i = 0; i <= registry.MAX_ENTRIES; i++) {
+    const u = registry.registerStream(`https://cdn.example.com/p${i}.mp3`);
+    urls.push(u);
+    registry.resolveStream(u);          // 每条都被「播放」过一次
+  }
+  assert.ok(registry.streamCount() <= registry.MAX_ENTRIES,
+    '即使每条都被取用过，容量上限仍然必须生效');
+  assert.equal(registry.resolveStream(urls[0]), null,
+    '全都被取用后应退化为按最近取用时间淘汰，最早的那条先走');
+  registry.clearStreams();
 });
 
 test('登记簿：解析只认本 scheme 的 key，不接受完整 URL 猜测', () => {
@@ -211,6 +231,43 @@ test('登记簿：解析只认本 scheme 的 key，不接受完整 URL 猜测', 
     '直接传一个外部 URL 不该被当成已登记的流');
   assert.equal(registry.resolveStream('lanyue-stream://nope'), null);
   registry.clearStreams();
+});
+
+// ── 真实链路形态（2026-10-13 现场）─────────────────────────
+// 上一条用例把 registerStream 的**返回值原样**回查，而生产里回传的是 Chromium
+// 规范化后的 URL —— 测试用理想输入，于是永远绿，而播放全线失败。
+
+test('登记簿：必须认得 Chromium 规范化后的形态（尾斜杠 / query / hash）', () => {
+  registry.clearStreams();
+  const k = registry.registerStream('https://cdn.example.com/x.mp3');
+  const url = 'https://cdn.example.com/x.mp3';
+  // standard scheme 的 host 之后会被补上 `/`；这三形态在真机上都会出现
+  for (const variant of [k, `${k}/`, `${k}?t=123`, `${k}/?t=123`, `${k}#frag`]) {
+    const meta = registry.resolveStream(variant);
+    assert.ok(meta, `解析不了真实形态：${variant}`);
+    assert.equal(meta.url, url, `${variant} 应指向同一条流`);
+  }
+  registry.clearStreams();
+});
+
+test('登记簿：归一化不得把不存在的 key 变成存在的（截断不能误伤）', () => {
+  registry.clearStreams();
+  registry.registerStream('https://cdn.example.com/keep.mp3');
+  assert.equal(registry.resolveStream('lanyue-stream://keep/extra/path'), null,
+    '多出来的路径段不该被当成同一个 key');
+  assert.equal(registry.resolveStream('lanyue-stream://'), null);
+  assert.equal(registry.resolveStream(''), null);
+  assert.equal(registry.resolveStream(null), null);
+  registry.clearStreams();
+});
+
+test('接线：404 分支必须写日志（无声的 404 是这次排查最大的时间黑洞）', () => {
+  const SPs = fs.readFileSync(path.join(ROOT, 'src', 'main', 'streamProtocol.js'), 'utf8');
+  const m = /if \(!meta \|\| !meta\.url\) \{([\s\S]*?)\n {4}\}/.exec(SPs);
+  assert.ok(m, '找不到 meta 为空的分支');
+  assert.match(m[1], /logger\.(warn|error)/,
+    '`no stream meta` 这条 404 必须落日志：它曾经完全静默，'
+    + '导致「请求没发出（CSP）」与「发出来了但没这条流」无法区分');
 });
 
 test('两个模块的 scheme 常量必须一致（各自写一份就会漂）', () => {
@@ -258,19 +315,20 @@ test('preload 之外，渲染层拿到的就是 scheme URL（不再等 file://�
   // D-35 起登记是三参：(url, referer, refreshFn)。第三参是同源重取回调，
   // 缺了它签名链接过期就只能如实失败。期望值必须跟着接线走 ——
   // 但断言意图不变：proxy-play 要登记流并返回 scheme URL，renderer 不得等整首落盘。
-  assert.match(DLs, /streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*\)/,
-    'proxy-play 应登记流（含重取回调）并返回 scheme URL —— 否则 renderer 仍在等整首落盘');
+  assert.match(DLs, /streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*,\s*check\s*\)/,
+    'proxy-play 应登记流（含重取回调）并返回 scheme URL —— 否则 renderer 仍在等整首落盘'
+    + '（第 4 参 check：复用本 handler 刚做完的那次 SSRF 校验，省掉流代理里的重复 DNS）');
 
   // 变异自检：把第三参换成别的标识，这道断言必须变红 ——
   // 否则它会退化成"文件里出现过 registerStream 就算过"的恒真守卫。
   {
     const mutated = DLs.replace(
-      /streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*\)/,
-      'streamRegistry.registerStream( url , referer , somethingElse )'
+      /streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*,\s*check\s*\)/,
+      'streamRegistry.registerStream( url , referer , somethingElse , check )'
     );
     assert.notEqual(mutated, DLs, '变异脚本要真改到东西');
     assert.ok(
-      !/streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*\)/.test(mutated),
+      !/streamRegistry\.registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*,\s*check\s*\)/.test(mutated),
       '第三参被换掉后断言仍绿 —— 这道守卫已经恒真，形同虚设');
   }
   assert.match(DLs, /return\s*\{\s*fileUrl:\s*streamUrl\s*,\s*streaming:\s*true\s*\}/,

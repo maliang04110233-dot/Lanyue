@@ -6,7 +6,8 @@
  * 纯函数导出供 node:test；DOM 只在元素存在时写，模块加载不碰 document。
  */
 
-// taskId -> 最近一次进度事件的速度/剩余/字节（main 端已节流，量级 = 并发数）
+// taskId -> 最近一次进度事件的速度/剩余/字节（main 端按 PROGRESS_THROTTLE_MS=120ms
+// 节流，量级 = 并发数；这条注释以前写着「main 端已节流」而其实并没有，直到 2026-10-13）
 const _live = new Map();
 
 export function recordLive(info) {

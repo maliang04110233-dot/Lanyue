@@ -22,8 +22,24 @@ async function _brief(e) {
 }
 
 // ── HTML 转义 ────────────────────────────────────────
+/**
+ * 文本内容转义。
+ *
+ * P3-1（2026-10-13 复审）：旧实现只转 & < > "，比 escAttr 少一个单引号 ——
+ * 于是「内容用 esc、属性用 escAttr」这个惯例就有了裂缝：谁照着写出
+ * `title='${esc(x)}'`（单引号属性），单引号即可闭合属性并挂上 onmouseover=。
+ * 本仓已经因为同样的理由把 highlight.js 的 escHtml 与 utils.js 的 esc 分成了两套，
+ * 三套口径迟早有一处先破。
+ *
+ * 现在 esc 直接委托 escAttr：单引号在**文本节点**里会被浏览器解码显示成 '，
+ * 对可见文本零影响；而在属性上下文里它才真正开始起作用。
+ *
+ * 保留 esc / escAttr 两个名字是有意的：它们的差别现在是语义与意图（内容 vs 属性），
+ * 调用点读起来自解释。**注意**：内联事件属性里的 JS 字符串字面量两者都不能用 ——
+ * 浏览器会先解码实体再执行，必须用 escQ（见 test/inline-handler-escape.test.js）。
+ */
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return escAttr(s);
 }
 
 /**

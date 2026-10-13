@@ -105,13 +105,18 @@ function register() {
     }
     // 登记后立即返回 scheme URL：不再等整首落盘。渲染层拿到就能播，
     // duration 由首个响应头给出，seek 从此可用。
-    // SSRF 校验在 protocol.handle 里会再做一次（见 streamProtocol.js 头注约束 1），
-    // 这一次是为了在登记前就拒掉明显非法的入参、少占一条登记位。
+    //
+    // SSRF 校验的**位置**（2026-10-13 调整）：此前这里是「登记前先拒掉明显非法
+    // 入参、少占一条登记位」，protocol.handle 里再真正校验一次，于是同一次播放
+    // 解析两次 DNS、只用第二次的结果。现在把这次已经拿到的 check 一起登记，
+    // protocol.handle 直接复用（URL 被 refresh 换过时会自动重新校验）——
+    // 少一次 DNS 往返，且连接本来就固定在校验时的 IP 上，安全等价。
+    //
     // D-35：登记时一并挂上同源重取回调。签名 URL 过期后上游一律 403，
     // 主进程靠它要一条新 URL 并用原始 Range 重放（见 streamProtocol.js）。
     // 缺省（老调用方 / 本地曲）不给回调，403 时如实失败。
     const refreshFn = refresh ? makeStreamRefresh(refresh, refresh.quality) : null;
-    const streamUrl = streamRegistry.registerStream(url, referer, refreshFn);
+    const streamUrl = streamRegistry.registerStream(url, referer, refreshFn, check);
     if (!streamUrl) return { error: 'no url' };
     return { fileUrl: streamUrl, streaming: true };
   });
@@ -130,7 +135,8 @@ function register() {
     // 用户可选择强制重下（参考 streamrip 的下载去重；渲染层批量场景
     // 传 forceRedownload 静默跳过，不走对话框）
     if (!song.forceRedownload) {
-      const done = history.findDownloaded(song.id, song.source);
+      // P2-9：异步判活。网络盘上单次同步 stat 就够窗口卡一下，这里没有理由例外。
+      const done = await history.findDownloadedAsync(song.id, song.source);
       if (done) {
         return {
           queued: false,
@@ -295,7 +301,9 @@ function register() {
           skippedDup++;
           continue;
         }
-        if (!s.forceRedownload && history.findDownloaded(s.id, s.source)) {
+        // P2-9：批量路径改用异步判活。同步版在网络盘上单次 stat 可达数十毫秒，
+        // 几百首逐条同步判活会把主进程（= UI 线程）卡住一整轮。
+        if (!s.forceRedownload && await history.findDownloadedAsync(s.id, s.source)) {
           skippedDownloaded++;
           continue;
         }

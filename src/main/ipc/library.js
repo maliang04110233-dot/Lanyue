@@ -7,7 +7,6 @@
 
 const { handle } = require('./register');
 const path = require('path');
-const { app } = require('electron');
 const {
   scanDirectory,
   readAudioMetadata,
@@ -60,7 +59,15 @@ function isInAllowedDir(filePath) {
     if (localDir) bases.push(localDir);
     const saveDir = prefs.get('saveDir') || '';
     if (saveDir) bases.push(saveDir);
-    bases.push(app.getPath('music'));
+    // P2-2（2026-10-13 复审）：这里曾无条件 push(app.getPath('music'))，
+    // 于是即便 prefs 全空、用户从未批准过任何目录，%USERPROFILE%\Music 下的
+    // **任意**路径仍可被 delete-file / write-local-lrc / update-id3-tags /
+    // rename-file 等十几条通道读写 —— 而同仓库里 open-folder 与下载落盘用的
+    // 都是严格版 isApprovedDir。这就是「两套口径」的最后一处实体。
+    //
+    // 现在不再单列系统音乐目录：默认下载目录（defaultDownloadDir(music)）在
+    // index.js 启动时已 approve，且 get-default-dir 展示的也是它，所以第一行的
+    // isApprovedDir 已覆盖「用户还没配任何目录」的首次使用场景 —— 无需额外开口子。
     return approvedDirs.isInsideRealAny(bases, resolved);
   } catch { return false; }
 }

@@ -93,6 +93,50 @@ function parseRange(header, totalSize) {
   return { start, end };
 }
 
+/**
+ * 归一化要透传给上游的 Range 头。
+ *
+ * 放行**单区间**的两种写法：
+ *   · `bytes=<start>-[<end>]` —— 起点明确
+ *   · `bytes=-N` —— 末尾 N 字节。**为什么不因为「判越界需要 totalSize」而拒绝**：
+ *     越界与否本来就该由上游用 416 回答，而 416 在重取分支里是如实透传给
+ *     Chromium 的（见 refreshUpstreamOn403 之后那段「重取成功不代表这次请求成立」）。
+ *     本地猜一个 totalSize 反而会丢掉合法的 seek 请求 —— D-35 的契约是
+ *     「重放必须与原请求逐字相同」，此前有一条守卫测试正是这么钉的（后缀形态）。
+ *
+ * 拒绝的只有：多区间（`bytes=0-99,200-299`）、畸形值、缺 `bytes=`、空。
+ * 多区间对音频播放没有意义；有的 CDN 返回 multipart/byteranges，Chromium 侧
+ * 表现为解码怪声甚至中断 —— 那比退化顺播更难排查。
+ *
+ * 宁可退化（当没有 Range ⇒ 上游返回 200 全量 ⇒ 从头顺播）也不要构造一个
+ * 上游会拒绝或会误解的请求。
+ *
+ * @param {string|null} header Chromium 传来的 Range 头
+ * @returns {string|null} 可安全透传的值；不可用时返回 null
+ */
+function normalizeRangeHeader(header) {
+  if (!header || typeof header !== 'string') return null;
+  const s = String(header).trim();
+  const m = /^bytes=(\d*)-(\d*)$/.exec(s);
+  if (!m) return null;
+  const [, rawStart, rawEnd] = m;
+  if (rawStart === '' && rawEnd === '') return null;
+
+  if (rawStart === '') {
+    // bytes=-N
+    const n = Number(rawEnd);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return s;
+  }
+
+  const start = Number(rawStart);
+  const end = rawEnd === '' ? null : Number(rawEnd);
+  if (!Number.isFinite(start) || start < 0) return null;
+  if (end !== null && (!Number.isFinite(end) || end < start)) return null;
+  // 原样透传上游给的语义（不自己重写格式），只做合法性判定
+  return s;
+}
+
 /** 内容类型 → Chromium 能识别为音频的 mime */
 function contentTypeOf(res) {
   const raw = String((res.headers && res.headers['content-type']) || '').split(';')[0].trim();
@@ -244,17 +288,54 @@ async function refreshUpstreamOn403(entry, deps, referer, rangeHeader) {
 function registerStreamScheme(protocol, resolveMeta) {
   protocol.handle(STREAM_SCHEME, async (request) => {
     const meta = await resolveMeta(request.url);
-    if (!meta || !meta.url) return new Response('no stream meta', { status: 404 });
-
-    const check = await assertPublicHttpUrl(meta.url);
-    if (!check.ok) {
-      logger.warn('[stream] URL 校验失败:', check.reason);
-      return new Response('URL rejected', { status: 403 });
+    if (!meta || !meta.url) {
+      // 这一分支曾经**不写任何日志**（2026-10-13 补）。后果是它成了整个播放链路上
+      // 最难查的一处：Chromium 规范化 scheme URL 后 key 查不到，就走这里 404，
+      // 而主进程日志一片干净 —— 现场只能看到渲染层刷 toast，
+      // 根本分不清「请求没发出来（CSP）」与「发出来了但没这条流（这里）」。
+      // 记下原始 URL 与登记簿规模，两种情况一眼可辨。
+      logger.warn('[stream] 登记簿里没有这条流:', request.url,
+        `（登记簿现有 ${registry.streamCount()} 条）`);
+      return new Response('no stream meta', { status: 404 });
     }
 
-    const rangeHeader = request.headers && request.headers.get
+    // SSRF 校验：**优先复用登记时那次**（proxy-play 在 registerStream 之前已经
+    // 校验过同一个 URL 并把结果带了进来）。
+    //
+    // 此前这里无条件再校验一次，于是同一次播放解析两次 DNS：第一次的结果被丢掉，
+    // 只有第二次真正用于连接。两次往返各省 10~80ms，且在弱网下更明显。
+    //
+    // 复用是否削弱防护？不会：连接本来就用 makePinnedLookup(check.ips) 固定到
+    // 校验时解析出的 IP，用第一次还是第二次的 IP 在连接层面等价；而固定住 IP
+    // 反而更抗 DNS rebinding（域名之后被改指内网也不影响我们，因为不再重新解析）。
+    //
+    // 什么时候必须重新校验？上游 URL 被换过之后 —— 即 refresh 成功时
+    // （streamProtocol 的 refreshUpstreamOn403 会改写 entry.url）。此时
+    // entry.check 指向的是旧 URL，与当前 meta.url 不一致，必须重新走一遍。
+    let check = null;
+    const reusable = meta.check
+      && meta.check.url
+      && String(meta.check.url) === String(meta.url)
+      && Array.isArray(meta.check.ips) && meta.check.ips.length;
+    if (reusable) {
+      check = meta.check;
+    } else {
+      check = await assertPublicHttpUrl(meta.url);
+      if (!check.ok) {
+        logger.warn('[stream] URL 校验失败:', check.reason);
+        return new Response('URL rejected', { status: 403 });
+      }
+    }
+
+    // Range 头**只透传上游给的值**，且必须先过 normalizeRangeHeader。
+    // 头注约束 2 早就承诺「解析失败就当没有 Range，绝不自己拼」，但此前
+    // parseRange 是死代码（定义了零调用点），于是多区间 / 畸形 Range 被原样
+    // 打给 CDN —— 有的返回 200 全量（退化成整首下载），有的返回
+    // multipart/byteranges，Chromium 侧表现为解码怪声或播放中断。
+    const rawRange = request.headers && request.headers.get
       ? request.headers.get('Range')
       : null;
+    const rangeHeader = normalizeRangeHeader(rawRange);
 
     let res;
     try {
@@ -296,6 +377,13 @@ function registerStreamScheme(protocol, resolveMeta) {
     }
 
     const partial = res.statusCode === 206;
+    // 每条流**首次**取用时记一笔（usedCount 由 resolveStream 累加，此处读到的是取用后
+    // 的值）。为什么只记首次：seek 会不断产生新的 Range 请求，逐次记账能把日志冲垮；
+    // 而「这条流第一跳拿到什么状态」才是判断链路通不通的关键那一笔。
+    if (Number(meta.usedCount) === 1) {
+      logger.log('[stream] 首次取用', String(meta.url).slice(0, 90),
+        '->', res.statusCode, partial ? '206' : '200');
+    }
     const contentLength = partial
       ? contentLengthOfRange(res.headers)
       : declared;
@@ -349,9 +437,11 @@ module.exports = {
   STREAM_SCHEME,
   MAX_BYTES,
   parseRange,
+  normalizeRangeHeader,
   contentTypeOf,
   contentLengthOfRange,
   registerStreamScheme,
   requestUpstream,
+  requestUpstreamFollowing,
   refreshUpstreamOn403,
 };

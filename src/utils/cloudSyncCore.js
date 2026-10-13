@@ -55,7 +55,13 @@ async function syncOnce(deps) {
       conflictRetried = true;
       const remote2 = await fetchSnapshot(config);
       merged = mergeSnapshotData(merged, _remoteDataOrThrow(remote2));
-      put = await pushSnapshot(config, _envelope(merged, now), {});
+      // P2-4（2026-10-13 复审）：重拉之后必须**重新上锁**。
+      // 旧实现这里传 {}，webdav.js 因 opts.etag 为空省略 If-Match ⇒ 无锁覆盖：
+      // 若此刻还有第三台设备在写，它的修改被静默吞掉且不产生任何冲突提示
+      // （最后一写赢），等于把「412 时重拉重并再推一次」的语义变成了「重推一次，
+      // 不管别人刚写了什么」。既然重拉了，就拿重拉到的 ETag 当新的前置条件。
+      put = await pushSnapshot(config, _envelope(merged, now),
+        { etag: remote2.exists ? remote2.etag : undefined });
     }
     if (!put || put.ok !== true) throw new Error('远端快照写入未成功，已放弃回写本地');
 

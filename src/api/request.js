@@ -26,12 +26,14 @@ const { USER_AGENT } = require('../utils/userAgent');
 const { assertPublicHttpUrl, makePinnedLookup } = require('../utils/urlGuard');
 
 /**
- * 日志脱敏：平台 API 常把鉴权态（authst/key/sign/data）放进 GET 查询串，
- * 全 URL 落日志等于把登录态抄送一份给日志文件/控制台。
+ * 日志脱敏统一走 src/utils/redact.js（2026-10-13 起）。
+ *
+ * 此前这里是本文件内自带的第二份实现，参数表比统一模块窄（漏了 uid/guid/
+ * sessionid/musicid 等），而 downloader / soda / migu / kuwo / resolveTrack
+ * 打印 URL 时根本没有脱敏。删掉这份实现后，「日志里不该出现签名参数」才有
+ * 系统级保证（logger 落盘前还会再兜一层）。
  */
-function redactUrl(u) {
-  return String(u).replace(/([?&](?:data|sign|vkey|authst|key|token|cookie)=)[^&]*/gi, '$1[redacted]');
-}
+const { redactUrl } = require('../utils/redact');
 
 /** 跨 host 重定向时必须剥掉的凭证头（C2：防止 302 把登录态带往任意域） */
 const CREDENTIAL_HEADERS = ['cookie', 'authorization', 'proxy-authorization'];
@@ -57,6 +59,51 @@ function isRetriableError(err) {
 /** HTTP 5xx / 429 → 值得重试 */
 function isRetriableStatus(status) {
   return status === 429 || (status >= 500 && status < 600);
+}
+
+// ── 最近一次 HTTP 状态的旁路记录（2026-10-13）──────────────────────────
+//
+// **为什么需要它**：request() 向后兼容地 `return result.data`，把 `{status, data}`
+// 里的 status 丢了；而 403 又不在 reject 名单里（只有 5xx/429 才 reject），于是
+// 「这条链是不是签名过期（403）」这个最该触发跨源换源的信息，在**插件层的
+// catch 里永远拿不到** —— 平台既没有 status、也往往只返回一句笼统文案，
+// 导致 resolveTrackService 里那条专门为 403/404/410 准备的换源出口形同虚设。
+//
+// **为什么不动返回值**：把 `{data, status}` 返回给 8 个平台是破坏性改动
+// （它们全都按 body 取字段），风险与收益完全不成比例。而 403 在语义上根本不是
+// 异常（body 照样是合法 JSON），把它升级成 reject 更会打断降级链。
+//
+// 所以走旁路：用一个异步上下文记住「本次取流链路里最后一次响应的状态码」，
+// 由 gateway 在出口处读取。8 个平台**零改动**就都获得了这个信号。
+//
+// 这里的 lastStatus 取「最后一次」而非「最严重」：平台常有降级链（如 kuwo 的
+// 双端点、soda 的多个候选直链），链路末尾那次响应的状态最接近「最终为什么失败」。
+
+const { AsyncLocalStorage } = require('node:async_hooks');
+const _httpStatusCtx = new AsyncLocalStorage();
+
+/** 在取流上下文里执行 fn，并返回该上下文内最后一次见到的 HTTP 状态 */
+async function runWithHttpStatusContext(fn) {
+  const ctx = { lastStatus: null };
+  try {
+    const result = await _httpStatusCtx.run(ctx, fn);
+    return { result, lastStatus: ctx.lastStatus };
+  } catch (err) {
+    return { result: undefined, lastStatus: ctx.lastStatus, error: err };
+  }
+}
+
+function _noteHttpStatus(status) {
+  const ctx = _httpStatusCtx.getStore();
+  if (!ctx) return;                                   // 不在上下文里：无人关心
+  const n = Number(status);
+  if (Number.isFinite(n) && n >= 100 && n <= 599) ctx.lastStatus = n;
+}
+
+/** 当前取流上下文里最后一次 HTTP 状态（不在上下文内时为 null） */
+function getLastHttpStatus() {
+  const ctx = _httpStatusCtx.getStore();
+  return ctx ? ctx.lastStatus : null;
 }
 
 /** 跟着 3xx 重定向（最多 5 次，防止无限递归） */
@@ -221,11 +268,13 @@ async function request(url, options = {}) {
       const result = await _followRedirects(url, options);
       // 向后兼容：原 request() 直接返回解析后的 JSON/字符串
       if (result && typeof result === 'object' && 'data' in result && 'status' in result) {
+        _noteHttpStatus(result.status);
         return result.data;
       }
       return result;
     } catch (err) {
       lastErr = err;
+      _noteHttpStatus(err && err.statusCode);
       const isRetriable = isRetriableError(err) || isRetriableStatus(err.statusCode);
       if (!isRetriable || attempt === maxRetries) {
         throw err;
@@ -383,3 +432,6 @@ async function testAudioLink(url, opts = {}) {
 module.exports = request;
 // 挂在 request 函数上（module.exports 保持函数本身，不破坏既有 `request(...)` 调用）
 module.exports.testAudioLink = testAudioLink;
+// 取流上下文的旁路状态读取（见文件内「最近一次 HTTP 状态的旁路记录」注释）
+module.exports.runWithHttpStatusContext = runWithHttpStatusContext;
+module.exports.getLastHttpStatus = getLastHttpStatus;

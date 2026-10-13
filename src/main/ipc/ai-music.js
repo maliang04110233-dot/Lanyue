@@ -8,6 +8,7 @@
 const { handle } = require('./register');
 const { app } = require('electron');
 const path = require('path');
+const logger = require('../../utils/logger');
 const aiMusic = require('../../api/ai-music');
 const { defaultDownloadDir, AI_SUBDIR_NAME } = require('../../shared/downloadDefaults');
 // 主进程即 UI 线程：文件 IO 必须异步
@@ -155,21 +156,23 @@ function register() {
 
       // 如果生成成功，保存为文件
       if (result.audioHex) {
-        // H10: Validate saveDir — must be within allowed directories
-        // 用 path.relative 判定（startsWith 有前缀碰撞：C:\MusicX 会误判在 C:\Music 内）
-        const isInside = (base, target) => {
-          const rel = path.relative(base, target);
-          return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
-        };
-        const allowedBaseDirs = [
-          path.resolve(defaultDownloadDir(app.getPath('music'))),
-          path.resolve(app.getPath('userData')),
-        ];
-        let saveDir = params.saveDir
-          ? path.resolve(params.saveDir)
-          : path.join(defaultDownloadDir(app.getPath('music')), AI_SUBDIR_NAME);
-        const isAllowed = allowedBaseDirs.some(base => isInside(base, saveDir));
-        if (!isAllowed) {
+        // P1-3（2026-10-13 复审）：沙箱判据与全仓其余路径通道**同源**。
+        //
+        // 旧实现在这里重写了一份纯词法 isInside（只做 path.relative），没过
+        // realpath 复核 —— 于是「默认下载目录里一个指向别处的链接」能把 AI 生成
+        // 的 mp3 写到沙箱外。src/utils/downloadPath.js 顶部的遗留注释早把它点名了。
+        //
+        // 换成 approvedDirs.isApprovedDir 还顺手修掉一个功能 bug：旧代码的允许基
+        // 目录只有「默认下载目录 + 整个 userData」，**不含 aiMusicSaveDir** ——
+        // 用户在 AI 页用原生选器挑的保存目录会被判为不合法，于是每一首都静默落到
+        // 默认目录，设置形同虚设。而 select-dir 选过的目录本就登记进 approvedDirs，
+        // isApprovedDir 认得它。
+        const { isApprovedDir } = require('../approvedDirs');
+        let saveDir = params.saveDir ? String(params.saveDir) : '';
+        if (!saveDir || !isApprovedDir(saveDir)) {
+          if (saveDir) {
+            logger.warn('[ai-music] 拒绝未批准的 saveDir，回落默认目录:', saveDir);
+          }
           saveDir = path.join(defaultDownloadDir(app.getPath('music')), AI_SUBDIR_NAME);
         }
         await fsa.ensureDir(saveDir);

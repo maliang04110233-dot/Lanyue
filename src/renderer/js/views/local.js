@@ -463,7 +463,7 @@ function _renderLocalRow(s, i) {
   const rowClass = selected && _localSelectionMode ? 'local-row selected' : 'local-row';
   const encodedPath = btoa(encodeURIComponent(s.filePath));
   return `
-  <div class="${rowClass}" data-idx="${i}" tabindex="0" role="button" onclick="playLocalSong(${i})" oncontextmenu="event.preventDefault();event.stopPropagation();showLocalRowMenu(event,${i})" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border-subtle);cursor:pointer;">
+  <div class="${rowClass}" data-idx="${i}" tabindex="0" role="button" onclick="playLocalSong(${i})" oncontextmenu="event.preventDefault();event.stopPropagation();showLocalRowMenu(event,${i})" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--stroke-1);cursor:pointer;">
     ${_localSelectionMode ? `
     <div class="local-row-cb" onclick="event.stopPropagation();toggleLocalSelect('${encodedPath}',${i}, event)">
       <input type="checkbox" id="localcb_${i}" ${selected ? 'checked' : ''}>
@@ -471,10 +471,10 @@ function _renderLocalRow(s, i) {
     ${s.cover
       ? `<img class="local-row-cover" src="${escAttr(s.cover)}" alt="" style="width:40px;height:40px;border-radius:4px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       : ''}
-    <div class="local-row-cover-ph" style="width:40px;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary);font-size:18px;${s.cover ? 'display:none' : ''}">🎵</div>
+    <div class="local-row-cover-ph" style="width:40px;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:var(--elev-2);font-size:18px;${s.cover ? 'display:none' : ''}">🎵</div>
     <div class="local-row-info" style="flex:1;min-width:0;">
       <div class="local-row-title" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.title)}</div>
-      <div class="local-row-artist" style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.artist || '未知艺术家')}${s.album ? ' · ' + esc(s.album) : ''}</div>
+      <div class="local-row-artist" style="font-size:11px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.artist || '未知艺术家')}${s.album ? ' · ' + esc(s.album) : ''}</div>
     </div>
     ${(() => { const q = qualityBadge(s, _probeCache.get(s.filePath)); return q ? `<span class="local-row-quality" title="${escAttr(q.title)}" style="font-size:11px;color:${q.color};white-space:nowrap;">${esc(q.text)}</span>` : ''; })()}
     <span class="local-row-duration" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${fmtDuration(s.durationMs)}</span>

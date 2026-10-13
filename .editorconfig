@@ -1,0 +1,32 @@
+# EditorConfig —— 与 .prettierrc.json / .gitattributes 三者对齐
+#
+# 为什么需要它：本仓同时有三个「格式事实源」，少一个就会漂：
+#   .prettierrc.json  格式化规则（2 空格、单引号、printWidth 100、es5 尾逗号）
+#   .gitattributes     换行一律 LF 入库（Windows 上工作树也必须是 LF）
+#   本文件            编辑器的缩进/换行/编码/BOM
+#
+# 三者冲突的排查顺序：先看本文件的 end_of_line 与 charset —— 它们决定文件在磁盘上
+# 长什么样；再看 .prettierrc.json 的缩进与引号。2026-09-28 那次 P1（正则断言里硬编码
+# \n、遇到 CRLF 必红）就是换行事实源缺失/不一致造成的，所以这里把它钉死。
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# Markdown 的行尾两个空格是「换行」语义，不能被 trim 掉
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+# Windows 批处理必须保留 CRLF，否则部分命令行下解析异常
+end_of_line = crlf
+indent_size = 4
+
+[*.{yml,yaml,json}]
+indent_size = 2

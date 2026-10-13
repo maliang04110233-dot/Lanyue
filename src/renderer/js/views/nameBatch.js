@@ -11,6 +11,8 @@
 import { errBrief } from '../errBrief.js';
 import { normKey } from '../songGroups.js';
 import { parseM3u } from '../m3uImport.js';
+// 转义取用：零依赖兜底模块，避免「全局 esc 尚未挂上」时退化成恒等函数
+import { escSafe } from '../escapeFallback.js';
 // resolveQuality 走 quality.js 挂载的 window 全局（同 batchImport.js 约定），
 // 避免 node 测试环境经 logger.js 顶层 window 炸链
 
@@ -118,7 +120,7 @@ function _setStatus(text) {
   if (el) el.textContent = text || '';
 }
 
-function _esc(s) { return typeof esc === 'function' ? esc(s) : String(s == null ? '' : s); }
+function _esc(s) { return escSafe(s); }
 function _srcName(src) { return typeof srcLabel === 'function' ? srcLabel(src) : String(src || ''); }
 function _dur(sec) { return typeof fmtDuration === 'function' ? fmtDuration(sec) : (sec ? Math.round(sec) + 's' : '—'); }
 
@@ -134,7 +136,7 @@ function _renderRows() {
     const hit = c ? `<b>${_esc(c.title)}</b> - ${_esc(c.artist)}（${_esc(_srcName(c.source))} · ${_dur(c.duration)} · ${_scoreTag(r.score)}）` : '未命中';
     const cyc = r.cands.length > 1 ? `<button class="btn-sm" title="换一个候选（共 ${r.cands.length} 个）" onclick="cycleNameBatchCand(${i})">🔄</button>` : '';
     return `
-    <div class="sched-job" style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+    <div class="sched-job" style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--stroke-1);">
       <input type="checkbox" id="nbChk_${i}" ${c && r.checked !== false ? 'checked' : ''} ${c ? '' : 'disabled'} style="margin-top:4px;" onchange="_nbSetCheck(${i}, this.checked)">
       <div class="sched-job-lines" style="flex:1;min-width:0;">
         <div style="font-size:12px;">${hit}</div>

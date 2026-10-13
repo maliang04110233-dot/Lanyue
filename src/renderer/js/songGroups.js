@@ -8,6 +8,10 @@
  * 只读 state.songs，不改动列表渲染与索引对齐。纯函数导出供 node:test。
  */
 
+// 转义取用：见 escapeFallback.js 的说明（旧的 `typeof esc === 'function' ? esc
+// : (s => String(s))` 恒等降级会让远端歌名以原文进 innerHTML）。
+import { escSafe, escQSafe } from './escapeFallback.js';
+
 /** 归一化匹配 key：去括号附注（Live/翻唱等视为另一版本的粗过滤）、去标点空白、小写 */
 export function normKey(title, artist) {
   const norm = (str) => String(str == null ? '' : str)
@@ -55,7 +59,7 @@ function _dur(sec) {
 
 function _bannerHtml(groups) {
   const n = groups.length;
-  return `<div class="song-groups-bar" style="display:flex;align-items:center;gap:10px;padding:6px 10px;margin-bottom:6px;font-size:12px;color:var(--neon-cyan);background:rgba(0,255,200,.06);border:1px solid rgba(0,255,200,.18);border-radius:6px;">
+  return `<div class="song-groups-bar" style="display:flex;align-items:center;gap:10px;padding:6px 10px;margin-bottom:6px;font-size:12px;color:var(--neon-cyan);background:color-mix(in srgb, var(--accent-ui) 6%, transparent);border:1px solid color-mix(in srgb, var(--accent-ui) 18%, transparent);border-radius:6px;">
     🔗 ${n} 首歌命中跨平台同名，多源可比价
     <button class="btn-sm" onclick="showSongGroupsModal()">查看分组</button>
   </div>`;
@@ -74,14 +78,13 @@ function _resolveVariantIdx(it) {
 }
 
 function _rowHtml(g) {
-  const esc_ = typeof esc === 'function' ? esc : (s => String(s));
   const variants = g.items.map(it => `
     <div class="sched-job" style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-      <span class="source-badge" style="flex-shrink:0;">${esc_(_srcName(it.source))}</span>
+      <span class="source-badge" style="flex-shrink:0;">${escSafe(_srcName(it.source))}</span>
       <span style="flex:1;color:var(--text-dim,#8b93a7);">${_dur(it.duration)}</span>
       <button class="btn-sm" title="试听" onclick="playSong(${_resolveVariantIdx(it)})">▶</button>
       <button class="btn-sm" title="下载" onclick="addDownload(${_resolveVariantIdx(it)})">⬇</button>
-      <button class="btn-sm" title="滚动到结果列表中的这一行" onclick="locateSongRow('${esc_(it.source)}','${esc_(it.id)}')">🎯</button>
+      <button class="btn-sm" title="滚动到结果列表中的这一行" onclick="locateSongRow('${escQSafe(it.source)}','${escQSafe(it.id)}')">🎯</button>
     </div>`).join('');
   return `
     <div class="sched-job-lines" style="margin-bottom:10px;">

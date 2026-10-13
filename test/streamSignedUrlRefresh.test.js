@@ -415,8 +415,8 @@ test('D-35：重取只认 desc.source，不引入跨源换源入口', async () =
 test('接线：proxy-play 登记重取回调，签名 URL 仍只落登记簿', () => {
   const DLs = strip(DL);
   assert.match(DLs, /makeStreamRefresh/, 'proxy-play 必须把重取回调登记到流上');
-  assert.match(DLs, /registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*\)/,
-    '登记时要把 refreshFn 一并挂上');
+  assert.match(DLs, /registerStream\(\s*url\s*,\s*referer\s*,\s*refreshFn\s*,\s*check\s*\)/,
+    '登记时要把 refreshFn 一并挂上；第 4 参 check 是 2026-10-13 加的（复用 proxy-play 已完成的那次 SSRF 校验，少一次 DNS 往返）');
   // 硬约束：签名 URL 绝不编进 scheme
   assert.ok(!/encodeURIComponent\(\s*url\s*\)/.test(REG), '上游 URL 不得编进 scheme');
   assert.ok(!/searchParams|\?url=/.test(REG), 'scheme URL 里不得带上游参数');

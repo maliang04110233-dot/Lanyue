@@ -1,0 +1,203 @@
+# 发版流水线：tag 触发 → 校验 → 打包 → 上传产物 → 草稿 Release
+#
+# 设计取舍（与 ci.yml 同一条思路：能自动化的自动化，会误伤的不自动化）：
+#
+# 1. **触发用 tag 而不是手动 dispatch**：`v1.0.36` 这个 tag 本身就是发布意图的
+#    唯一声明。手动 dispatch 会出现「点了发布但版本没变」的错位。
+# 2. **版本一致性是硬闸**：tag 版本必须与 package.json 的 version 一致，且
+#    package-lock.json 也一致。不一致就直接失败 —— 历史上 lock 曾长期落后于
+#    package.json（1.0.12 停在 lock 里、package.json 已到 1.0.14），版本溯源一片混乱。
+# 3. **产物是 Release 资产而不是 Action 直接发布**：先出「草稿 Release」，
+#    由人确认后再 publish。理由是安装包一旦挂上 GitHub Releases，
+#    electron-updater 会立刻把它推给所有已装用户 —— 没有反悔余地。
+# 4. **不碰签名**：本项目尚未配置 Windows 代码签名，签名校验对安装包是空转的
+#    （详见 SECURITY.md 第四节）。等证书到位后，在这里加 CSC_LINK/CSC_KEY_PASSWORD
+#    即可自动生效，届时 verifyUpdateCodeSignature 才真正有约束力。
+#    因此产物与已发布版本都会触发 SmartScreen 提示，这是**已知代价**而非疏漏。
+# 5. **不发布 macOS/Linux**：仓库脚本目前只对 Windows 有实证（asar 冒烟、native
+#    模块、python 辅助脚本都按 Windows 验证过）。宁可少发，不要发没验证过的产物。
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '手动触发时的 tag（需与 package.json version 一致）'
+        required: true
+
+permissions:
+  contents: write   # 需要创建 Release 与上传资产
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # 发版绝不取消：取消 = 半发状态
+
+jobs:
+  # ── 版本一致性校验（秒级，红了就不用打包了）────────────────
+  verify-version:
+    name: Verify tag ↔ version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        name: 版本必须三方一致（tag / package.json / package-lock.json）
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          # workflow_dispatch 时 ref 不是 tag，从 inputs 取
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          PKG=$(node -p "require('./package.json').version")
+          LOCK=$(node -p "require('./package-lock.json').version")
+
+          echo "tag=$TAG package.json=$PKG package-lock.json=$LOCK"
+
+          EXPECT="v$PKG"
+          if [ "$TAG" != "$EXPECT" ]; then
+            echo "::error::tag 与 package.json 不一致：tag=$TAG，期望=$EXPECT"
+            echo "改版本用：node scripts/version-bump.js（会同步 lock），然后 git tag $EXPECT"
+            exit 1
+          fi
+          if [ "$LOCK" != "$PKG" ]; then
+            echo "::error::package-lock.json 的 version（$LOCK）与 package.json（$PKG）不一致"
+            echo "修法：node scripts/version-bump.js 或 npm install --package-lock-only"
+            exit 1
+          fi
+          echo "version=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: CHANGELOG 必须有本次版本的条目
+        run: |
+          set -euo pipefail
+          V=$(cat <<'EOF'
+          ${{ steps.check.outputs.version }}
+          EOF
+          )
+          if ! grep -qE "^## \[${V}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md 里没有 ## [${V}] 条目 —— 发版必须写清用户可感知的变化"
+            exit 1
+          fi
+
+  # ── 质量闸门：与 CI 同一套（lint / audit / 单测）────────────
+  quality:
+    name: Lint & Audit & Test
+    runs-on: ubuntu-latest
+    needs: verify-version
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: npm audit (production)
+        run: npm run audit:deps
+      - name: Dead deps check
+        run: npm run check:dead-deps
+      - name: Unit tests
+        run: npm test
+
+  # ── 打包 Windows 产物（NSIS 安装包 + 便携版）────────────────
+  build:
+    name: Build Windows artifacts
+    runs-on: windows-latest
+    needs: [verify-version, quality]
+    outputs:
+      version: ${{ needs.verify-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # 这里打完整 nsis + portable（而不是 CI 里的 --dir 冒烟）：
+      # 发版产物必须是真实打出来的，否则「构建通过」只证明了目录能解开。
+      # 耗时几分钟，但发版本就不该快。
+      - name: Package (win, x64)
+        run: npx electron-builder --config build/config.cjs --win --x64 --publish never
+        env:
+          # 无证书 → 跳过签名探测（详见 SECURITY.md 第四节：当前未启用签名校验）
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Asar smoke test
+        run: npm run smoke:asar
+
+      - name: 列出产物（确认真的打出来了）
+        run: |
+          Get-ChildItem release -Include *.exe,*.yml,*.blockmap -Recurse |
+            Select-Object FullName, Length |
+            Format-Table -AutoSize | Out-String | Write-Output
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ github.sha }}
+          path: |
+            release/*.exe
+            release/*.yml
+            release/*.blockmap
+          retention-days: 30
+          if-no-files-found: error
+
+  # ── 生成草稿 Release（人工确认后再 publish）────────────────
+  draft-release:
+    name: Draft GitHub Release
+    runs-on: ubuntu-latest
+    needs: [verify-version, build]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets-${{ github.sha }}
+          path: assets
+
+      - name: 从 CHANGELOG 抽取本次版本的条目作为 Release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          V="${{ needs.build.outputs.version }}"
+          # 抽取 "## [V]" 到下一个 "## [" 之间的内容
+          NOTES=$(awk -v v="$V" '
+            $0 ~ "^## \\["v"\\]" {flag=1; next}
+            flag && /^## \[/ {exit}
+            flag {print}
+          ' CHANGELOG.md | sed '/./,$!d')
+          {
+            echo "## ${V}"
+            echo
+            echo "${NOTES:-（CHANGELOG 中该版本条目为空）}"
+            echo
+            echo "---"
+            echo "由 Release workflow 自动生成。安装包**未做代码签名**，Windows 可能显示 SmartScreen 提示（见 SECURITY.md 第四节）。"
+          } > notes.md
+          cat notes.md
+
+      - name: 创建草稿 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          name: 揽乐 v${{ needs.build.outputs.version }}
+          body_path: notes.md
+          draft: true          # ← 人工确认后手动 publish，这是有意的闸门
+          prerelease: false
+          files: assets/*
+
+      - name: 输出下一步操作提示
+        run: |
+          echo "::notice title=草稿 Release 已就绪::请到 Releases 页面确认后点击 Publish。"
+          echo "发布前请确认："
+          echo "  1. 安装包能正常安装与启动"
+          echo "  2. 安装包内版本号与 tag 一致"
+          echo "  3. latest.yml 里的 sha512 与实际文件匹配（electron-updater 依赖它）"
+          echo "发布后自动更新会把该版本推给所有已装用户 —— 这一步没有反悔余地。"

@@ -44,6 +44,7 @@
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .winctrls button:hover { background: var(--elev-2); color: var(--fg-1); }
+/* 关闭按钮是窗口管理器的约定色（红=关闭），与主题无关，刻意不跟主题走 */
 .winctrls .close:hover { background: #e5484d; color: #fff; }
 
 /* ── 主体 ───────────────────────────────────────────── */
@@ -89,7 +90,7 @@
 /* 导航项：40px 高 / 圆角 8px / 激活靠「淡底 + 左侧指示条」 */
 .nav-item {
   position: relative;
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: var(--sp-2);
   height: 38px; padding: 0 10px;
   border-radius: var(--r-md);
   cursor: pointer; color: var(--fg-2);
@@ -105,7 +106,7 @@
   content: '';
   position: absolute; left: -10px; top: 50%;
   transform: translateY(-50%);
-  width: 3px; height: 17px; border-radius: 0 3px 3px 0;
+  width: 3px; height: 17px; border-radius: 0 var(--r-xs) var(--r-xs) 0;
   background: var(--accent-ui);
   opacity: 0; transition: opacity var(--dur-2) var(--ease);
 }
@@ -129,10 +130,10 @@
 
 /* 平台状态指示器 */
 .platform-status-list {
-  margin: var(--sp-2) 0 var(--sp-1); display: flex; flex-direction: column; gap: 3px;
+  margin: var(--sp-2) 0 var(--sp-1); display: flex; flex-direction: column; gap: var(--sp-1);
 }
 .platform-status-row {
-  display: flex; align-items: center; gap: 7px;
+  display: flex; align-items: center; gap: var(--sp-2);
   padding: 5px 10px; border-radius: var(--r-sm);
   font-size: 11.5px; color: var(--fg-3); white-space: nowrap;
 }

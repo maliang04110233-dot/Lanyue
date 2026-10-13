@@ -541,7 +541,7 @@ async function generateAiLyrics() {
       if (!hint) {
         hint = document.createElement('div');
         hint.id = 'aiMusicPromptHint';
-        hint.style.cssText = 'font-size:12px;color:#888;margin-top:4px;padding:4px 8px;background:rgba(255,255,255,0.03);border-radius:4px;border-left:2px solid #a78bfa;';
+        hint.style.cssText = 'font-size:12px;color:var(--fg-3);margin-top:4px;padding:4px 8px;background:var(--elev-1);border-radius:4px;border-left:2px solid var(--neon-purple);';
         titleEl.parentNode.insertBefore(hint, titleEl.nextSibling);
       }
       hint.textContent = '🎵 音乐描述: ' + aiState.musicPrompt;

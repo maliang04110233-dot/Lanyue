@@ -56,10 +56,10 @@ function _modalEl() {
   if (el) return el;
   el = document.createElement('div');
   el.id = 'lyricEditorModal';
-  el.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center';
-  el.innerHTML = '<div style="width:min(680px,92vw);max-height:86vh;display:flex;flex-direction:column;background:var(--bg-secondary,#1e1e28);border:1px solid var(--border,#333);border-radius:12px;padding:16px 18px;gap:10px">'
+  el.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:var(--scrim);align-items:center;justify-content:center';
+  el.innerHTML = '<div style="width:min(680px,92vw);max-height:86vh;display:flex;flex-direction:column;background:var(--elev-1);border:1px solid var(--stroke-1);border-radius:12px;padding:16px 18px;gap:10px">'
     + '<div style="font-weight:600">✏️ 编辑歌词 <span id="lyricEditorTarget" style="font-weight:400;opacity:.65;font-size:12px"></span></div>'
-    + '<textarea id="lyricEditorText" spellcheck="false" style="flex:1;min-height:320px;resize:vertical;background:var(--bg-primary,#141419);color:var(--text-primary,#eee);border:1px solid var(--border,#333);border-radius:8px;padding:10px;font:13px/1.7 Consolas,monospace" placeholder="[00:12.30]歌词行格式，直接粘贴纯文本也可以（将静态显示）"></textarea>'
+    + '<textarea id="lyricEditorText" spellcheck="false" style="flex:1;min-height:320px;resize:vertical;background:var(--bg-input);color:var(--fg-1);border:1px solid var(--stroke-2);border-radius:8px;padding:10px;font:13px/1.7 Consolas,monospace" placeholder="[00:12.30]歌词行格式，直接粘贴纯文本也可以（将静态显示）"></textarea>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end">'
     + '<button class="btn-sm" id="lyricEditorClear">🗑 清除</button>'
     + '<button class="btn-sm" id="lyricEditorCancel">取消</button>'

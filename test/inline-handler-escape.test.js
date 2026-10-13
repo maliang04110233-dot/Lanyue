@@ -88,9 +88,14 @@ function findViolations(files) {
           const inner = full.slice(2, -1).trim();
           const fnName = (inner.match(/^([A-Za-z_$][\w$]*)\s*\(/) || [])[1] || null;
           if (!fnName) continue; // 裸变量/字面量：另由数字白名单覆盖
-          if (fnName === 'escQ') continue;
+          // 2026-10-13（P3-2）：判据从「精确名单」放宽成「名字里带 esc/escape」。
+          // 原名单只认 escAttr/esc/escHtml/escapeHtml/htmlEscape，于是
+          // `const esc_ = ... ? esc : s => String(s)` 这种**本地别名**能整条绕过扫描
+          // —— src/renderer/js/songGroups.js 的 locateSongRow 实参就是这么写的，
+          // 而全局 esc 缺失时它的降级目标是恒等函数，载荷能直接逃出 JS 字符串。
+          if (/^escQ/i.test(fnName)) continue;      // escQ / escQSafe：都对
           if (ALLOWED_WRAPPERS.includes(fnName)) continue;
-          if (HTML_ONLY_ESCAPERS.includes(fnName)) {
+          if (HTML_ONLY_ESCAPERS.includes(fnName) || /esc|escape/i.test(fnName)) {
             violations.push({
               file: path.relative(ROOT, f).replace(/\\/g, '/'),
               line: i + 1, fn: fnName, expr: inner.slice(0, 70),
@@ -131,8 +136,19 @@ test('守卫自检：扫描器真的能抓到错误写法（正则写坏会静�
     'const a = `<button onclick="f(\'${escQ(x.key)}\')">a</button>`;',
     'const b = `<button onclick="f(\'${Number(i)}\')">b</button>`;',
     'const c = `<span title="${escAttr(x.name)}">c</span>`;', // 纯属性用 escAttr 是对的
+    'const d = `<button onclick="f(\'${escQSafe(x.key)}\')">d</button>`;', // 兜底版 escQ 同语义
   ].join('\n'), 'utf8');
   assert.deepStrictEqual(findViolations([good]), [], '正确写法不得误报');
+
+  // 别名绕过也必须被抓：真实缺陷形态（全局 esc 缺失时降级成恒等的 esc_）
+  const alias = path.join(tmpDir, 'alias.js');
+  fs.writeFileSync(alias, [
+    'const esc_ = typeof esc === "function" ? esc : (s => String(s));',
+    'const e = `<button onclick="f(\'${esc_(x.key)}\')">e</button>`;',
+  ].join('\n'), 'utf8');
+  const aliasHits = findViolations([alias]);
+  assert.strictEqual(aliasHits.length, 1,
+    '本地别名（esc_）曾整条绕过扫描 —— 扫描判据不能只认精确函数名');
 });
 
 test('守卫自检：escAttr 与 escQ 在单引号内确实语义不同（防止有人"统一"成一个函数）', () => {

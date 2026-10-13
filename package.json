@@ -1,6 +1,6 @@
 {
   "name": "music-downloader",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "description": "多平台音乐下载器 - 支持网易云/QQ音乐/B站/酷狗/酷我/咪咕/汽水/5sing",
   "main": "dist/main/index.js",
   "scripts": {
@@ -11,6 +11,9 @@
     "publish": "vite build && node scripts/postbuild.js && electron-builder --config build/config.cjs --publish always",
     "postinstall": "electron-builder install-app-deps",
     "test": "node --test \"test/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage \"test/*.test.js\"",
+    "bench": "node scripts/bench.js",
+    "setup:hooks": "node scripts/setup-hooks.js",
     "lint": "eslint src/ test/",
     "smoke:asar": "node scripts/smoke-asar.js",
     "check:dead-deps": "node scripts/check-dead-deps.cjs",
@@ -22,10 +25,28 @@
   "keywords": [
     "music",
     "downloader",
-    "electron"
+    "electron",
+    "netease",
+    "qq-music",
+    "bilibili",
+    "kugou",
+    "kuwo",
+    "migu",
+    "webdav"
   ],
   "author": "揽乐",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maliang04110233-dot/Lanyue.git"
+  },
+  "homepage": "https://github.com/maliang04110233-dot/Lanyue#readme",
+  "bugs": {
+    "url": "https://github.com/maliang04110233-dot/Lanyue/issues"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "electron": "^44.4.1",

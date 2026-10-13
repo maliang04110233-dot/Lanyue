@@ -26,12 +26,11 @@ const { renderPathSegments } = require('./naming');
  * 所以不存在循环依赖；它也不会把 electron / prefs 拖进来，utils 侧的纯函数
  * 测试仍能直接 require 本模块。
  *
- * ⚠️ 遗留（不在本次范围内，留给后续）：src/main/ipc/ai-music.js 里另有一份
- * 纯词法的 isInside（ai-generate-music 的 saveDir 校验），同样只做 path.relative
- * 判定，没过 realpath 复核。那份文件本次不归我改，但它和这里现在是**两套口径**
- * —— 同一种「批准目录内的链接指到外面」的形态，下载路径模板这侧已拒、AI 音乐
- * 落盘那侧仍放行。补的时候请复用 approvedDirs.isApprovedDir / isInsideReal，
- * 不要顺手把 path.relative 换皮一遍。
+ * ⚠️ 已闭合（2026-10-13 复审 P1-3）：src/main/ipc/ai-music.js 曾另带一份纯词法
+ * isInside（ai-generate-music 的 saveDir 校验），只做 path.relative、没过 realpath
+ * 复核，于是同一种「批准目录内的链接指到外面」的形态在 AI 落盘侧仍放行。那一处
+ * 现已改为调用 approvedDirs.isApprovedDir，全仓的路径判据到此只有一份。
+ * 由 test/ai-music-savepath.test.js 钉住，别让它退回自写判据。
  */
 const { isInsideReal } = require('../main/approvedDirs');
 

@@ -728,12 +728,17 @@ const LEDGER = {
   'src/renderer/js/views/converter.js': 10,
   'src/renderer/js/views/dragdrop.js': 10,
   'src/renderer/js/views/history.js': 24,
-  'src/renderer/js/views/home.js': 15,
+  // 15 → 13（2026-10-13）：播放流程的正常态 toast（「正在准备音源」「正在播放」）
+  // 按产品决策「只有报错才提示」删除 —— 变少是进步，按台账家法把数字钉小。
+  'src/renderer/js/views/home.js': 13,
   'src/renderer/js/views/local-stats.js': 11,
   // 46 → 0（阶段5b-1 + 5b-2 + 5a）：本地曲库的反馈文案已全部收编进词典，
   // 按台账家法「归零即删项」，此处不留恒真记录。
   'src/renderer/js/views/nameBatch.js': 8,
-  'src/renderer/js/views/search.js': 36,
+  // 36 → 37（2026-10-13 复审 P2-13）：AI 搜索的「部分关键词失败」提示还没进词典。
+  // 按台账家法「新增欠账要改表」先把数字钉住；后续若收编进 t()，再改回 36 或删项。
+  // 37 → 35（同日）：播放流程的两条正常态 toast 按「只有报错才提示」删除。
+  'src/renderer/js/views/search.js': 35,
 };
 
 test('欠账台账与实际逐字相等（新增欠账要改表，还清欠账也要改表）', () => {

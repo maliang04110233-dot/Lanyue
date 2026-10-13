@@ -1,0 +1,86 @@
+# 依赖自动更新
+#
+# 为什么用 group 而不是逐个开 PR：
+#   electron / electron-builder / vite 这类包一次能带出几十个间接依赖变更，
+#   逐个开 PR 会让 PR 列表被锁文件淹没，真正的安全更新被夹在中间没人看。
+#   分组后一个 PR 一类意图（安全 / 运行时 / 开发链），review 成本与漏看概率都低。
+#
+# 为什么 runtime 与 dev 分开：
+#   runtime 组进的是**会打进安装包**的依赖（electron、运行时库），出问题影响用户；
+#   dev 组只是构建与测试工具链，出问题影响开发而不影响已发布版本。
+#   两者的 review 关注点不同，不该混在一个 PR 里。
+#
+# 注意：本项目对部分上游包用了 overrides（qq-music-api 的 axios 等）与
+# 打包期死依赖排除（build/config.cjs）。dependabot 提 PR 后必须走一遍
+# `npm run check:dead-deps` 与 `npm run verify` —— 尤其 electron 大版本升级
+# 可能让「死依赖排除」的假设失效（那时会在打包后才暴露）。
+
+version: 2
+
+updates:
+  # ── 应用运行时依赖 ──────────────────────────────────────
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    labels: ['dependencies', 'runtime']
+    commit-message:
+      prefix: 'deps(runtime)'
+    groups:
+      security:
+        applies-to: version-updates
+        patterns:
+          - '*'
+        exclude-patterns:
+          - 'electron'
+          - 'electron-builder'
+          - 'electron-updater'
+          - 'vite'
+        update-types: ['minor', 'patch']
+      electron:
+        # Electron 自身单独成组：它带 Chromium，大版本升级需要人工验证
+        # （渲染层安全开关、流式播放协议、打包体积都要看）
+        patterns: ['electron', 'electron-updater', 'electron-builder']
+        update-types: ['minor', 'patch']
+      # 锁文件抖动小到无需 review 的那一类
+      lockfile-only:
+        applies-to: lockfile-only-updates
+
+  # ── 开发工具链 ─────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: monthly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 3
+    labels: ['dependencies', 'dev']
+    commit-message:
+      prefix: 'deps(dev)'
+    groups:
+      dev-toolchain:
+        patterns:
+          - 'vite'
+          - 'eslint'
+          - '@eslint/js'
+          - 'globals'
+        update-types: ['minor', 'patch']
+      dev-lockfile:
+        applies-to: lockfile-only-updates
+
+  # ── GitHub Actions 自身 ─────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+    labels: ['dependencies', 'ci']
+    commit-message:
+      prefix: 'ci'
+    groups:
+      actions:
+        patterns: ['*']

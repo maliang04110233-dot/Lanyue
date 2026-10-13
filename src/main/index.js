@@ -612,6 +612,16 @@ app.whenReady().then(async () => {
   // 注册所有 IPC handler（按职责拆分到 src/main/ipc 下各模块）
   registerAllIpcHandlers();
 
+  // P0-1（2026-10-13 复审）：恢复出来的 pending 任务必须自己开跑。
+  // 放在 registerAllIpcHandlers() 之后：调度过程中会用到的上下文（取流、
+  // 歌词、偏好）都在这段装配里就绪。旧实现只在用户新增/重试/批量入队时才
+  // 调度，重启后队列会一直挂在「排队中」不动。
+  try {
+    downloadQueueEngine.resumeRestoredQueue();
+  } catch (e) {
+    logger.warn('[index] 恢复队列调度失败:', e.message);
+  }
+
   // 初始化自动更新（GitHub Releases）
   try {
     const { initUpdater } = require('./updater');

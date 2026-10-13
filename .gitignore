@@ -80,3 +80,8 @@ spark-output/
 # 用**精确路径**，不要写成 scripts/*-probe.mjs —— 那会静默吃掉将来
 # 正当的探针测试（仓库里已有 *-wiring.test.js 这类形态）。
 scripts/cdp-toolbar-probe.mjs
+
+# 性能基线（scripts/bench.js --save 产出）。
+# **刻意不入库**：基准是单进程计时，数值受机器/JIT/GC 影响，跨机器比较无意义。
+# 入库反而会让人拿别人的数字当自己的基线。需要的开发者在本地生成后自行保留。
+bench-baseline.json

@@ -110,6 +110,22 @@ function request(url, options = {}) {
       // 退避等待期间被取消：这一跳根本不该发出去
       if (cancelled()) return fail(_abortError());
 
+      // P2-12（2026-10-13 复审）：同一跳最多排一次重试。
+      //
+      // 旧实现的 bug：timeout 分支里 req.destroy() 会让**同一个 req** 随即触发
+      // 'error'（socket hang up），于是 error 分支和 timeout 分支各排一个定时器，
+      // 两者用同一个 retryCount，而 retryTimer 变量被后一次赋值覆盖 ⇒ 前一个定时器
+      // 没被 clear，到点后 doRequest 执行两次。settle 只能保证 Promise 单次结算，
+      // 拦不住已经发出的第二跳 —— 结果就是一次超时换两次请求、两次计费。
+      // （当前 generateLyrics / generateMusic 显式传 retries: 0 才躲过，但任何
+      //   将来复用这个包装且忘了关重试的调用方都会踩。）
+      let hopRetryScheduled = false;
+      const retryThisHop = () => {
+        if (hopRetryScheduled) return;
+        hopRetryScheduled = true;
+        scheduleRetry(retryCount);
+      };
+
       const req = lib.request(reqOptions, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
@@ -126,7 +142,7 @@ function request(url, options = {}) {
       req.on('error', (e) => {
         if (cancelled()) return fail(e);
         if (retryCount < maxRetries) {
-          scheduleRetry(retryCount);
+          retryThisHop();
         } else {
           fail(e);
         }
@@ -135,7 +151,8 @@ function request(url, options = {}) {
         req.destroy();
         if (cancelled()) return fail(_abortError());
         if (retryCount < maxRetries) {
-          scheduleRetry(retryCount);
+          // 上面 destroy() 必然引发随后的 'error'，由 hopRetryScheduled 吞掉那一次
+          retryThisHop();
         } else {
           fail(new Error('请求超时'));
         }
@@ -783,4 +800,8 @@ module.exports = {
   loadHistory,
   addToHistory,
   clearHistory,
+  // 仅供单测驱动超时/重试路径（生产调用方一律 retries: 0 —— 计费接口禁自动重试）。
+  // 不导出就没法验证 P2-12「同一跳只排一次重试」这条不变量：那个 bug 的全部危害
+  // 都发生在重试通道上，而生产路径把它关掉了。
+  request,
 };

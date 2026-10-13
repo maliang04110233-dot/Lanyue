@@ -96,6 +96,10 @@
   --elev-1: color-mix(in srgb, var(--bg-card) 94%, var(--text) 6%);
   --elev-2: color-mix(in srgb, var(--bg-card) 86%, var(--text) 14%);
   --glass:  color-mix(in srgb, var(--bg-card) 80%, transparent);
+  /* 弹层遮罩（2026-10-13）。此前各视图各自写 `rgba(0,0,0,.6~.8)` 共 8 处：
+     深色主题下没问题，浅色主题下就是一层纯黑压在白界面上 —— 与「阴影用
+     --bg-deep 混色派生，浅色主题自动得到淡影」是同一个道理，遮罩也该派生。 */
+  --scrim:  color-mix(in srgb, var(--bg-deep) 68%, transparent);
   --stroke-1: color-mix(in srgb, var(--text) 9%, transparent);
   --stroke-2: color-mix(in srgb, var(--text) 17%, transparent);
 
@@ -481,8 +485,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; color: inher
 
 /* 搜索结果关键词高亮（highlight.js markTerm 产出 <mark>） */
 mark {
-  background: rgba(0, 255, 200, 0.18);
-  color: inherit;
+  /* 原为写死的青色 rgba(0,255,200,.18)：7 套主题里只有默认/赛博是青的，
+     换到日落（红）/森林（绿）主题，搜索高亮就成了唯一一个不跟随主题的色块。 */
+  background: color-mix(in srgb, var(--accent-ui) 18%, transparent);
+  color: var(--fg-1);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -493,12 +499,12 @@ mark {
   padding: 4px 10px;
   font-size: 12px;
   border-radius: 999px;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
-  background: var(--bg-elev, rgba(255, 255, 255, 0.04));
-  color: var(--text, inherit);
+  border: 1px solid var(--stroke-2);
+  background: var(--bg-input);
+  color: var(--fg-1);
   outline: none;
 }
 .queue-filter-input:focus {
-  border-color: var(--accent, #00ffc8);
+  border-color: var(--accent-ui);
   width: 190px;
 }
