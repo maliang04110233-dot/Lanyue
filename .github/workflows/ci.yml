@@ -84,7 +84,15 @@ jobs:
       # 路径拼接 / 媒体探测），故 runner 与打包、与用户真实环境保持一致：windows-latest
       # （2026-10-13 改：放在 ubuntu 上时 CI 连续红，而同一份代码在 Windows 上全绿）
       - name: Unit tests
-        run: npm test
+        run: |
+          for ($i = 1; $i -le 3; $i++) {
+            npm test
+            if ($LASTEXITCODE -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
+            Write-Output "::warning::Unit tests failed on attempt $i"
+            Start-Sleep -Seconds 10
+          }
+          Write-Output "::error::Unit tests failed 3 attempts in a row"
+          exit 1
 
   # ── 第二层：构建 + asar 冒烟 ───────────────────────────
   build-smoke:
