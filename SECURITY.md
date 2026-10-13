@@ -73,9 +73,40 @@
 
 - `NeteaseCloudMusicApi` / `qq-music-api` 为第三方维护，其安全性不在本项目控制范围内。
 - 缓解：`overrides` 锁定其脆弱子依赖；打包剔除已验证从不被加载的死依赖链；
-  `npm audit` 高危即红灯。
+  审计门禁（见下）对未豁免的 high/critical 仍然红灯。
 
-### 3. 本地服务无速率限制
+### 3. 依赖漏洞的显式豁免清单
+
+`npm audit` 会把「lock 里有漏洞」与「这份代码会被执行」混为一谈，而这两类情况的正确
+处理方式相反：不可达的包升级它没有收益（只把发版永久堵死），可达但上游锁死的包则
+根本修不了。因此审计门禁改为 `scripts/audit-gate.cjs`：读 `scripts/audit-allowlist.json`
+的显式豁免，**剩余的 high/critical 仍然阻断**。
+
+豁免分三类，每条都带理由与核查日期（缺任一字段门禁直接失败 —— 豁免必须是可复核的
+判断，不是黑名单）：
+
+| 分组 | 包 | 依据 |
+| --- | --- | --- |
+| `unreachable_excluded` | `jade` `constantinople` `uglify-js` `transformers` `clean-css` | 运行时插桩与源码静态引用（`scripts/check-dead-deps.cjs` 的判据）均未命中，且 `build/config.cjs` 已把它们排除出 asar —— 不在发布产物里 |
+| `unreachable_but_packaged` | `useragent` | 同上判据未命中；差别是会打进产物，故单列以示区分 |
+| `upstream_locked` | `NeteaseCloudMusicApi` `express` `body-parser` `path-to-regexp` `node-forge` `basic-ftp` `get-uri` `pac-proxy-agent` | **可达**（运行时插桩确认该 SDK 确实起了 express 服务，不是死代码），但 `NeteaseCloudMusicApi@4.32.0` 已是最新，修复需跨大版本升级其内置依赖，会破坏它的 HTTP 服务行为 |
+
+配套约束：
+
+- 能安全升级的已经升了（`overrides`：`proxy-addr@^2.0.8`、`moment@^2.31.0`、`qs@^6.16.0`
+  —— 同大版本或 patch 级），升级后 2816 条单测与 `check:dead-deps` 均通过。
+- 豁免清单里若有条目**当前已无对应漏洞**，门禁会报错要求移除 —— 豁免不得只增不减，
+  否则它会变成掩盖新问题的集合。
+- `unreachable_*` 的依据是可达性判据，与 `check:dead-deps` 配套：任何人把这些包加回
+  运行路径，那条检查会红。
+- 复核触发点：`NeteaseCloudMusicApi` 发布新版本时重新评估 `upstream_locked` 组。
+
+残余风险：`upstream_locked` 那批是**真实可达**的依赖，其漏洞并未消除，只是当前无
+可行的修复路径。已确认的实际缓解面：出网请求统一过 `utils/urlGuard.js` 的
+SSRF 校验（scheme/userinfo/DNS 全记录/内网 IP 判定），且不可达的模板引擎链已
+从产物中移除。
+
+### 4. 本地服务无速率限制
 
 - MCP 服务只靠 Bearer 令牌与 Origin 白名单防误触，没有请求频率限制。
 - 影响面限于**本机**（监听回环），且需要先拿到令牌。

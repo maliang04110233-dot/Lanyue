@@ -1,0 +1,19 @@
+{
+  "_comment": "npm audit 豁免清单。每条都必须写清「为什么豁免」，否则 scripts/audit-gate.cjs 拒绝放行 —— 豁免必须是可复核的判断，不是黑名单。分级判据见 SECURITY.md。",
+  "unreachable_excluded": {
+    "_why": "运行时插桩 + 源码静态引用（scripts/check-dead-deps.cjs 的判据）均未命中，且 build/config.cjs 已把它们排除出 asar —— 这些代码根本不在发布产物里，漏洞不可达。",
+    "_verified": "2026-10-13",
+    "packages": ["jade", "constantinople", "uglify-js", "transformers", "clean-css"]
+  },
+  "unreachable_but_packaged": {
+    "_why": "运行时插桩与静态引用均未命中：会被打进 asar，但没有任何代码路径加载它。与上一类的差别是「产物里存在」，故单列以示区分。",
+    "_verified": "2026-10-13",
+    "packages": ["useragent"]
+  },
+  "upstream_locked": {
+    "_why": "可达，但根因是 NeteaseCloudMusicApi@4.32.0（已是最新）内置的老依赖树。修复需跨大版本升级 express(4->5) / path-to-regexp(0.1->8) / body-parser(1->2)，会破坏该 SDK 内部的 HTTP 服务行为 —— 已实机验证该 SDK 确实起了 express 服务（运行时插桩命中），不是死代码。node-forge 自身 1.4.0 即最新。风险与缓解见 SECURITY.md。",
+    "_verified": "2026-10-13",
+    "_revisit": "NeteaseCloudMusicApi 发布新版本时重新评估",
+    "packages": ["NeteaseCloudMusicApi", "express", "body-parser", "path-to-regexp", "node-forge", "basic-ftp", "get-uri", "pac-proxy-agent"]
+  }
+}

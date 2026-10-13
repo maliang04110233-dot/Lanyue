@@ -58,15 +58,24 @@ test('verify 覆盖了真正需要本地跑通的全套检查', () => {
 });
 
 test('audit:deps 脚本仍保留（漏洞扫描不能消失，只是换了位置）', () => {
+  // 2026-10-13 起 audit:deps 指向 scripts/audit-gate.cjs：直接跑
+  // `npm audit --audit-level=high` 会把「不可达且已排除出包的 jade 依赖链」
+  // 也算成失败，发版被永久堵死（豁免依据见 SECURITY.md）。守卫的**意图不变**：
+  // 扫描必须还在，而且仍然对未豁免的 high/critical 红灯。
   assert.match(
-    scripts['audit:deps'], /npm audit .*--omit=dev.*--audit-level=high/,
-    'audit:deps 脚本被删或改了参数 —— 漏洞扫描不能因为「难跑」就不做了',
+    scripts['audit:deps'], /audit-gate\.cjs/,
+    'audit:deps 又退回了裸 npm audit —— 已评估过的依赖会把发版堵死',
   );
+  const gate = read(path.join('scripts', 'audit-gate.cjs'));
+  assert.match(gate, /LEVELS = \['critical', 'high'\]/, '门禁不再拦 high/critical');
+  assert.match(gate, /audit-allowlist\.json/, '门禁不再读豁免清单，等于直接放行全部漏洞');
 });
 
 test('CI 里 audit 步骤能区分「有漏洞」与「查不到」', () => {
   const ci = read(path.join('.github', 'workflows', 'ci.yml'));
-  assert.match(ci, /npm audit --omit=dev --audit-level=high/, 'CI 里的 audit 步骤不见了');
+  // 与 release.yml / npm 脚本同口径：都走 audit-gate.cjs，
+  // 否则 CI 会因为「已评估并豁免」而红，而发版流水线却放行 —— 两处口径分叉最坏。
+  assert.match(ci, /npm run audit:deps/, 'CI 里的 audit 步骤不见了，或与 npm 脚本口径不一致');
 
   // 关键：必须有把基础设施失败降级为 warning 的分支，且分支条件要能匹配
   // 镜像 404 与网络失败这两类真实报错。

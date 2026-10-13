@@ -50,8 +50,10 @@ jobs:
       - name: ESLint
         run: npm run lint
 
-      # 依赖漏洞：先只看 production 链路（--omit=dev）降噪；
-      # high 及以上直接红灯，避免静默积压。
+      # 依赖漏洞：走 scripts/audit-gate.cjs —— 它读 audit-allowlist.json 的显式豁免，
+      # **剩余的 high/critical 仍然阻断**。直接用 `npm audit --audit-level=high`
+      # 会把「不可达且已排除出包的 jade 依赖链」也算成失败，于是发版被永久堵死
+      # （这三类豁免的依据见 SECURITY.md「依赖漏洞的显式豁免」）。
       #
       # 但「有漏洞」和「查不到」在 npm audit 里是同一个退出码 1，必须分开：
       # 不少 registry 镜像（含国内常用的 npmmirror）没实现 audit 端点，
@@ -60,10 +62,10 @@ jobs:
       # 训练出来的结果是「红了就重跑」，真正的 high 漏洞也就一起被重跑掉了。
       # 所以这里按 stderr 特征把「基础设施失败」降级为 warning 并放行，
       # 「真有漏洞」仍然红灯。
-      - name: npm audit (production)
+      - name: 依赖漏洞审计（显式豁免清单）
         run: |
           set +e
-          out=$(npm audit --omit=dev --audit-level=high 2>&1)
+          out=$(npm run audit:deps 2>&1)
           status=$?
           set -e
           echo "$out"
