@@ -111,22 +111,22 @@ jobs:
       - name: Dead deps check
         run: npm run check:dead-deps
       - name: Unit tests
-        # 间歇性失败重试至多 3 次。
+        # --test-concurrency=4，并重试至多 3 次。
         #
-        # 为什么需要：本地 Node 22 / 24 均为 2828 全绿，CI 却在 ubuntu 与 windows
-        # 两个 runner 上都红在这一步 —— 不是平台差异，是**间歇性失败**。已确认的样本：
-        # test/scan-local-library.test.js 本地跑时出现过一次耗时 22.6 秒后超时（碰真实
-        # 文件系统的那几条用例在负载高的 runner 上会超时）。
+        # 并发限制的判据（本地已复现，不是猜）：默认并发下全量跑是 **2818 pass / 2 fail**，
+        # 失败的正是 test/export-scrub.test.js 与 test/import-whitelist.test.js；把并发降到 4
+        # 则是 **2828 pass / 0 fail**。而这两个文件单独跑只要 196ms，全量并发下却要 5~7 秒
+        # —— 典型资源竞争，不是逻辑错误（它们各自用 mkdtemp，目录并不冲突；冲突在
+        # prefs / approvedDirs 这类带模块级状态的依赖被并发摆弄）。
         #
-        # 为什么用 shell 循环而不是 `node --test-retry`：那个选项并非所有 node 构建都认
-        # （本地实测 `node: bad option: --test-retry=2`），把一个本地跑不通的命令写进流水
-        # 线，等于悄悄丢掉「本地验证过」这个前提。pwsh 是 Windows runner 的默认 shell，
-        # 本地也能直接跑这段 —— 与「先本地验过再推」的做法一致。
+        # 这也解释了为什么 ubuntu 与 windows 两个 runner 都红在同一步：与平台无关，是并发。
+        # 限制并发是治本（让用例不再互相踩），重试只是兜底 —— CI 机器核数少、负载高，
+        # 默认并发下更容易触发，不限制的话发不发得出去要靠运气。
         #
         # 边界：真失败重试 3 次仍会红，仍会阻断 —— 这是容忍 flaky，不是放水。
         run: |
           for ($i = 1; $i -le 3; $i++) {
-            npm test
+            node --test --test-concurrency=4 "test/*.test.js"
             if ($LASTEXITCODE -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
             Write-Output "::warning::Unit tests failed on attempt $i"
             Start-Sleep -Seconds 10

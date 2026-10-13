@@ -84,9 +84,11 @@ jobs:
       # 路径拼接 / 媒体探测），故 runner 与打包、与用户真实环境保持一致：windows-latest
       # （2026-10-13 改：放在 ubuntu 上时 CI 连续红，而同一份代码在 Windows 上全绿）
       - name: Unit tests
+        # 与 release.yml 同口径：并发 4 + 重试 3 次。判据见 release.yml 同名步骤的注释
+        # （默认并发下本地可复现 2 个用例因资源竞争而红，并发降到 4 即 2828 全绿）。
         run: |
           for ($i = 1; $i -le 3; $i++) {
-            npm test
+            node --test --test-concurrency=4 "test/*.test.js"
             if ($LASTEXITCODE -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
             Write-Output "::warning::Unit tests failed on attempt $i"
             Start-Sleep -Seconds 10
