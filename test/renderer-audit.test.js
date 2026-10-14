@@ -493,11 +493,11 @@ test('侧边栏分组：四个分区标题按序就位（164 起「搜歌」收�
   }
 });
 
-test('侧边栏条目：七个 data-tab 且「搜歌」是唯一发现/搜索入口（164 合并：search 条目退役，页面路由保留）', () => {
+test('侧边栏条目：九个 data-tab 且「搜歌」是唯一发现/搜索入口（164 合并：search 条目退役，页面路由保留）', () => {
   const html = read('index.html');
   const sb = html.slice(html.indexOf('<div class="sidebar">'), html.indexOf('<div class="content">'));
   const tabs = [...sb.matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]);
-  assert.deepStrictEqual(tabs, ['home', 'download', 'local', 'playlist', 'aggregate', 'subscription', 'ai-music', 'converter'],
+  assert.deepStrictEqual(tabs, ['home', 'download', 'local', 'playlist', 'aggregate', 'subscription', 'ai-music', 'assistant', 'converter'],
     '条目增删/换序会破坏 switchTab 兜底查询与 ⌘K/快捷键的 data-tab 反查 —— 164 只合并 home+search，余账不动');
   for (const t of tabs) {
     assert.ok(sb.includes(`onclick="switchTab('${t}',this)"`), `${t} 的 onclick 形状被改，切换链路可能断`);
@@ -518,7 +518,7 @@ test('侧边栏条目：七个 data-tab 且「搜歌」是唯一发现/搜索入
     '首个条目必须只有搜歌一项（多出来的说明有页面绕过分组挂在了栏顶）');
   assert.deepStrictEqual([...seg['下载'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['download']);
   assert.deepStrictEqual([...seg['曲库'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['local', 'playlist', 'aggregate', 'subscription']);
-  assert.deepStrictEqual([...seg['工具'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['ai-music', 'converter']);
+  assert.deepStrictEqual([...seg['工具'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['ai-music', 'assistant', 'converter']);
   assert.ok(!seg['操作'].includes('data-tab'), '「操作」两项是动作按钮不是页面，挂上 data-tab 会被 switchTab 兜底误高亮');
   // 「操作」段的打开目录按钮走 openFolderSafe（utils.js 的唯一出口）——
   // 裸调 api.openFolder 在主进程沙箱拒绝时是静默失败，用户点了没反应也没提示。

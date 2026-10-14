@@ -130,11 +130,12 @@ test('族钉本身非空转：三族裸调用与三种全局前缀全命中，�
   }
 });
 
-// ── 接线钉：17 个调用点全部改走 askConfirm ──────────────────
+// ── 接线钉：18 个调用点全部改走 askConfirm ──────────────────
 
 const ASK_SITES = [
   ['app.js', 1],
   ['lyricEditor.js', 1],
+  ['views/ai-assistant.js', 1],
   ['views/ai-music.js', 1],
   ['views/download.js', 1],
   ['views/dragdrop.js', 1],
@@ -144,7 +145,7 @@ const ASK_SITES = [
   ['views/settings.js', 4],
 ];
 
-test('17 处不可逆操作全部接线 askConfirm，且调用处必带 await（不 await 的确认框等于没有确认）', async () => {
+test('18 处不可逆操作全部接线 askConfirm，且调用处必带 await（不 await 的确认框等于没有确认）', async () => {
   let total = 0;
   for (const [f, n] of ASK_SITES) {
     const src = read('js', ...f.split('/'));
@@ -155,7 +156,7 @@ test('17 处不可逆操作全部接线 askConfirm，且调用处必带 await（
     `${f} 需 import askConfirm`);
     total += calls.length;
   }
-  assert.equal(total, 17, '调用点总数必须等于 17——多了少了都要先改这张表再改代码');
+  assert.equal(total, 18, '调用点总数必须等于 18——多了少了都要先改这张表再改代码');
 });
 
 // ── 弹层自身的纪律 ────────────────────────────────────────
