@@ -712,12 +712,12 @@ function switchTab(tab, btn) {
   } else if (tab === 'subscription') {
     if (subscriptionPage) {
       subscriptionPage.style.display = 'flex';
+      if (typeof initSubscriptionView === 'function') initSubscriptionView();
+    }
   } else if (tab === 'aggregate' && aggregatePage) {
     aggregatePage.style.display = 'flex';
     // 首次进入才拉数据：反复切页不该反复打 IPC
     if (!_aggLoaded) { _aggLoaded = true; loadAggregated(); }
-      if (typeof initSubscriptionView === 'function') initSubscriptionView();
-    }
   } else if (tab === 'ai-music') {
     if (aiMusicPage) {
       aiMusicPage.style.display = 'flex';

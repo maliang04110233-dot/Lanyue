@@ -57,6 +57,51 @@ test('switchTab：首次进入才拉数据（反复切页不该反复打 IPC）'
   assert.match(APP, /if\s*\(!_aggLoaded\)/, '加载应受标志保护');
 });
 
+/**
+ * 形状钉：每个侧栏入口都必须有 if-chain **顶层**分支。
+ * 7232733 把 aggregate 分支贴进了 subscription 分支的 if 体里 —— 语法合法、
+ * lint 不报、上面三枚「取出/隐藏/显示」钉全绿（那三枚只看字符串在不在，不看在哪），
+ * 但点聚合只会看到一片空白：所有页面都被隐藏，没人负责显示。
+ * 判据因此是**花括号深度**：分支行得在函数体第一层，缩进不算（贴错的那行缩进是对的）。
+ */
+test('switchTab：侧栏每个 tab 都有顶层分支（分支嵌进别的分支里=页面不可达）', () => {
+  const tabs = [...new Set([...HTML.matchAll(/class="nav-item" data-tab="([^"]+)"/g)].map(m => m[1]))];
+  assert.ok(tabs.includes('aggregate'), '侧栏聚合入口没了，本钉就失效了');
+
+  const start = APP.indexOf('function switchTab(tab, btn)');
+  assert.ok(start > 0, 'switchTab 找不到');
+  const seg = APP.slice(APP.indexOf('{', start), APP.indexOf('\n}\n', start) + 2);
+  const noBlock = seg.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // 只剩花括号与行首注释剥离后的结构：模板串的 ${} 与字符串里的花括号都不算结构
+  const structural = (line) => {
+    const s = line
+      .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+      .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+      .replace(/`(?:[^`\\]|\\.)*`/g, '``');
+    const c = s.indexOf('//');
+    return c >= 0 ? s.slice(0, c) : s;
+  };
+
+  const branchDepth = new Map();   // tab 名 → 该分支所在的花括号深度（1 = if-chain 顶层）
+  let depth = 0;
+  for (const line of noBlock.split('\n')) {
+    const shape = structural(line);
+    const m = shape.includes("if (tab === ") && line.match(/^\s*(?:\}\s*)?(?:else\s+)?if\s*\(tab === '([^']+)'/);
+    // 行首的 } 先关掉上一层，分支真正的层级要减掉它才算
+    const lead = shape.trimStart().startsWith('}') ? 1 : 0;
+    if (m && !branchDepth.has(m[1])) branchDepth.set(m[1], depth - lead);
+    for (const c of shape) {
+      if (c === '{') depth++;
+      else if (c === '}') depth--;
+    }
+  }
+
+  const off = tabs.filter(v => branchDepth.get(v) !== 1);
+  assert.deepStrictEqual(off, [], '这些侧栏 tab 的分支不在 if-chain 顶层: ' +
+    off.map(v => `${v}@depth${branchDepth.has(v) ? branchDepth.get(v) : 'none'}`).join(', '));
+});
+
 // ── 3. 视图模块 ───────────────────────────────────────
 
 test('视图：已被 app.js import', () => {
