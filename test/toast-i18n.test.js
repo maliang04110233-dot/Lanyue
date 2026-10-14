@@ -371,6 +371,8 @@ const CONQUERED = [
   'src/renderer/js/views/subscriptions.js',
   // 轨道二出生即零欠账：助手页从第一版起文案全走词典
   'src/renderer/js/views/ai-assistant.js',
+  // 轨道三同上：智能歌单面板也是出生即全走词典
+  'src/renderer/js/views/smart-playlist.js',
 ];
 
 test('已收编文件的用户反馈文案零硬编码（本轮兑现的那一面）', () => {
@@ -436,6 +438,8 @@ const CONQUERED_VIEWS = [
   'src/renderer/js/views/subscriptions.js',
   // 轨道二出生即零欠账，无须「先攒中文再收编」这一轮
   'src/renderer/js/views/ai-assistant.js',
+  // 轨道三同上
+  'src/renderer/js/views/smart-playlist.js',
 ];
 
 test('已收编视图文件的取词走 i18n.js 的 t，且文件内没有名为 t 的局部遮蔽', () => {

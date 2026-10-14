@@ -1807,3 +1807,48 @@
   font-family: inherit;
 }
 .asst-input:focus { outline: none; border-color: var(--neon-cyan); }
+
+/* ── AI 智能歌单面板（轨道三，长在歌单页顶部）──────────── */
+.spl-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.spl-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.spl-scope {
+  padding: 7px 10px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.spl-scope:focus { outline: none; border-color: var(--neon-cyan); }
+.spl-prompt { flex: 1; min-width: 160px; }
+.spl-status { font-size: 12px; color: var(--neon-dim); line-height: 1.6; }
+.spl-result { display: flex; flex-direction: column; gap: var(--sp-2); }
+.spl-label { font-size: 12px; color: var(--neon-dim); white-space: nowrap; }
+.spl-name { max-width: 220px; }
+.spl-reason { font-size: 12px; color: var(--neon-dim); line-height: 1.6; }
+.spl-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.spl-song { display: flex; align-items: center; gap: var(--sp-2); font-size: 12.5px; color: var(--text); cursor: pointer; }
+.spl-song:hover { background: var(--bg-hover); }
+.spl-song:focus-within { outline: 1px solid var(--neon-cyan); outline-offset: -1px; }
+.spl-song input { accent-color: var(--neon-cyan); }
+.spl-off { color: var(--neon-dim); text-decoration: line-through; }
+.spl-actions { display: flex; gap: var(--sp-2); }

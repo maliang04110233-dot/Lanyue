@@ -55,6 +55,7 @@ import './views/playlist.js';
 import './views/aggregate.js';
 import './views/subscriptions.js';
 import './views/ai-assistant.js';
+import './views/smart-playlist.js';
 import './views/clipboard.js';
 import './views/batchImport.js';
 import './views/nameBatch.js';

@@ -38,6 +38,7 @@ const ipcCloudSync = require('./ipc/cloudSync');
 const ipcSubscriptions = require('./ipc/subscriptions');
 const ipcMcp = require('./ipc/mcp');
 const ipcAssistant = require('./ipc/ai-assistant');
+const ipcSmartPlaylist = require('./ipc/smart-playlist');
 const subscriptions = require('./subscriptions');
 const clipboardWatch = require('./clipboardWatch');
 const { createLibraryWatcher } = require('./libraryWatcher');
@@ -762,6 +763,9 @@ function registerAllIpcHandlers() {
 
   // 助手与外部 Agent 共用同一张工具表与同一条桥，所以排在 MCP 之后（口径一致，非依赖）
   ipcAssistant.register();
+
+  // 智能歌单只读曲库、只出一次网，写库仍走 save-user-playlist，所以排在助手之后即可
+  ipcSmartPlaylist.register();
 
   // ── 播放队列持久化 IPC ─────────────────────────────
   ipcHandle('save-play-queue', (_, data) => {

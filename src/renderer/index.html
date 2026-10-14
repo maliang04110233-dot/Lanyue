@@ -510,7 +510,31 @@
         <button class="tab" title="扫描全部歌单，揪出同一身份散落在 ≥2 个歌单的歌（本地认文件路径、在线认来源+ID）" onclick="scanCrossPlaylistDupes()" style="white-space:nowrap;">🧮 跨单查重</button>
         <button class="tab" title="选择 .m3u/.m3u8 文件，按本地曲库匹配（路径优先、曲名+歌手兜底）直接建为歌单，导入即可播" onclick="pickM3uForPlaylist()" style="white-space:nowrap;">📥 导入 m3u</button>
         <button class="tab" id="plTrashBtn" title="已删除的歌单在这里保留 30 天，可恢复或彻底删除" onclick="openPlaylistTrash()" style="display:none;white-space:nowrap;">🗑 回收站</button>
+        <button class="tab" id="smartPlToggleBtn" onclick="toggleSmartPanel()" style="white-space:nowrap;" data-i18n="smartPl.open">✨ AI 生成歌单</button>
         <button class="btn-primary" onclick="openPlaylistEditor(null)" style="white-space:nowrap;">➕ 新建歌单</button>
+      </div>
+
+      <!-- 轨道三：AI 智能歌单 —— 只读生成，落库只发生在下面「存为歌单」那一下 -->
+      <div id="smartPlPanel" class="spl-panel" style="display:none;">
+        <div class="spl-row">
+          <select class="spl-scope" id="smartPlScope" aria-label="挑选范围"></select>
+          <input class="search-input spl-prompt" id="smartPlPrompt" maxlength="200" data-i18n="smartPl.promptPlaceholder" placeholder="例：适合夜跑的快节奏中文歌">
+          <button class="btn-primary" id="smartPlGenBtn" onclick="runSmartPlaylist()" data-i18n="smartPl.generate">生成</button>
+        </div>
+        <div class="spl-status" id="smartPlStatus"></div>
+        <div class="spl-result" id="smartPlResult" style="display:none;">
+          <div class="spl-row">
+            <span class="spl-label" data-i18n="smartPl.nameLabel">歌单名</span>
+            <input class="search-input spl-name" id="smartPlName" maxlength="40">
+            <span class="spl-label" data-i18n="smartPl.hintUnchecked">取消勾选即可去掉这首</span>
+          </div>
+          <div class="spl-reason" id="smartPlReason"></div>
+          <div class="spl-list" id="smartPlList"></div>
+          <div class="spl-actions">
+            <button class="btn-primary" onclick="saveSmartPlaylist()" data-i18n="smartPl.save">存为歌单</button>
+            <button class="btn-secondary" onclick="toggleSmartPanel()" data-i18n="smartPl.close">收起</button>
+          </div>
+        </div>
       </div>
       <div id="userPlaylistGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;"></div>
     </div>

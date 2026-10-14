@@ -188,6 +188,12 @@ const CHANNELS = {
   'ai-assistant-tools': { invoke: MAIN },
   'ai-assistant-plan': { invoke: MAIN, args: [['messages', t.arr(24)]] },
   'ai-assistant-tool-call': { invoke: MAIN, args: [['name', t.str(64)], ['args', t.obj()], ['confirmed', t.bool()]] },
+
+  // ── AI 智能歌单（invoke）──────────────────────────
+  // 只读通道：取候选 → 一次出网 → 回真歌曲对象。写不写库由界面那一下
+  // 「存为歌单」经既有的 save-user-playlist 决定，所以这条通道不进 MCP 工具表白名单
+  // （外部 Agent 要同样的效果，用 get_user_playlists 自己挑，无需 LLM 代劳）。
+  'smart-playlist-generate': { invoke: MAIN, args: [['prompt', t.str(200)], ['scope', t.str(64)]] },
   'check-for-update':   { invoke: MAIN },
   'download-update':    { invoke: MAIN },
   'restart-and-install':{ invoke: MAIN },
