@@ -267,14 +267,14 @@ diff：
 ${cap}`;
 }
 
-async function callModel({ fetchImpl, apiKey, messages, signal }) {
+async function callModel({ fetchImpl, apiKey, prompt, signal }) {
   const res = await fetchImpl(`${API_BASE}/v1/text/chatcompletion_v2`, {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model: MODEL, messages: [
       { role: 'system', content: '你是严格的代码复审者。只输出结论，不输出任何工具调用或 JSON 协议。' },
-      { role: 'user', content: messages },
+      { role: 'user', content: prompt },
     ], temperature: 0.2, max_tokens: MAX_TOKENS }),
   });
   const data = await res.json();
@@ -307,7 +307,7 @@ async function run(opts = {}) {
   let comment = '';
   try {
     const text = await callModel({ fetchImpl, apiKey: env.MINIMAX_API_KEY,
-      messages: buildPrompt({ diff: String(opts.diff || ''), findings: opts.findings }),
+      prompt: buildPrompt({ diff: String(opts.diff || ''), findings: opts.findings }),
       signal: AbortSignal.timeout(90_000) });
     comment = renderComment(text);
     await postComment({ fetchImpl, token: env.GITHUB_TOKEN, repo: env.REPO, prNumber: env.PR_NUMBER,
@@ -442,7 +442,10 @@ Expected: FAIL —— `ci.yml 里没有 ai-review job`
           git diff "origin/${GITHUB_BASE_REF}...HEAD" > pr.diff || true
           wc -c pr.diff
 
-      # doctor 只在红的那次落 attempt-N.tap.txt；绿跑没有这个文件，脚本按 null 处理
+      # 本版**不接**归因产物：doctor 的结论已经在 step summary 里给人看了，而 ai-review 与 lint-test
+      # 是两个并行 job（故意不 needs，见上面注释），拿不到 attempt-N.tap.txt。
+      # 引擎侧的 --findings-file 已实现并有测试覆盖，将来要接就是补一个 artifact 传递 —— 别顺手加，
+      # 那是第二条需要论证的链路（多一次 artifact 读写就多一种失败形态）。
       - name: 跑复审
         env:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
