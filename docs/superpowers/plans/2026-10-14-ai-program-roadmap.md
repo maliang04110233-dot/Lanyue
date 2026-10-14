@@ -15,7 +15,7 @@
 | # | 轨道 | 计划文件 | 依赖 | 状态 |
 |---|------|----------|------|------|
 | 1 | MCP 一等公民化 + 调用审计 + 速率限制 | `2026-10-14-mcp-first-class.md` | 无 | 已落地（收尾 e5320a1） |
-| 2 | 应用内 AI 助手（复用 MCP 工具面做 function-calling） | `2026-10-14-in-app-ai-assistant.md` | 轨道 1 的 `auditStore` / `onCall` 钩子 | 已落地（3dcd2a5 起六枚提交，收尾 b8e8059）；推送+CI 已绿（`e44df72` 两条 job success），界面实测：离线链真点到，出网三条待用户 Key |
+| 2 | 应用内 AI 助手（复用 MCP 工具面做 function-calling） | `2026-10-14-in-app-ai-assistant.md` | 轨道 1 的 `auditStore` / `onCall` 钩子 | 已落地（3dcd2a5 起六枚提交，收尾 b8e8059）；推送+CI 已绿（`e44df72` 两条 job success），界面实测：机制四条已在真 DOM 点到（只读直连、写前真弹层、取消零执行、回复含标签只当文本），欠账只剩「真供应商回复形态」一层，待用户 Key |
 | 3 | AI 智能歌单（**打标已砍**，见下方说明） | 无计划文件：范围收到一处 bounded 改动，直接按 TDD 落地 | 轨道 2 的出网通道 `assistantChat` 与严格 JSON 协议 | 已落地（4e28237）；行为单测 16 枚 + CDP 真点离线链，CI 同上一条一起绿 |
 | 4 | AI 接管研发流水线（CI 归因 + 复审 agent） | 无计划文件：归因是一处 bounded 改动（只碰 `.github/workflows/` 与新脚本），直接按 TDD 落地 | 无（与 1-3 并行不冲突） | 归因侧已落地并在 runner 上验绿（`1302f35` → `05e31ed` → `84fa480` → `dec890b`，两个 job 全成功）；复审 agent 未动 —— 它必然要出网花钱，与归因半侧无共享写入点，另立计划再说 |
 
@@ -46,6 +46,16 @@
 多开一条凭据外泄通道，与 `SECURITY.md` 的口径相反；② 换来的覆盖是重复的 ——
 `planAssistantTurn` 的 `chat` 本来就是注入的，协议解析、白名单钳制、确认闸门、审计落点都已有
 拿假 chat 跑过的单测，真没验的只剩「模型按协议答话时上游通不通」，那只有真 Key 答得出。
+
+**机制半侧已在真 DOM 里点过**（2026-10-14，不出网、不要 Key）：脚手架是一个静态服务
+`src/renderer` 的一次性 harness，把 `window.ipcRenderer` 按 preload 的真实语义打桩 —— 未授权通道
+返回 `undefined`（生产就是这么静默）、信封已由 preload 解过所以桩返回渲染层实际拿到的东西、
+白名单直接取主进程注入的同一份 `buildContractArg('main')` 而不是另攒一份。四条结论：
+只读步骤不弹确认、`confirmed` 传 `false`；写步骤先弹**真**确认框（标题「助手想执行：add_to_queue」，
+参数原样列在正文），点确认后才有那一次 `confirmed=true`；点取消则该步零次 tool-call、
+上屏「已取消：toggle_favorite」且循环继续走到下一回合；模型回复塞 `<img src=x onerror=…>` 时
+消息节点零子元素、文档里零注入 `img`。harness 用完即删 —— 它换到的是「界面侧断言从源码形状钉
+升到真 DOM 观察」，重建做法已写在这段里。欠账因此收窄成一层：**真供应商的回复形态**。
 
 **轨道 3 为什么只剩一半**：曲库自动打标原计划把标签写进 `library-index.json`，
 读时再 join 回歌单。动手前对着源码否掉了 —— `incrementalScan` 在文件 mtime 变化时执行

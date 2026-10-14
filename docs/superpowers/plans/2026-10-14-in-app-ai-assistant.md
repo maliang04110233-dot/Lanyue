@@ -1364,7 +1364,10 @@ window.clearAssistant = clearAssistant;
 Run: `node --test test/ai-assistant-ui.test.js test/toast-i18n.test.js`
 Expected: `ai-assistant-ui` 全绿；`toast-i18n` 此时仍绿（新文件还没进 `CONQUERED`，Task 6 收编）。
 
-- [ ] **Step 9: 手动验证（起应用真点一遍）**
+- [ ] **Step 9: 手动验证（起应用真点一遍）** —— 2026-10-14 状态：机制四条已在真 DOM 点到
+  （只读步骤不弹确认、写步骤弹真确认框且只有点确认后才出现 `confirmed=true`、点取消则该步零次
+  执行且循环继续、模型回复含 `<img>` 只当文本上屏；harness 做法记在 roadmap 同名段落）。
+  **这一项不勾**：剩下的是真供应商回复形态下的三条金路，要用户的 Key 或在装好的应用里人肉走一遍。
 
 ```bash
 npm run dev   # 或本仓既有的启动方式
