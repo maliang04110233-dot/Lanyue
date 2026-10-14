@@ -117,8 +117,8 @@ jobs:
       # 但「哪个用例红的」这句话丢了，就等于把归因做成了半件。
       - name: Unit tests
         # 与 release.yml 同口径：并发 2 + 重试 3 次 + 失败用例以 annotation 暴露。
-        # 判据与理由见 release.yml 同名步骤的注释。
-        # （详版归因先只加在这侧：release.yml 要 tag 才跑，今天改它无从验证，等下次动它时跟上。）
+        # 判据与理由见 release.yml 同名步骤的注释；两处命令体必须逐行相同，
+        # 这件事由 test/ciDoctor.test.js 的形状钉守着（分叉过一次：probe 调试行只在一侧被删）。
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           for ($i = 1; $i -le 3; $i++) {

@@ -295,6 +295,42 @@ test('analyze: 中文全成乱码也照样定性 —— 判据只吃 ASCII，不
   assert.strictEqual(analyze(attemptsSame(3, mojibake(TAP_ASSERTION))).findings[0].category, 'DETERMINISTIC_REGRESSION');
 });
 
+// ── 形状钉：两条 workflow 的归因口径不许分叉 ─────────────
+
+test('ci.yml 与 release.yml 的 Unit tests 命令体逐行相同 —— probe 调试行曾在两处差活四天', () => {
+  // 分叉是怎么发生的：详版归因先只加在 ci.yml（release.yml 要 tag 才跑，当时无从验证），
+  // 于是同一条 `::error::probe` 调试行在 ci.yml 被删掉后，还在 release.yml 里每次绿跑
+  // 都发一条假 error。读一份 yaml 再比对成本极低，分叉成本是一次「发版时才发现两处不一样」。
+  const runBody = (file) => {
+    const lines = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', file), 'utf8').split(/\r?\n/);
+    const start = lines.findIndex((l) => /^\s*- name: Unit tests\s*$/.test(l));
+    assert.notStrictEqual(start, -1, `${file} 里找不到 Unit tests 步骤`);
+    const runAt = lines.findIndex((l, i) => i > start && /^\s*run: \|\s*$/.test(l));
+    assert.notStrictEqual(runAt, -1, `${file} 的 Unit tests 步骤没有 run 块`);
+    const indent = lines[runAt].match(/^\s*/)[0].length;
+    const body = [];
+    for (let i = runAt + 1; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.trim() !== '' && l.match(/^\s*/)[0].length <= indent) break;
+      body.push(l.replace(/^ {4}/, ''));
+    }
+    return body.join('\n');
+  };
+
+  const ci = runBody('ci.yml');
+  const rel = runBody('release.yml');
+  assert.strictEqual(rel, ci, '两份 Unit tests 命令体必须逐行一致');
+
+  // 钉住关键特征本身（防止有人把两处一起改坏成另一份共同形状）
+  assert.match(ci, /\[Console\]::OutputEncoding = \[System\.Text\.Encoding\]::UTF8/);
+  assert.match(ci, /-Context 3,26/);
+  assert.match(ci, /Context\.PreContext/);
+  assert.match(ci, /node scripts\/ci-doctor\.cjs --tap-dir \. --summary/);
+  assert.ok(!/probe attempt=/.test(ci), '调试探针行不该留在任何一侧 —— 它每次绿跑都发一条 ::error::');
+  assert.ok(!/[^\x00-\x7F]/.test(ci), 'run 块必须纯 ASCII：它会被原样写进 PowerShell 脚本文件，编码由 runner 决定');
+});
+
+
 // ── 输出：annotation 必须能被 runner 解析 ────────────────
 
 test('formatAnnotations: 每条 finding 一行，% 与 # 与换行都转义（workflow command 的硬要求）', () => {

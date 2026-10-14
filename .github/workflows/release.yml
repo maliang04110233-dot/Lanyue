@@ -122,23 +122,32 @@ jobs:
         # check-runs 的 annotations，那里无需 token 即可读，于是排查不再需要人肉爬网页。
         #
         # 边界：真失败重试 3 次仍会红，仍会阻断 —— 这是容忍 flaky，不是放水。
+        #
+        # 归因口径与 ci.yml 的 Unit tests 步骤**逐行相同**（详情窗口取 not ok 前 3 行、
+        # 落盘 attempt-N.tap.txt、红满 3 次交给 scripts/ci-doctor.cjs 定性、首行强令控制台
+        # UTF-8）。两份循环一旦分叉就重演 2026-10-14：同一条 probe 调试行在 ci.yml 被修掉了，
+        # 在 release.yml 里又活了四天，因为没人对比过两处。钉它的用例在 test/ciDoctor.test.js。
+        # 注意这一步骤在 tag 触发前无从在 runner 上验证，改动体是本地实跑过的那份的原样拷贝。
         run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           for ($i = 1; $i -le 3; $i++) {
             $out = node --test --test-concurrency=2 "test/*.test.js" 2>&1
             $code = $LASTEXITCODE
-            # 探针：无论成败都发一条 annotation。上一轮 annotations 数组存在却全空，
-            # 分不清是「命令格式没被解析」还是「压根没匹配到失败行」—— 一次分清。
-            Write-Output "::error::probe attempt=$i exit=$code lines=$($out.Count)"
+            $out | Out-File -FilePath "attempt-$i.tap.txt" -Encoding utf8
+            Set-Content -Path "attempt-$i.exit" -Value $code -Encoding ascii
             if ($code -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
-            $hits = @($out | Select-String -Pattern '✖|not ok' | Select-Object -First 10)
-            Write-Output "::error::matched $($hits.Count) failure lines"
+            $hits = @($out | Select-String -Pattern 'not ok \d+' -Context 3,26 | Select-Object -First 4)
+            Write-Output "::error::matched $($hits.Count) failing tests"
             foreach ($h in $hits) {
-              $msg = ($h -replace '%', '%25' -replace "`r", '' -replace "`n", ' ')
-              if ($msg.Length -gt 150) { $msg = $msg.Substring(0, 150) }
-              Write-Output "::error::FAIL-LINE $msg"
+              $body = (@($h.Context.PreContext) + @($h.Line) + @($h.Context.PostContext)) -join ' | '
+              $body = ($body -replace '%', '%25' -replace '#', '%23') -replace "`r", ''
+              $body = $body -replace "`n", ' ' -replace ' +', ' '
+              if ($body.Length -gt 1400) { $body = $body.Substring(0, 1400) }
+              Write-Output "::error::FAIL-DETAIL $body"
             }
             Start-Sleep -Seconds 10
           }
+          node scripts/ci-doctor.cjs --tap-dir . --summary
           Write-Output "::error::Unit tests failed 3 attempts in a row"
           exit 1
 
