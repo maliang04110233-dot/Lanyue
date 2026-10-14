@@ -142,6 +142,62 @@ jobs:
           Write-Output "::error::Unit tests failed 3 attempts in a row"
           exit 1
 
+      # 归因引擎的 FAIL 分支自检（合成红 TAP，每次绿跑都走一遍）。
+      # 为什么要有这一步：上面那行 `--tap-dir . --summary` 只在单测连红三次之后才执行，
+      # 于是「归因引擎自己坏了」这件事只会在真正需要它的那次红里暴露 —— 而那次恰好缺归因
+      # （与 test/ciDoctor.test.js 把归因引擎单独拉进 lint 覆盖是同一条理由：把死角提前到日常提交）。
+      # 做法是喂一份**合成的**红 TAP（test/fixtures/ci-doctor-red.tap：三轮同指纹 + 中文用例名），
+      # 让红路和绿路一样每天真跑一次，而不是靠人造一次真红。
+      #
+      # 两条不变量，改这一步之前先读懂：
+      #   ① 归因输出必须**捕获**、不许裸回显。红路 annotation 的真身是 `::error::` 开头的行，
+      #      裸跑就等于在绿跑上伪造一堆真红 annotation —— Unit tests 里那条调试探针行干过的事
+      #      （每次绿跑发一条假 error）。自检失败时确实要回显排查原文，但先把前缀换成中性串：
+      #      连「自检挂了」这一次都不该顺带伪造一层红。
+      #   ② GITHUB_STEP_SUMMARY 必须在步骤内改指临时文件。归因表写得挺像样（结论：FAIL +
+      #      用例名 + 处置建议），不改指向就是把假红写进真实 job summary，绿跑看着像红过 ——
+      #      那比没有自检更糟。
+      # 断言里不许出现中文字面量：这个 run 块会被原样写进 PowerShell 脚本文件，编码由 runner 决定
+      # （本文件上面 Unit tests 那段注记的同一口径）。所以「中文用例名活着」不写成中文去比，改成
+      # 两条定位到**用例名那一位**的正向断言：annotation 的 `name=` 后面必须还有非 ASCII 字符、
+      # summary 表格里 `| DETERMINISTIC_REGRESSION | ` 后面同理；再加一条 U+FFFD 不许出现
+      # （U+FFFD 用 [char]0xFFFD 拼）。为什么定位到那一位：全串级别的「还有非 ASCII 吗」探测不到
+      # 用例名烂掉 —— 归因的建议文案本身就是中文，2026-10-14 拿纯 ASCII 用例名的 fixture 试过一次，
+      # 全串探测照样放行。
+      # 覆盖范围如实说清：这一步验的是「脚本在 runner 的 Node/PowerShell/真实文件路径下跑得通、
+      # 定得对性、中文不烂」；它读的是合成 TAP，不验真红时上游落盘的那三份文件本身是否完好。
+      - name: CI doctor self-check
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $work = Join-Path $env:RUNNER_TEMP ("ci-doctor-selfcheck-" + $env:GITHUB_RUN_ID)
+          Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          for ($i = 1; $i -le 3; $i++) {
+            Copy-Item test/fixtures/ci-doctor-red.tap (Join-Path $work ("attempt-$i.tap.txt"))
+            Set-Content -Path (Join-Path $work ("attempt-$i.exit")) -Value 1 -Encoding ascii
+          }
+          $env:GITHUB_STEP_SUMMARY = Join-Path $work 'step-summary.md'
+          $out = node scripts/ci-doctor.cjs --tap-dir $work --summary 2>&1
+          $code = $LASTEXITCODE
+          $text = ($out | Out-String)
+          $fffd = [string][char]0xFFFD
+          $bad = @()
+          if ($code -ne 0) { $bad += "exit=$code" }
+          if ($text -notmatch 'CI-DOCTOR category=DETERMINISTIC_REGRESSION') { $bad += 'no annotation' }
+          if ($text -match $fffd) { $bad += 'annotation mojibake' }
+          if ($text -notmatch 'name=[^\u0000-\u007f]') { $bad += 'test name lost' }
+          $sum = ''
+          if (Test-Path $env:GITHUB_STEP_SUMMARY) { $sum = Get-Content -Raw -Encoding utf8 $env:GITHUB_STEP_SUMMARY }
+          if ($sum -notmatch '## CI') { $bad += 'no step summary' }
+          if ($sum -match $fffd) { $bad += 'summary mojibake' }
+          if ($sum -notmatch '\| DETERMINISTIC_REGRESSION \| [^\u0000-\u007f]') { $bad += 'summary test name lost' }
+          if ($bad.Count -gt 0) {
+            ($text -replace '::error::', 'DOC-ERR ') | Write-Output
+            Write-Output ('CI-DOCTOR-SELFCHECK-FAILED ' + ($bad -join '; '))
+            exit 1
+          }
+          Write-Output 'CI-DOCTOR-SELFCHECK-OK'
+
   # ── 第二层：构建 + asar 冒烟 ───────────────────────────
   build-smoke:
     name: Build & Asar Smoke

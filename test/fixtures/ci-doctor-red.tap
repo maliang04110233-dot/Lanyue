@@ -1,0 +1,27 @@
+TAP version 13
+# Subtest: 用例丙：断言失败
+not ok 1 - 用例丙：断言失败
+  ---
+  duration_ms: 4.3433
+  type: 'test'
+  location: 'F:\\新建文件夹\\Lanyue-1.0.35\\test\\localLibrary.test.js:3:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+
+      {
+    +   title: '未知 - 01.mp3'
+    -   title: '无标签'
+      }
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    TestContext.<anonymous> (F:\新建文件夹\Lanyue-1.0.35\test\localLibrary.test.js:4:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+  ...
+1..1
+# tests 1
+# pass 0
+# fail 1

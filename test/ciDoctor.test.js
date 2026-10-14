@@ -299,12 +299,12 @@ test('analyze: 中文全成乱码也照样定性 —— 判据只吃 ASCII，不
 // ── 形状钉：两条 workflow 的归因口径不许分叉 ─────────────
 
 /** 抠出某个 workflow 里 `Unit tests` 步骤的 run 块正文（去缩进，逐行原样） */
-function unitTestsRunBody(file) {
+function stepRunBody(file, stepName) {
   const lines = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', file), 'utf8').split(/\r?\n/);
-  const start = lines.findIndex((l) => /^\s*- name: Unit tests\s*$/.test(l));
-  assert.notStrictEqual(start, -1, `${file} 里找不到 Unit tests 步骤`);
+  const start = lines.findIndex((l) => new RegExp(`^\\s*- name: ${stepName}\\s*$`).test(l));
+  assert.notStrictEqual(start, -1, `${file} 里找不到 ${stepName} 步骤`);
   const runAt = lines.findIndex((l, i) => i > start && /^\s*run: \|\s*$/.test(l));
-  assert.notStrictEqual(runAt, -1, `${file} 的 Unit tests 步骤没有 run 块`);
+  assert.notStrictEqual(runAt, -1, `${file} 的 ${stepName} 步骤没有 run 块`);
   const indent = lines[runAt].match(/^\s*/)[0].length;
   const body = [];
   for (let i = runAt + 1; i < lines.length; i++) {
@@ -313,6 +313,10 @@ function unitTestsRunBody(file) {
     body.push(l.replace(/^ {4}/, ''));
   }
   return body.join('\n');
+}
+
+function unitTestsRunBody(file) {
+  return stepRunBody(file, 'Unit tests');
 }
 
 test('ci.yml 与 release.yml 的 Unit tests 命令体逐行相同 —— probe 调试行曾在两处差活四天', () => {
