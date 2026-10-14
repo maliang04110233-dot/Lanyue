@@ -197,19 +197,35 @@ jobs:
 
       - name: 从 CHANGELOG 抽取本次版本的条目作为 Release notes
         id: notes
+        # 抽取失败**不得阻断发版**：tag 才是发布意图的唯一声明，notes 是附属品。
+        # 原写��用 `set -euo pipefail` + `sed '/./,$!d'`，两处都要命：
+        #   · awk 对 "\[" 的转义处理在实现之间不一致 —— gawk 5.4 明确 warning 并把它当
+        #     普通 "["，于是 "[1.0.36]" 退化成**字符类**（只匹配单个字符），永远匹配不上；
+        #   · `sed '/./,$!d'` 实际语义是"删掉第一个非空行及其之后的所有内容"，
+        #     等于把刚抽出来的条目整个清空。
+        # 而这段代码此前从未真正跑过 —— 流水线从 10-10 起一直红在它前面的步骤，
+        # 它一次都没被执行到，"看起来能跑"其实只是没被执行过。
+        #
+        # 现在：index() 做纯字面量比较（无正则、无转义、mawk/gawk/BSD 一致）；
+        # 抽不到就 warning + 兜底文案，Release 照常创建。
         run: |
-          set -euo pipefail
           V="${{ needs.build.outputs.version }}"
-          # 抽取 "## [V]" 到下一个 "## [" 之间的内容
-          NOTES=$(awk -v v="$V" '
-            $0 ~ "^## \\["v"\\]" {flag=1; next}
-            flag && /^## \[/ {exit}
-            flag {print}
-          ' CHANGELOG.md | sed '/./,$!d')
+          NOTES=""
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk -v v="$V" '
+              index($0, "## [" v "]") == 1 {flag=1; next}
+              flag && index($0, "## [") == 1 {exit}
+              flag {print}
+            ' CHANGELOG.md || true)
+          fi
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "::warning::CHANGELOG.md 里抽不到 ## [$V] 条目，Release notes 改用兜底文案"
+            NOTES="本版变更详见 CHANGELOG.md 的 \`## [$V]\` 一节。"
+          fi
           {
             echo "## ${V}"
             echo
-            echo "${NOTES:-（CHANGELOG 中该版本条目为空）}"
+            echo "${NOTES}"
             echo
             echo "---"
             echo "由 Release workflow 自动生成。安装包**未做代码签名**，Windows 可能显示 SmartScreen 提示（见 SECURITY.md 第四节）。"
