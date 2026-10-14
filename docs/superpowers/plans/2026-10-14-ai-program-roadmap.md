@@ -15,9 +15,9 @@
 | # | 轨道 | 计划文件 | 依赖 | 状态 |
 |---|------|----------|------|------|
 | 1 | MCP 一等公民化 + 调用审计 + 速率限制 | `2026-10-14-mcp-first-class.md` | 无 | 已落地（收尾 e5320a1） |
-| 2 | 应用内 AI 助手（复用 MCP 工具面做 function-calling） | `2026-10-14-in-app-ai-assistant.md` | 轨道 1 的 `auditStore` / `onCall` 钩子 | 已落地（3dcd2a5 起六枚提交，收尾 b8e8059） |
-| 3 | AI 智能歌单（**打标已砍**，见下方说明） | 无计划文件：范围收到一处 bounded 改动，直接按 TDD 落地 | 轨道 2 的出网通道 `assistantChat` 与严格 JSON 协议 | 已落地（4e28237） |
-| 4 | AI 接管研发流水线（CI 归因 + 复审 agent） | `2026-10-14-ai-ci-doctor.md` | 无（与 1-3 并行不冲突） | 待编写 |
+| 2 | 应用内 AI 助手（复用 MCP 工具面做 function-calling） | `2026-10-14-in-app-ai-assistant.md` | 轨道 1 的 `auditStore` / `onCall` 钩子 | 已落地（3dcd2a5 起六枚提交，收尾 b8e8059）；推送+CI 已绿（`e44df72` 两条 job success），界面实测：离线链真点到，出网三条待用户 Key |
+| 3 | AI 智能歌单（**打标已砍**，见下方说明） | 无计划文件：范围收到一处 bounded 改动，直接按 TDD 落地 | 轨道 2 的出网通道 `assistantChat` 与严格 JSON 协议 | 已落地（4e28237）；行为单测 16 枚 + CDP 真点离线链，CI 同上一条一起绿 |
+| 4 | AI 接管研发流水线（CI 归因 + 复审 agent） | `2026-10-14-ai-ci-doctor.md` | 无（与 1-3 并行不冲突） | 待编写 —— 归因引擎已定：**纯确定性规则，CI 不出网、不花钱**（2026-10-14 用户选定；LLM 摘要与本地 agent 两个备选都否了） |
 
 **轨道 3 为什么只剩一半**：曲库自动打标原计划把标签写进 `library-index.json`，
 读时再 join 回歌单。动手前对着源码否掉了 —— `incrementalScan` 在文件 mtime 变化时执行

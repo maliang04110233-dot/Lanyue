@@ -1618,7 +1618,18 @@ npm run lint && npm run audit:deps && npm run check:dead-deps \
 
 Expected: lint 0 error（2 条既有 warning）、审计与死依赖检查通过、`node --test` 全绿（本轮净增约 25 枚测试）、build+asar 13/13。
 
-- [ ] **Step 6: 提交、推送、看 CI**
+- [x] **Step 6: 提交、推送、看 CI**
+
+> **实测记录（2026-10-14）**：推送成功（`e5320a1..d4ad5a6` 快进 13 枚，随后 `bb5cfba`、`0fb4e34`、
+> `08d832f`、`e44df72`）。CI 首跑**红**，而且红的不是助手 —— 是本地库扫描那条老路径：
+> annotation 里 `failureType: unhandledRejection`、栈落在
+> `node_modules/qq-music-api/routes/search.js:83`，用例指向 `libraryIpc.integration.test.js` 的 scan。
+> 根因写在 `0fb4e34`（`readAudioMetadata` 的在线封面兜底把「跑过哪个解析器」当成「标题来自哪里」，
+> 于是文件名猜出来的标题照样触发在线搜索 ⇒ 测试其实在触网，CI 的 runner 连得上就炸）。
+> 收尾证据：`e44df72` 两条 job 全 `success`
+> （`Lint & Unit Tests` / `Build & Asar Smoke`）。
+> 归因能做到的这一步靠的是 `bb5cfba` 把 TAP 详情块写进 annotation ——
+> 只有用例名的 annotation 等于把红推给「猜环境差异」，这条轨道欠的债由此清掉。
 
 ```bash
 git add SECURITY.md README.md CHANGELOG.md docs/superpowers/plans/2026-10-14-ai-program-roadmap.md docs/superpowers/plans/2026-10-14-in-app-ai-assistant.md
