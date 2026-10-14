@@ -48,7 +48,7 @@
 | SSRF | 统一 URL 守卫：IP 编码归一化（十进制/十六进制/八进制）、IPv4-mapped IPv6、NAT64、DNS rebinding pinning、重定向逐跳复检、拒绝 https→http 降级、跨 host 剥离 Cookie/Authorization | `src/utils/urlGuard.js`、`src/api/request.js` |
 | 路径沙箱 | 双闸：词法快筛 + `realpath` 复核；无法验证时 **fail-closed**（判否而非放行）；junction 经 `readlinkSync` 逐段解析 | `src/main/approvedDirs.js` |
 | 凭据存储 | 三态模型：可用则 DPAPI（Windows `safeStorage`）加密；**系统加密不可用时拒绝写入**，绝不静默明文落盘 | `src/utils/secretStore.js` |
-| 本地服务 | MCP 仅监听 `127.0.0.1`，Bearer 令牌 `timingSafeEqual` 比较，Origin 白名单只放行回环，请求体 1 MiB 上限，令牌桶限流（429 + `Retry-After`），工具白名单排除凭据/文件写入/设置/更新安装，调用留审计，默认关闭 | `src/main/mcp/`、`src/main/ipc/mcp.js` |
+| AI 调用面（外部 Agent + 应用内助手） | MCP 仅监听 `127.0.0.1`，Bearer 令牌 `timingSafeEqual` 比较，Origin 白名单只放行回环，请求体 1 MiB 上限，令牌桶限流（429 + `Retry-After`），工具白名单排除凭据/文件写入/设置/更新安装，写操作在应用内必须逐条确认，调用留审计（`source` 区分 agent/assistant），MCP 服务默认关闭 | `src/main/mcp/`、`src/main/ipc/mcp.js`、`src/main/ipc/ai-assistant.js` |
 | XSS | 8 类远端数据逐条转义后入 DOM；内联事件处理器必须用 `escQ`（有全仓守卫 + 别名绕过检测） | `src/renderer/js/utils.js`、`test/inline-handler-escape.test.js` |
 | 日志脱敏 | 落盘前统一过一遍：URL 敏感查询参数、Cookie/Authorization/token 形态 | `src/utils/redact.js`、`src/utils/logger.js` |
 | 供应链 | `npm audit --omit=dev --audit-level=high` 进 CI；`overrides` 锁上游脆弱子依赖；打包时剔除已验证的死依赖链 | `.github/workflows/ci.yml`、`package.json`、`build/config.cjs` |
@@ -130,6 +130,19 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
   警告，绝不拖慢或阻塞 Agent 的响应。
 - 位置：`src/main/mcp/auditStore.js`、`src/main/ipc/mcp.js`，端到端链路在 `test/mcp-e2e.test.js`。
 
+### 6. 两个调用方，一张白名单（外部 Agent 与应用内 AI 助手）
+
+应用内助手（侧栏「AI 助手」）不是第二套权限：它能看到、能调用的就是外部 Agent 那
+**17 个工具**，且执行走**同一条进程内桥**（`src/main/mcp/agentBridge.js`），因此参数钳制、
+契约拒绝语义与审计落点两边一致 —— 助手侧比 Agent 松就是实锤的漂移，钉在
+`test/ai-assistant-e2e.test.js`。
+
+差异只有一处，且是收紧不是放宽：**改动曲库或队列的三个写操作**
+（`add_to_queue` / `add_to_playlist` / `toggle_favorite`）在应用内必须逐条经用户确认，
+判据是主进程 handler 上的 `confirmed === true` 参数（`src/main/ipc/ai-assistant.js`），
+不是「界面已经问过了」这种口头承诺；被拒的调用不进桥，因此不出现在审计里。
+助手的审计与 Agent 的写在同一个文件，靠 `source` 字段区分（`agent` / `assistant`）。
+
 ---
 
 ## 五、应用自身的数据边界
@@ -138,6 +151,9 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 - WebDAV 密码与 MCP 令牌同样加密；日志落盘前脱敏
 - WebDAV 快照只含歌单 / 下载模板 / 下载历史，不含目录等本机设置，也不含 MCP 调用审计
 - 导出诊断包前会对偏好值再做一次脱敏（`aiMusicApiKey` 等键一律剔除）
+- 应用内 AI 助手会把你的对话文本与工具返回的歌曲标题发给 MiniMax（`api.minimaxi.com`）；
+  对话只存在界面内存里（不写盘、不同步），调用记录落本机 `userData/mcp-audit.json`，
+  两者都不进 WebDAV 快照与导出备份
 
 ---
 

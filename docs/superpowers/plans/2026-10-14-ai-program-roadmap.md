@@ -14,8 +14,8 @@
 
 | # | 轨道 | 计划文件 | 依赖 | 状态 |
 |---|------|----------|------|------|
-| 1 | MCP 一等公民化 + 调用审计 + 速率限制 | `2026-10-14-mcp-first-class.md` | 无 | 待执行 |
-| 2 | 应用内 AI 助手（复用 MCP 工具面做 function-calling） | `2026-10-14-in-app-ai-assistant.md` | 轨道 1 的 `auditStore` / `onCall` 钩子 | 待编写 |
+| 1 | MCP 一等公民化 + 调用审计 + 速率限制 | `2026-10-14-mcp-first-class.md` | 无 | 已落地（收尾 e5320a1） |
+| 2 | 应用内 AI 助手（复用 MCP 工具面做 function-calling） | `2026-10-14-in-app-ai-assistant.md` | 轨道 1 的 `auditStore` / `onCall` 钩子 | 已落地（3dcd2a5 起六枚提交，收尾 b8e8059） |
 | 3 | AI 智能歌单 / 曲库自动打标 | `2026-10-14-ai-playlist-tagging.md` | 轨道 2 的助手循环（作为它的两个工具落地） | 待编写 |
 | 4 | AI 接管研发流水线（CI 归因 + 复审 agent） | `2026-10-14-ai-ci-doctor.md` | 无（与 1-3 并行不冲突） | 待编写 |
 
