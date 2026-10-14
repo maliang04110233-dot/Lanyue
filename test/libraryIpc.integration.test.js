@@ -11,6 +11,9 @@
  * 同时装同步 fs 守卫：扫描本地库期间不得出现任何 *Sync 调用。
  * 这是本轮改动的核心验收点（主进程 = UI 线程，同步 IO 会冻结窗口）。
  *
+ * 另装常驻出网守卫：本文件跑完必须零对外连接。CI 曾在这一条上三连红而本地全绿，
+ * 根因是没有标签的测试音频被文件名兜底猜出标题后照样去在线搜封面（详见守卫处注释）。
+ *
  * 注意：造的文件用 .flac 后缀。node-id3 仅对 .mp3 生效，而它内部用
  * readFileSync——若用 .mp3 会让守卫把第三方库的同步读误判为本模块的回归。
  */
@@ -20,6 +23,8 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const net = require('node:net');
+const http = require('node:http');
 
 // ── 环境搭建 ─────────────────────────────────────────────────
 
@@ -115,6 +120,42 @@ async function withSyncFsGuard(fn) {
   }
 }
 
+// ── 出网守卫（文件级常驻）──────────────────────────────────
+//
+// 「测试不触网」是本仓测试的地基，而扫描链曾经悄悄破过一次：假音频没有标签，
+// 标题由文件名兜底猜出来，本地库读取照样拿它去在线搜封面 ⇒ 用例真的向 QQ 音乐发请求。
+// CI 的 windows runner 上上游返 500，qq-music-api 抛出没人 await 的游离 rejection，
+// 被 node --test 记成「当时正在跑的那个用例」失败 —— 本地全绿、CI 三连红。
+//
+// 守卫为什么常驻整个文件而不是按用例开关：实测出网是**后台发射**的，请求在扫描
+// 用例返回之后才落地（node --test 报的就是「test ended 后的异步活动」），按用例
+// 开关的窗口抓不住它。常驻 + 收尾统一验收才锁得住这条地基。
+const EGRESS = [];
+
+(function installEgressGuard() {
+  const originalConnect = net.Socket.prototype.connect;
+  net.Socket.prototype.connect = function guardedConnect(...args) {
+    // 形状不止一种：(options) / (port, host) / (path)，Node 24 的内部转发还会把
+    // 参数**整体包成一层数组**再调一次（实测如此），故先展平一层再描述。
+    // https 也经过这里（tls.connect 内部仍调 Socket.prototype.connect，实测能抓到
+    // songsearch.kugou.com:443），所以不需要再去改 Agent.createSocket —— 试过，
+    // 那个钩子会把真实请求打断（cb is not a function），既脆弱又没必要。
+    const flat = args.flat(1);
+    const shape = flat
+      .map((x) => (x && typeof x === 'object'
+        ? JSON.stringify({ host: x.host ?? x.hostname, port: x.port, path: x.path })
+        : typeof x === 'function' ? 'fn' : String(x)))
+      .join(' ');
+    EGRESS.push(`sock ${shape}`);
+    return originalConnect.apply(this, args);
+  };
+})();
+
+/** 排除守卫自检用的本机回环连接 */
+function externalEgress() {
+  return EGRESS.filter((e) => !e.includes('127.0.0.1'));
+}
+
 // ── 造一个本地音乐库 ─────────────────────────────────────────
 
 const libDir = fs.mkdtempSync(path.join(os.tmpdir(), 'musictest-lib-'));
@@ -139,21 +180,54 @@ test('同步 fs 守卫本身有效（防止守卫失效导致假绿）', async (
   );
 });
 
+test('出网守卫本身有效（防止守卫失效导致假绿）', async () => {
+  // 用本机回环上的真监听口，而不是"连一个不存在的端口"：后者会在用例结束后
+  // 还吐出迟到的 ECONNREFUSED，被 node --test 记成"测试结束后的异步活动"，
+  // 反而把守卫自检变成假红。
+  const server = http.createServer((_req, res) => res.end('ok'));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  try {
+    // ① 裸 socket ② 经 http.Agent 的出站（真实请求都走这条）
+    const sock = net.connect({ host: '127.0.0.1', port });
+    await new Promise((r) => sock.once('connect', r));
+    sock.destroy();
+
+    await new Promise((resolve, reject) => {
+      const req = http.get({ host: '127.0.0.1', port, timeout: 1000 });
+      req.on('timeout', () => req.destroy(new Error('本机回环响应超时')));
+      req.on('error', reject);
+      req.on('response', (r) => { r.resume(); r.on('end', resolve); });
+    });
+  } catch { /* 回环服务器不回数据时请求会以错误收尾：建链已被记录，无需在意响应 */ }
+
+  const local = EGRESS.filter((e) => e.includes('127.0.0.1'));
+  assert.ok(
+    local.length >= 2,
+    `守卫必须记下裸 socket 与 http 请求两条连接尝试，否则「零出网」是假通过: ${JSON.stringify(EGRESS)}`
+  );
+  server.close();
+});
+
 // ── 扫描本地库 ───────────────────────────────────────────────
 
-test('scan-local-library: 返回全部音频，且全程无同步 fs 调用', async () => {
-  const { result, syncCalls } = await withSyncFsGuard(() =>
+test('scan-local-library: 返回全部音频，全程无同步 fs 调用且零出网', async () => {
+  const { result: scan, syncCalls } = await withSyncFsGuard(() =>
     invoke('scan-local-library')({}, libDir)
   );
 
-  assert.strictEqual(result.error, undefined, `扫描报错: ${result.error}`);
-  assert.strictEqual(result.count, LIB_FILES.length);
-  assert.strictEqual(result.songs.length, LIB_FILES.length);
-  assert.ok(result.songs.every((s) => s.filePath), '每首歌都要有 filePath');
+  assert.strictEqual(scan.error, undefined, `扫描报错: ${scan.error}`);
+  assert.strictEqual(scan.count, LIB_FILES.length);
+  assert.strictEqual(scan.songs.length, LIB_FILES.length);
+  assert.ok(scan.songs.every((s) => s.filePath), '每首歌都要有 filePath');
 
   assert.deepStrictEqual(
     syncCalls, [],
     `扫描期间出现同步 fs 调用（会冻结主进程 UI 线程）: ${syncCalls.join(', ')}`
+  );
+  assert.deepStrictEqual(
+    externalEgress(), [],
+    `扫描期间出现对外连接（测试必须离线；上游异常还会以游离 rejection 炸掉在跑的用例）: ${externalEgress().join(', ')}`
   );
 });
 
@@ -292,6 +366,13 @@ test('playCache: cleanupStaleFiles / cleanupExpired 可安全空跑', async () =
 // ── 收尾 ─────────────────────────────────────────────────────
 
 test('清理测试残留', () => {
+  // 整份文件跑完必须零对外连接：出网是后台发射的，只按用例检查会漏掉
+  // 落地晚于用例结束的那一批（CI 三连红的正是这一批）。
+  assert.deepStrictEqual(
+    externalEgress(), [],
+    `本文件出现了对外连接，违反「测试不触网」: ${externalEgress().join(', ')}`
+  );
+
   prefs.destroy(); // 取消防抖写盘定时器，避免删除目录后 race
   for (const d of [libDir, userDataDir, musicDir, trashDir]) {
     fs.rmSync(d, { recursive: true, force: true });

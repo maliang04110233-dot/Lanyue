@@ -177,6 +177,9 @@ async function _decodeAudioMetadata(filePath, stat) {
   }
 
   // 4) 文件名兜底
+  // 「标题到底来自标签还是文件名」必须在这一步之前定型：后面的在线封面兜底
+  // 只能认标签里的标题（见第 6 步），而文件名兜底会把 title 填成猜测值。
+  const titleFromTag = Boolean(title);
   if (!title && !artist) {
     const parsed = parseFilename(fileName);
     title = parsed.title;
@@ -187,9 +190,12 @@ async function _decodeAudioMetadata(filePath, stat) {
   // 5) 时长：真实优先，否则估算
   const durationMs = realDurationMs || estimateDuration(filePath, ext, stat.size);
 
-  // 6) 最后兑底：在线拉取封面（仅当 title 来自 ID3 标签时才尝试）
+  // 6) 最后兑底：在线拉取封面（仅当 title 来自标签时才尝试）
   // 修复 B16：避免文件名 fallback 出来的"未知 - 01.mp3"产生错误匹配
-  if (!coverBase64 && title && (source === 'music-metadata' || source === 'node-id3')) {
+  // 判据是 titleFromTag（标题的来源），不是 source（跑过哪个解析器）——
+  // music-metadata 能打开文件却读不出标签时 source 仍是 'music-metadata'，
+  // 那时标题是文件名猜的，照旧出网等于拿猜测值去搜真人真歌。
+  if (!coverBase64 && titleFromTag) {
     try {
       const { fetchOnlineCover } = require('./onlineCover');
       const online = await fetchOnlineCover(title, artist);

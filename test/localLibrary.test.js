@@ -1,5 +1,5 @@
 /**
- * 单元测试：utils/localLibrary.js 的封面兜底查找
+ * 单元测试：utils/localLibrary.js 的封面兜底链
  *
  * 跑：npm test
  *
@@ -7,6 +7,9 @@
  * 旧实现对 22 个候选逐个 existsSync + statSync，现在改为一次 readdir + 内存比对，
  * 本测试锁定「候选优先级不变、大小写不敏感行为不变」这两点，
  * 并用同步 fs 守卫确保它不会退回同步实现。
+ *
+ * 后半段锁「在线封面」这一环的出网条件：它是本地库读取里唯一会碰网络的地方，
+ * 也是本仓「测试不触网」不变量的唯一例外来源（详见那段用例的头注）。
  */
 
 const test = require('node:test');
@@ -15,7 +18,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { _findFolderCover } = require('../src/utils/localLibrary');
+const { _findFolderCover, readAudioMetadata } = require('../src/utils/localLibrary');
 
 const SYNC_FS_APIS = [
   'statSync', 'existsSync', 'readFileSync', 'writeFileSync',
@@ -150,4 +153,119 @@ test('_findFolderCover: 全程无同步 fs 调用，且只做一次目录读取'
   assert.ok(result, '应命中封面');
   assert.deepStrictEqual(syncCalls, [], `出现同步 fs 调用: ${syncCalls.join(', ')}`);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ── 在线封面兜底的出网闸门 ───────────────────────────────────
+//
+// 为什么单独锁这一环：本地库读取里只有「没有内嵌封面 → 去在线搜一张」会真出网。
+// CI 曾在 windows-latest 上因为它连红三次（本地却全绿）：测试造的假音频没有标签，
+// 标题是文件名猜出来的，而当时的判据看的是**哪个解析器跑过**（source），
+// 不是**标题到底来自标签还是文件名** —— 于是猜出来的标题照样触发在线搜索，
+// qq-music-api 上游返 500 时抛出没人 await 的游离 rejection，
+// 被 node --test 记成"当时正在跑的那个用例"失败。本机复现不了是因为
+// 这台机器根本连不上 QQ 音乐，请求在 DNS 阶段就死了（走 catch，静默）。
+//
+// 下面两条一对：无标签必须**零出网**（守住「测试不触网」），
+// 有标签必须**照常出网一次**（别把功能一起砍没了）。
+
+/** 把 utils/onlineCover 换成计数器桩（localLibrary 里是惰性 require，事后替换有效） */
+function stubOnlineCover() {
+  const p = require.resolve('../src/utils/onlineCover');
+  const original = require.cache[p];
+  const calls = [];
+  require.cache[p] = {
+    id: p,
+    filename: p,
+    loaded: true,
+    exports: {
+      fetchOnlineCover: async (title, artist) => {
+        calls.push({ title, artist });
+        return {
+          coverBase64: 'data:image/jpeg;base64,AA==',
+          mime: 'image/jpeg',
+          size: 1,
+          sourceUrl: 'stub',
+          source: 'qq-online',
+        };
+      },
+      downloadImageBuffer: async () => { throw new Error('测试里不许出网'); },
+      detectImageMime: () => 'image/jpeg',
+    },
+  };
+  return { calls, restore: () => { if (original) require.cache[p] = original; else delete require.cache[p]; } };
+}
+
+/** 把 music-metadata 换成可控桩：common 里有没有 title 就是"标签有没有标题" */
+function stubMusicMetadata(common) {
+  const p = require.resolve('music-metadata');
+  const original = require.cache[p];
+  require.cache[p] = {
+    id: p,
+    filename: p,
+    loaded: true,
+    exports: {
+      parseFile: async () => ({ common: { ...common }, format: { duration: 1, bitrate: 128 } }),
+    },
+  };
+  return { restore: () => { if (original) require.cache[p] = original; else delete require.cache[p]; } };
+}
+
+test('readAudioMetadata: 标签里没有标题时绝不发起在线封面搜索（测试不触网的地基）', async () => {
+  const dir = makeTempDir();
+  // 每条用例独立文件名：_metaCache 按 路径+mtime+size 缓存，避免相互污染
+  const audio = path.join(dir, '无标签.mp3');
+  fs.writeFileSync(audio, 'not-really-audio');
+
+  const mm = stubMusicMetadata({});            // 解析器能打开文件，但标签是空的
+  const cover = stubOnlineCover();
+  try {
+    const meta = await readAudioMetadata(audio);
+    assert.deepStrictEqual(cover.calls, [], '文件名猜出来的标题不该触发在线搜索');
+    assert.strictEqual(meta.title, '无标签', '标题仍按文件名兜底给出');
+    assert.strictEqual(meta.cover, null, '没有内嵌封面也不补在线封面');
+  } finally {
+    mm.restore();
+    cover.restore();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('readAudioMetadata: 标签里有标题时照常出网一次拉封面（别把功能砍没）', async () => {
+  const dir = makeTempDir();
+  const audio = path.join(dir, '有标签.mp3');
+  fs.writeFileSync(audio, 'not-really-audio');
+
+  const mm = stubMusicMetadata({ title: '夜曲', artist: '周杰伦' });
+  const cover = stubOnlineCover();
+  try {
+    const meta = await readAudioMetadata(audio);
+    assert.deepStrictEqual(
+      cover.calls, [{ title: '夜曲', artist: '周杰伦' }],
+      '标签标题应触发一次在线封面搜索，且用的是标签里的标题/歌手'
+    );
+    assert.strictEqual(meta.cover, 'data:image/jpeg;base64,AA==');
+  } finally {
+    mm.restore();
+    cover.restore();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('readAudioMetadata: 已有内嵌封面时不出网（在线只是兜底）', async () => {
+  const dir = makeTempDir();
+  const audio = path.join(dir, '有封面.mp3');
+  fs.writeFileSync(audio, 'not-really-audio');
+
+  const pic = { format: 'image/jpeg', data: Buffer.from([0xFF, 0xD8, 0xFF]) };
+  const mm = stubMusicMetadata({ title: '夜曲', picture: [pic] });
+  const cover = stubOnlineCover();
+  try {
+    const meta = await readAudioMetadata(audio);
+    assert.deepStrictEqual(cover.calls, [], '内嵌封面已够用，不该再出网');
+    assert.ok(String(meta.cover).startsWith('data:image/jpeg;base64,'));
+  } finally {
+    mm.restore();
+    cover.restore();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
