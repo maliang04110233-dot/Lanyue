@@ -63,6 +63,11 @@ jobs:
       # 所以这里按 stderr 特征把「基础设施失败」降级为 warning 并放行，
       # 「真有漏洞」仍然红灯。
       - name: 依赖漏洞审计（显式豁免清单）
+        # 这段是 bash 语法（`set +e` / `[ "$status" -ne 0 ]` / `$?`），必须显式声明
+        # shell：job 在 windows-latest 上，默认 shell 是 PowerShell，会被解析成
+        # `if (...)` 而直接 ParserError（2026-10-14 CI 红在此，与代码无关）。
+        # 同 job 的 Unit tests 步骤已是 PowerShell 写法，两者口径不同是有意保留的。
+        shell: bash
         run: |
           set +e
           out=$(npm run audit:deps 2>&1)
