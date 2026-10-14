@@ -88,21 +88,33 @@ jobs:
       # 测试不触网，但大量用例直接碰文件系统与平台分支（符号链接复核 / 目录沙箱 /
       # 路径拼接 / 媒体探测），故 runner 与打包、与用户真实环境保持一致：windows-latest
       # （2026-10-13 改：放在 ubuntu 上时 CI 连续红，而同一份代码在 Windows 上全绿）
+      # 归因必须带"差在哪"：只把 `not ok 1181 - 某用例名` 搬进 annotation 等于什么也没说 ——
+      # 断言的 error:/expected:/actual: 与 location（文件:行）全在紧随其后的 TAP 详情块里。
+      # 而 job 原始日志要仓库 admin 才下得动：非管理员的贡献者对着一条"红了"无从下手
+      # （2026-10-14 就红过这样一次：本地 2951 枚全绿、annotation 只有用例名，
+      # 最后只能靠猜 Node 版本与 runner 磁盘差异）。连着详情块一起发，
+      # 代价是多几条 annotation，换来"哪一条、差在哪、第几行"。
+      # 说明写在 YAML 注释而不是 run 块里：run 块每一行都会原样进 PowerShell 脚本文件，
+      # 那里的注释还得对 runner 的脚本编码负责 —— 能不冒这个险就不冒
+      # （本文件上面审计步骤的 `shell: bash` 注记记的是同一族的坑：解析器选错，红得与代码无关）。
       - name: Unit tests
         # 与 release.yml 同口径：并发 2 + 重试 3 次 + 失败用例以 annotation 暴露。
         # 判据与理由见 release.yml 同名步骤的注释。
+        # （详版归因先只加在这侧：release.yml 要 tag 才跑，今天改它无从验证，等下次动它时跟上。）
         run: |
           for ($i = 1; $i -le 3; $i++) {
             $out = node --test --test-concurrency=2 "test/*.test.js" 2>&1
             $code = $LASTEXITCODE
             Write-Output "::error::probe attempt=$i exit=$code lines=$($out.Count)"
             if ($code -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
-            $hits = @($out | Select-String -Pattern '✖|not ok' | Select-Object -First 10)
-            Write-Output "::error::matched $($hits.Count) failure lines"
+            $hits = @($out | Select-String -Pattern 'not ok \d+' -Context 0,26 | Select-Object -First 4)
+            Write-Output "::error::matched $($hits.Count) failing tests"
             foreach ($h in $hits) {
-              $msg = ($h -replace '%', '%25' -replace "`r", '' -replace "`n", ' ')
-              if ($msg.Length -gt 150) { $msg = $msg.Substring(0, 150) }
-              Write-Output "::error::FAIL-LINE $msg"
+              $body = (@($h.Line) + @($h.Context.PostContext)) -join ' | '
+              $body = ($body -replace '%', '%25' -replace '#', '%23') -replace "`r", ''
+              $body = $body -replace "`n", ' ' -replace ' +', ' '
+              if ($body.Length -gt 1400) { $body = $body.Substring(0, 1400) }
+              Write-Output "::error::FAIL-DETAIL $body"
             }
             Start-Sleep -Seconds 10
           }
