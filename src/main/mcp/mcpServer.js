@@ -6,7 +6,8 @@
  *   - Bearer token：timingSafe 比较，防本地恶意页面时序猜解；
  *   - Origin 白名单只放行回环主机：浏览器里任意网站打本地端口（DNS
  *     rebinding 之外的一般跨站 POST）直接被这一刀挡掉；
- *   - 请求体上限 1 MiB：桌面进程不能因一个坏客户端 OOM。
+ *   - 请求体上限 1 MiB：桌面进程不能因一个坏客户端 OOM；
+ *   - 请求频率：令牌桶，默认 `capacity=120 / refillPerSec=30`；超限 429 + Retry-After。
  *
  * 协议分发在 mcpCore.js，本文件只管 HTTP 壳；transport 与 core 分开，
  * 单测用假 handleMessage 即可隔离鉴权/限流路径。
@@ -20,6 +21,26 @@ const crypto = require('crypto');
 const MCP_PATH = '/mcp';
 const MAX_BODY_BYTES = 1024 * 1024;
 const LOCAL_ORIGIN_RE = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+const DEFAULT_RATE_LIMIT = { capacity: 120, refillPerSec: 30 };
+
+/** 令牌桶：容量 = 突发上限，refill = 稳态配额。时钟注入以便测试。 */
+function createTokenBucket({ capacity, refillPerSec, now }) {
+  let tokens = capacity;
+  let last = now();
+  return {
+    tryTake(cost = 1) {
+      const t = now();
+      const gained = ((t - last) / 1000) * refillPerSec;
+      last = t;
+      tokens = Math.min(capacity, tokens + gained);
+      if (tokens < cost) {
+        return { ok: false, retryAfterSec: Math.max(1, Math.ceil((cost - tokens) / refillPerSec)) };
+      }
+      tokens -= cost;
+      return { ok: true };
+    },
+  };
+}
 
 function safeEqual(a, b) {
   const ba = Buffer.from(String(a));
@@ -38,9 +59,13 @@ function json(res, status, payload) {
  * @param {Object} deps
  * @param {string} deps.token Bearer 令牌
  * @param {(msg:Object)=>Promise<Object|null>} deps.handleMessage 单条 JSON-RPC 分发
+ * @param {{capacity:number,refillPerSec:number}} [deps.rateLimit] 令牌桶参数
+ * @param {() => number} [deps.now] 时钟注入（测试用固定时钟，不靠 sleep）
+ * @param {(info:{retryAfterSec:number}) => void} [deps.onRejected] 限流计数回调
  * @returns {{start:(port:number)=>Promise<{port:number}>, stop:()=>Promise<void>, listening:boolean}}
  */
-function createMcpServer({ token, handleMessage }) {
+function createMcpServer({ token, handleMessage, rateLimit = DEFAULT_RATE_LIMIT, now = Date.now, onRejected = null }) {
+  const bucket = createTokenBucket({ ...DEFAULT_RATE_LIMIT, ...rateLimit, now });
   let server = null;
   let boundPort = 0;
 
@@ -79,6 +104,15 @@ function createMcpServer({ token, handleMessage }) {
     const origin = req.headers.origin;
     if (origin && !LOCAL_ORIGIN_RE.test(origin)) {
       return json(res, 403, { error: 'forbidden origin' });
+    }
+
+    // 速率限制放在鉴权之后：未过鉴权的请求一律 401/403 且不消耗令牌，
+    // 否则任意本机进程都能用垃圾请求把合法 Agent 的配额吃光（限流反成 DoS 面）。
+    const take = bucket.tryTake(1);
+    if (!take.ok) {
+      if (onRejected) onRejected({ retryAfterSec: take.retryAfterSec });
+      res.setHeader('Retry-After', String(take.retryAfterSec));
+      return json(res, 429, { error: 'rate_limited' });
     }
 
     let raw;
@@ -141,4 +175,4 @@ function createMcpServer({ token, handleMessage }) {
   };
 }
 
-module.exports = { createMcpServer, MCP_PATH, MAX_BODY_BYTES, LOCAL_ORIGIN_RE };
+module.exports = { createMcpServer, MCP_PATH, MAX_BODY_BYTES, LOCAL_ORIGIN_RE, DEFAULT_RATE_LIMIT, createTokenBucket };
