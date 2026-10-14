@@ -38,7 +38,7 @@
   `src/renderer/js/views/settings.js` 属 `test/toast-i18n.test.js` 的 `CONQUERED`（欠账 0），
   新代码不许往 `showToast()` 里塞中文字面量，否则台账与门禁一起翻脸。
 - **开关值只准一处**：`src/renderer/js/features.js` 的 `FEATURES`；`ai: false`（AI 创作）
-  是增量214 的**产品决定**，任何轨道都不许顺手翻它。
+  是 4ffa7ea 里定下的**产品决定**，任何轨道都不许顺手翻它。
 - **只发 Windows**：`release.yml:16-18`；不做代码签名（`SECURITY.md §4`）。
 - **五层闸门必须全绿**：`npm run lint`（0 error）→ `npm run audit:deps` →
   `npm run check:dead-deps` → `node --test --test-concurrency=2 "test/*.test.js"` →

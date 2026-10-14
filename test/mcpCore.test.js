@@ -151,3 +151,58 @@ test('rpc: 工具执行异常 / 契约参数非法 → isError:true 而不是断
   assert.strictEqual(r2.result.isError, true);
   assert.match(r2.result.content[0].text, /keyword/);
 });
+
+// ── 3. onCall 审计钩子 ───────────────────────────────
+
+test('onCall：每次 tools/call 都产出一条审计（成功与业务失败都记）', async () => {
+  const tools = [{
+    name: 'search_music', channel: 'search-music',
+    inputSchema: { type: 'object', properties: { keyword: { type: 'string' } } },
+  }];
+  const entries = [];
+  const handler = createMcpHandler({
+    tools, serverVersion: '1.0.0',
+    callTool: async (channel, args) => (args[0] === 'boom' ? { error: '平台无结果' } : { songs: [] }),
+    onCall: (e) => entries.push(e),
+  });
+  await handler({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'search_music', arguments: { keyword: '周杰伦' } } });
+  await handler({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'search_music', arguments: { keyword: 'boom' } } });
+  assert.strictEqual(entries.length, 2, '两次调用都要有记录');
+  assert.strictEqual(entries[0].tool, 'search_music');
+  assert.strictEqual(entries[0].ok, true);
+  assert.strictEqual(entries[0].summary, '周杰伦');
+  assert.deepStrictEqual(entries[0].argsKeys, ['keyword']);
+  assert.strictEqual(entries[1].ok, false, '业务失败（isError）也是审计对象');
+  assert.strictEqual(entries[1].source, 'agent');
+});
+
+test('onCall：未知工具不产审计，抛错要产 err 字段', async () => {
+  const entries = [];
+  const handler = createMcpHandler({
+    tools: [{ name: 'get_lyrics', channel: 'get-lyrics', inputSchema: { type: 'object', required: ['id'], properties: { id: {} } } }],
+    serverVersion: '1.0.0',
+    callTool: async () => { throw new Error('网络不可达'); },
+    onCall: (e) => entries.push(e),
+  });
+  await handler({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'no_such_tool', arguments: {} } });
+  assert.strictEqual(entries.length, 0, '工具名都不存在时无从审计');
+  await handler({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'get_lyrics', arguments: { id: '1' } } });
+  assert.strictEqual(entries[0].ok, false);
+  assert.match(entries[0].err, /网络不可达/);
+});
+
+test('onCall：契约参数校验失败不执行工具，也不该假装成功记账', async () => {
+  const entries = [];
+  let executed = 0;
+  const handler = createMcpHandler({
+    tools: [{ name: 'search_music', channel: 'search-music', inputSchema: { type: 'object', required: ['keyword'], properties: { keyword: { type: 'string' } } } }],
+    serverVersion: '1.0.0',
+    callTool: async () => { executed += 1; return {}; },
+    onCall: (e) => entries.push(e),
+  });
+  const r = await handler({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'search_music', arguments: { keyword: { evil: 1 } } } });
+  assert.strictEqual(r.result.isError, true);
+  assert.strictEqual(executed, 0);
+  assert.strictEqual(entries.length, 1, '被拒的调用同样是一次「有人试过」的事实');
+  assert.strictEqual(entries[0].ok, false);
+});

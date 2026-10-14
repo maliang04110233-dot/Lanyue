@@ -11,6 +11,9 @@
  */
 
 const { CHANNELS, normalizeArgs } = require('../../shared/ipcContract');
+// 参数摘要（含「什么算敏感参数」的判据）只有 auditStore 一份实现：
+// 协议层另写一遍就会漂移成两套规则，敏感值迟早从其中一套漏出去。
+const { summarizeArgs } = require('./auditStore');
 
 const PROTOCOL_VERSION = '2025-03-26';
 const SERVER_NAME = 'musicdl';
@@ -41,12 +44,21 @@ function toolText(id, isError, text) {
  * @param {Array} deps.tools   toolsFromContract() 的产物（含 channel 内部字段）
  * @param {string} deps.serverVersion
  * @param {(channel:string, args:any[])=>Promise<any>} deps.callTool
+ * @param {(entry:Object)=>void} [deps.onCall] 每次 tools/call 的审计回调（entry 见 auditStore）
+ * @param {'agent'|'assistant'} [deps.source] 调用方身份：外部 Agent 还是应用内助手
  * @returns {(msg:Object) => Promise<Object|null>} JSON-RPC 分发；通知返回 null
  */
-function createMcpHandler({ tools, serverVersion, callTool }) {
+function createMcpHandler({ tools, serverVersion, callTool, onCall = null, source = 'agent' }) {
   const byName = new Map(tools.map(t => [t.name, t]));
   // tools/list 面剔除内部字段（channel 不外泄给 Agent）
   const publicTools = tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+
+  const brief = (s) => String(s == null ? '' : s).slice(0, 200);
+  function audit(base, namedArgs, ok, err) {
+    if (!onCall) return;
+    const { argsKeys, summary } = summarizeArgs(namedArgs);
+    onCall({ ...base, source, ok, argsKeys, summary, ...(err ? { err: brief(err) } : {}) });
+  }
 
   return async function handle(msg) {
     if (!msg || typeof msg !== 'object' || typeof msg.method !== 'string') {
@@ -75,15 +87,24 @@ function createMcpHandler({ tools, serverVersion, callTool }) {
         const name = params && params.name;
         const tool = byName.get(name);
         if (!tool) return rpcError(id, -32602, `未知工具: ${String(name).slice(0, 64)}`);
-        const r = namedToPositional(tool.channel, params && params.arguments);
-        if (!r.ok) return toolText(id, true, r.error);
+        const base = { ts: Date.now(), tool: name };
+        const named = params && params.arguments;
+        const r = namedToPositional(tool.channel, named);
+        if (!r.ok) {
+          // 被契约拒掉的调用也是事实：审计里没有它，「有人试过但没权限」就查不到
+          audit(base, named, false, r.error);
+          return toolText(id, true, r.error);
+        }
         let result;
         try {
           result = await callTool(tool.channel, r.args);
         } catch (e) {
-          return toolText(id, true, `工具执行失败: ${e.message || e}`);
+          audit({ ...base, ms: Date.now() - base.ts }, named, false, e.message || e);
+          return toolText(id, true, `工具执行失败: ${brief(e.message || e)}`);
         }
         const businessError = !!(result && typeof result === 'object' && result.error);
+        audit({ ...base, ms: Date.now() - base.ts }, named, !businessError,
+          businessError ? (result.error && result.error.message) || result.error : '');
         return toolText(id, businessError, JSON.stringify(result === undefined ? null : result));
       }
 

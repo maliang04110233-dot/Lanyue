@@ -11,6 +11,7 @@
  */
 
 const crypto = require('crypto');
+const path = require('path');
 const { handle, getInvokeHandler } = require('./register');
 const prefs = require('../../utils/prefs');
 const logger = require('../../utils/logger');
@@ -18,10 +19,23 @@ const secretStore = require('../../utils/secretStore');
 const { createMcpServer } = require('../mcp/mcpServer');
 const { createMcpHandler } = require('../mcp/mcpCore');
 const { toolsFromContract } = require('../mcp/tools');
+const { createAuditStore, AUDIT_FILE_NAME } = require('../mcp/auditStore');
 
 const DEFAULT_PORT = 39217;
 
 let _server = null;
+let _audit = null;
+let _rateLimited = 0;
+
+/** 审计落在 userData，与 prefs/history 同目录；electron 未就绪时返回 null（服务照跑，只是没审计） */
+function _auditStore() {
+  if (_audit) return _audit;
+  let dir = '';
+  try { dir = require('electron').app.getPath('userData'); } catch (_e) { return null; }
+  if (!dir) return null;
+  _audit = createAuditStore({ filePath: path.join(dir, AUDIT_FILE_NAME) });
+  return _audit;
+}
 
 function _getPort() {
   const p = Number(prefs.get('mcpPort'));
@@ -49,9 +63,16 @@ async function _start() {
 
   const handleMessage = createMcpHandler({
     tools: toolsFromContract(),
+    source: 'agent',
     serverVersion: (() => {
       try { return require('electron').app.getVersion(); } catch (_e) { return '0.0.0'; }
     })(),
+    // 审计是可观测性，绝不影响调用结果：写盘失败（磁盘满、权限）只记一条 warn。
+    onCall: (entry) => {
+      const s = _auditStore();
+      if (!s) return;
+      s.record(entry).catch(e => logger.warn('[mcp] 审计写入失败:', e));
+    },
     callTool: async (channel, args) => {
       const fn = getInvokeHandler(channel);
       if (!fn) throw new Error(`通道未注册: ${channel}`);
@@ -60,7 +81,10 @@ async function _start() {
     },
   });
 
-  _server = createMcpServer({ token, handleMessage });
+  _server = createMcpServer({
+    token, handleMessage,
+    onRejected: () => { _rateLimited += 1; },
+  });
   try {
     const { port } = await _server.start(_getPort());
     logger.log(`[mcp] 本地 MCP 服务已启动: http://127.0.0.1:${port}/mcp`);
@@ -87,6 +111,7 @@ function _status() {
   return {
     enabled: prefs.get('mcpEnabled') === true,
     running: !!(_server && _server.listening),
+    rateLimited: _rateLimited,
     port: _getPort(),
     token: secretStore.decrypt(prefs.get('mcpToken') || '') || '',
     url: `http://127.0.0.1:${_getPort()}/mcp`,
@@ -119,6 +144,24 @@ function register() {
       }
     }
     return { success: true, status: _status() };
+  });
+
+  handle('mcp-audit', async (_, opts) => {
+    const store = _auditStore();
+    if (!store) return { items: [], count: 0, maxEntries: 0, rateLimited: _rateLimited, error: '审计不可用（userData 未就绪）' };
+    const want = Number(opts && opts.limit);
+    const limit = Number.isFinite(want) && want > 0 ? Math.min(want, store.maxEntries) : 50;
+    const items = await store.list({ limit });
+    return { items, count: await store.size(), maxEntries: store.maxEntries, rateLimited: _rateLimited };
+  });
+
+  handle('mcp-audit-clear', async () => {
+    const store = _auditStore();
+    if (!store) return { success: false, error: '审计不可用' };
+    await store.clear();
+    _rateLimited = 0;
+    logger.log('[mcp] 调用审计已清空');
+    return { success: true };
   });
 }
 

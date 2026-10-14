@@ -175,6 +175,8 @@ const CHANNELS = {
   // ── MCP 本地服务（invoke）─────────────────────────
   'mcp-status':     { invoke: MAIN },
   'mcp-set-config': { invoke: MAIN, args: [['cfg', t.any()]] },
+  'mcp-audit':      { invoke: MAIN, args: [['opts', t.obj()]] },
+  'mcp-audit-clear': { invoke: MAIN },
   'check-for-update':   { invoke: MAIN },
   'download-update':    { invoke: MAIN },
   'restart-and-install':{ invoke: MAIN },
