@@ -111,24 +111,28 @@ jobs:
       - name: Dead deps check
         run: npm run check:dead-deps
       - name: Unit tests
-        # --test-concurrency=4，并重试至多 3 次。
+        # 并发 2 + 重试 3 次，并把失败用例名以 annotation 形式暴露。
         #
-        # 并发限制的判据（本地已复现，不是猜）：默认并发下全量跑是 **2818 pass / 2 fail**，
-        # 失败的正是 test/export-scrub.test.js 与 test/import-whitelist.test.js；把并发降到 4
-        # 则是 **2828 pass / 0 fail**。而这两个文件单独跑只要 196ms，全量并发下却要 5~7 秒
-        # —— 典型资源竞争，不是逻辑错误（它们各自用 mkdtemp，目录并不冲突；冲突在
-        # prefs / approvedDirs 这类带模块级状态的依赖被并发摆弄）。
+        # 并发判据（本地已复现）：默认并发全量跑是 2818 pass / 2 fail（export-scrub 与
+        # import-whitelist，单独跑各 196ms、全量下 5~7 秒 —— 资源竞争），并发降到 4 即
+        # 2828 全绿。这里再降到 2：CI runner 的 vCPU 远少于本地，且要同时跑打包任务。
         #
-        # 这也解释了为什么 ubuntu 与 windows 两个 runner 都红在同一步：与平台无关，是并发。
-        # 限制并发是治本（让用例不再互相踩），重试只是兜底 —— CI 机器核数少、负载高，
-        # 默认并发下更容易触发，不限制的话发不发得出去要靠运气。
+        # 为什么带 annotation 输出：GitHub 的 job 日志页需要登录才能看，脚本无法读取，
+        # 于是「单测红了」这件事查不出红在哪 —— 只能靠猜着改测试。`::error::` 会进
+        # check-runs 的 annotations，那里无需 token 即可读，于是排查不再需要人肉爬网页。
         #
         # 边界：真失败重试 3 次仍会红，仍会阻断 —— 这是容忍 flaky，不是放水。
         run: |
           for ($i = 1; $i -le 3; $i++) {
-            node --test --test-concurrency=4 "test/*.test.js"
-            if ($LASTEXITCODE -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
+            $out = node --test --test-concurrency=2 "test/*.test.js" 2>&1
+            $code = $LASTEXITCODE
+            if ($code -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
             Write-Output "::warning::Unit tests failed on attempt $i"
+            $out | Select-String -Pattern '^not ok |✖ ' | Select-Object -First 15 | ForEach-Object {
+              $msg = ($_ -replace '%', '%25' -replace "`r", '' -replace "`n", ' ')
+              if ($msg.Length -gt 120) { $msg = $msg.Substring(0, 120) + '…' }
+              Write-Output "::error title=单测失败(attempt $i)::$msg"
+            }
             Start-Sleep -Seconds 10
           }
           Write-Output "::error::Unit tests failed 3 attempts in a row"
