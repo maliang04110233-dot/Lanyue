@@ -444,3 +444,14 @@ test('run: 全程不产生任何对外连接（轨道四的承诺：CI 不出网
     net.Socket.prototype.connect = originalConnect;
   }
 });
+
+test('ci-doctor.cjs 落在 lint 覆盖里 —— 它只在 CI 红的那次才执行，坏掉不能等到那时才发现', () => {
+  // scripts/ 整目录不过 lint（历史见 test/scripts-hygiene.test.js 的头注释），
+  // 而 CI 里其他 scripts/*.cjs 都被某条步骤**执行**过，语法错误当场就炸。
+  // 只有归因引擎是例外：绿跑在 `passed on attempt 1` 就 exit 0，压根跑不到它。
+  // 于是「归因引擎自己坏了」这件事，只会在真正需要它的那次红里出现 ——
+  // 而那次已经缺归因了。把它单独纳进 lint，就是把这个死角提前到日常提交。
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  assert.ok(pkg.scripts.lint.includes('scripts/ci-doctor.cjs'),
+    `lint 命令没覆盖归因引擎：${pkg.scripts.lint}`);
+});

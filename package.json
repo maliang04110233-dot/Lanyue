@@ -14,7 +14,7 @@
     "test:coverage": "node --test --experimental-test-coverage \"test/*.test.js\"",
     "bench": "node scripts/bench.js",
     "setup:hooks": "node scripts/setup-hooks.js",
-    "lint": "eslint src/ test/",
+    "lint": "eslint src/ test/ scripts/ci-doctor.cjs",
     "smoke:asar": "node scripts/smoke-asar.js",
     "check:dead-deps": "node scripts/check-dead-deps.cjs",
     "check:icons": "node scripts/check-icons.cjs",

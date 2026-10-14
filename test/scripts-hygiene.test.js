@@ -3,7 +3,8 @@
  *
  * 背景：scripts/ 长期是「什么都往里扔」的地带，而它同时是**没人看**的地带 ——
  * `npm run lint` 只扫 `src/ test/`，.github/workflows 里也没有任何一条针对 scripts/
- * 的检查。于是一次性脚本留在里面有两个后果，且都不会报警：
+ * 的检查（唯一被单独拉进 lint 的是 scripts/ci-doctor.cjs，理由见 test/ciDoctor.test.js
+ * 末尾那条守卫 —— 它在绿跑里根本执行不到）。于是一次性脚本留在里面有两个后果，且都不会报警：
  *   ① 任何人误跑一次就可能**二次改写已经迁完的产物**（实测过的例子：
  *      _migrate-playlist-i18n.js 会就地重写 views/playlist.js + 两份语言包 +
  *      test/toast-i18n.test.js；文件头自己写着 "Run once"）；
