@@ -1,0 +1,397 @@
+/**
+ * ciDoctor.test.js —— scripts/ci-doctor.cjs 的归因规则自带自测
+ *
+ * 为什么必须补：轨道四的全部价值押在「同一段 TAP 文本，规则给出同一个结论」。
+ * 归因脚本自己错判时，症状和 2026-10-14 那次假绿一模一样 —— 不是变红，是**变得更好读**：
+ * 一条被误判成「环境抖动」的真回归，读起来比裸 annotation 更像可以重跑了事。
+ * 所以这个脚本没有自测就等于没有。
+ *
+ * fixture 一律用**真跑出来的 TAP**，不是我按记忆写的样子：
+ *   ① 断言失败块：`node --test --test-reporter=tap` 在一条 deepStrictEqual 失败上的原样输出。
+ *   ② 误归属块：用例内起了一个延后 reject 的异步任务（就是 qq 上游路由那个形状），
+ *      node 把它报成 `not ok N - <文件名>`（整文件级），真凶写在**前面**那行 `# Error:` 注释里。
+ *      第 ② 条是本轮 CI 红四天的直接教训：现有 annotation 逻辑用
+ *      `Select-String 'not ok \d+' -Context 0,26` 只取失败行之后的 26 行，
+ *      于是唯一指出真凶的那一行被丢掉 —— 只有用例名的 annotation 等于把红推给「猜环境差异」。
+ *   ③ 出网特征串：本轮真在 CI 里出现过的目标（c.y.qq.com / y.qq.com / ECONNREFUSED 族）。
+ * 若 node 升级改了文案，这些用例会红，而红得对 —— 规则判据必须跟着真实输出走。
+ */
+'use strict';
+
+const { test } = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const { parseTap, analyze, formatAnnotations, formatSummary, run } = require('../scripts/ci-doctor.cjs');
+
+// ── fixture：真 TAP 文本 ────────────────────────────────
+
+/** 普通断言失败：用例名级 not ok，带 expected/actual 与 stack */
+const TAP_ASSERTION = [
+  'TAP version 13',
+  '# Subtest: 用例丙：断言失败',
+  'not ok 1 - 用例丙：断言失败',
+  '  ---',
+  '  duration_ms: 4.3433',
+  "  type: 'test'",
+  "  location: 'F:\\\\新建文件夹\\\\Lanyue-1.0.35\\\\test\\\\localLibrary.test.js:3:1'",
+  "  failureType: 'testCodeFailure'",
+  '  error: |-',
+  '    Expected values to be strictly deep-equal:',
+  '    + actual - expected',
+  '',
+  '      {',
+  "    +   title: '未知 - 01.mp3'",
+  "    -   title: '无标签'",
+  '      }',
+  '',
+  "  code: 'ERR_ASSERTION'",
+  "  name: 'AssertionError'",
+  '  stack: |-',
+  '    TestContext.<anonymous> (F:\\新建文件夹\\Lanyue-1.0.35\\test\\localLibrary.test.js:4:10)',
+  '    Test.runInAsyncScope (node:async_hooks:227:14)',
+  '  ...',
+  '1..1',
+  '# tests 1',
+  '# pass 0',
+  '# fail 1',
+  '',
+].join('\n');
+
+/** 误归属：两个用例都 ok，整文件 not ok，真凶写在 not ok **之前**的 # Error 注释里 */
+const TAP_ASYNC_ESCAPE = [
+  'TAP version 13',
+  '# Subtest: 用例甲：正常通过',
+  'ok 1 - 用例甲：正常通过',
+  '  ---',
+  '  duration_ms: 0.5444',
+  "  type: 'test'",
+  '  ...',
+  '# Subtest: 用例乙：触发游离 rejection',
+  'ok 2 - 用例乙：触发游离 rejection',
+  '  ---',
+  '  duration_ms: 0.1751',
+  "  type: 'test'",
+  '  ...',
+  '# Error: Test "用例乙：触发游离 rejection" at test/localLibrary.test.js:3:1 generated asynchronous activity after the test ended. This activity created the error "Error: 上游路由自己炸了" and would have caused the test to fail, but instead triggered an unhandledRejection event.',
+  '# Subtest: test/localLibrary.test.js',
+  'not ok 1 - test/localLibrary.test.js',
+  '  ---',
+  '  duration_ms: 233.8972',
+  "  type: 'test'",
+  "  location: 'F:\\新建文件夹\\Lanyue-1.0.35\\test\\localLibrary.test.js:1:1'",
+  "  failureType: 'testCodeFailure'",
+  '  exitCode: 1',
+  '  error: test failed',
+  '  code: ERR_TEST_FAILURE',
+  '  ...',
+  '1..3',
+  '# tests 3',
+  '# pass 2',
+  '# fail 1',
+  '',
+].join('\n');
+
+/** 出网特征：失败详情里带着真实目标域名 —— 本仓测试必须离线，这不是抖动 */
+const TAP_EGRESS = [
+  'TAP version 13',
+  '# Subtest: scan-local-library: 返回全部音频',
+  'not ok 7 - scan-local-library: 返回全部音频',
+  '  ---',
+  "  location: 'F:\\新建文件夹\\Lanyue-1.0.35\\test\\libraryIpc.integration.test.js:120:1'",
+  '  error: |-',
+  '    出现对外连接: c.y.qq.com:80',
+  '    Aggregated error: connect ECONNREFUSED 1.1.1.1:80',
+  '  code: ERR_ASSERTION',
+  '  stack: |-',
+  '    TestContext.<anonymous> (F:\\新建文件夹\\Lanyue-1.0.35\\test\\libraryIpc.integration.test.js:131:5)',
+  '  ...',
+  '1..7',
+  '# pass 6',
+  '# fail 1',
+  '',
+].join('\n');
+
+/** 只有基础设施层面的红：node 崩了但没报出任何用例 */
+const TAP_INFRA = [
+  'TAP version 13',
+  '# Subtest: test/foo.test.js',
+  'ok 1 - test/foo.test.js',
+  '  ---',
+  '  ...',
+  '1..1',
+  '# pass 1',
+  '# fail 0',
+  '',
+].join('\n');
+
+function attempt(index, exitCode, tap) {
+  return { index, exitCode, tap };
+}
+
+/** 把同一份 TAP 当作 N 次 attempt（CI 的步骤会重试 3 次）*/
+function attemptsSame(times, tap) {
+  return Array.from({ length: times }, (_, i) => attempt(i + 1, 1, tap));
+}
+
+// ── parseTap ────────────────────────────────────────────
+
+test('parseTap: 断言失败块抽出用例名、位置、expected/actual 与 stack 首帧', () => {
+  const parsed = parseTap(TAP_ASSERTION);
+
+  assert.strictEqual(parsed.failures.length, 1);
+  const f = parsed.failures[0];
+  assert.strictEqual(f.name, '用例丙：断言失败');
+  assert.strictEqual(f.fileLevel, false, '用例级失败不该被认成整文件级');
+  assert.match(f.location, /localLibrary\.test\.js:3:1$/);
+  assert.match(f.error, /title: '未知 - 01\.mp3'/);
+  assert.strictEqual(f.culprit, 'F:\\新建文件夹\\Lanyue-1.0.35\\test\\localLibrary.test.js:4:10',
+    'stack 首帧才是真凶位置，location 只是用例声明处');
+  assert.strictEqual(parsed.counts.fail, 1);
+  assert.strictEqual(parsed.counts.pass, 0);
+});
+
+test('parseTap: 通过用例不产生 failure', () => {
+  const parsed = parseTap(TAP_INFRA);
+  assert.deepStrictEqual(parsed.failures, []);
+  assert.strictEqual(parsed.counts.pass, 1);
+});
+
+test('parseTap: 整文件级 not ok（名字就是 .test.js）单独标记', () => {
+  const parsed = parseTap(TAP_ASYNC_ESCAPE);
+
+  assert.strictEqual(parsed.failures.length, 1);
+  const f = parsed.failures[0];
+  assert.strictEqual(f.fileLevel, true);
+  assert.strictEqual(f.name, 'test/localLibrary.test.js');
+});
+
+test('parseTap: # Error 异步活动注释是「真凶行」，且它出现在 not ok 之前', () => {
+  const parsed = parseTap(TAP_ASYNC_ESCAPE);
+
+  assert.strictEqual(parsed.escapes.length, 1);
+  const e = parsed.escapes[0];
+  assert.strictEqual(e.ownerTest, '用例乙：触发游离 rejection');
+  assert.strictEqual(e.culprit, 'test/localLibrary.test.js:3:1');
+  assert.match(e.message, /上游路由自己炸了/);
+
+  // 这条断言钉住本轮 CI 红四天的机制本身：annotation 若只取失败行之后的窗口就拿不到它
+  assert.ok(TAP_ASYNC_ESCAPE.indexOf('# Error:') < TAP_ASYNC_ESCAPE.indexOf('not ok 1 - test/localLibrary'),
+    '# Error 行必须在 not ok 之前 —— 只取后文的 annotation 必然丢掉真凶');
+});
+
+// ── analyze：规则优先级 ─────────────────────────────────
+
+test('analyze: 整文件级失败 + 异步活动注释 → 判「误归属」，并给出真凶行', () => {
+  const r = analyze(attemptsSame(3, TAP_ASYNC_ESCAPE));
+
+  assert.strictEqual(r.verdict, 'FAIL');
+  assert.strictEqual(r.findings.length, 1);
+  const [f] = r.findings;
+  assert.strictEqual(f.category, 'ASYNC_ESCAPE');
+  assert.strictEqual(f.culprit, 'test/localLibrary.test.js:3:1');
+  assert.match(f.nextAction, /游离|异步/, '该说清下一步是去堵异步泄漏，不是改用例断言');
+  assert.ok(!/改用例断言/.test(f.verdict), '不该把整文件失败说成这个用例自己断言错了');
+});
+
+test('analyze: 详情含出网特征 → 判「测试出网」，不是环境抖动', () => {
+  const [f] = analyze(attemptsSame(3, TAP_EGRESS)).findings;
+
+  assert.strictEqual(f.category, 'TEST_EGRESS');
+  assert.match(f.culprit, /libraryIpc\.integration\.test\.js:131/);
+  assert.match(f.nextAction, /离线|出网/);
+});
+
+test('analyze: 出网特征优先于「整文件级」的默认判定（同一段 TAP 两种特征都在时）', () => {
+  const tap = TAP_ASYNC_ESCAPE.replace('1..3', '1..3\n# extra: connect ECONNREFUSED 1.1.1.1');
+  const [f] = analyze(attemptsSame(3, tap)).findings;
+
+  assert.strictEqual(f.category, 'TEST_EGRESS', '出网是能直接定罪的证据，比形态推断更具体');
+});
+
+test('analyze: 三次 attempt 同一指纹 → 判「确定性回归」，必须修', () => {
+  const r = analyze(attemptsSame(3, TAP_ASSERTION));
+  const [f] = r.findings;
+
+  assert.strictEqual(f.category, 'DETERMINISTIC_REGRESSION');
+  assert.deepStrictEqual(f.attempts, [1, 2, 3]);
+  assert.match(f.nextAction, /不能靠重跑/);
+});
+
+test('analyze: 指纹在 attempt 间漂移 → 判「间歇」，并列出各次失败名', () => {
+  const other = TAP_ASSERTION.replaceAll('用例丙：断言失败', '用例丁：另一条').replace('localLibrary.test.js:4:10', 'localLibrary.test.js:9:1');
+  const r = analyze([
+    attempt(1, 1, TAP_ASSERTION),
+    attempt(2, 1, other),
+    attempt(3, 1, TAP_ASSERTION),
+  ]);
+
+  const categories = r.findings.map((x) => x.category);
+  assert.ok(categories.includes('FLAKY'), `应识别出间歇性，实得 ${categories.join(',')}`);
+  const flaky = r.findings.find((x) => x.category === 'FLAKY');
+  assert.match(flaky.evidence, /用例丁/, '间歇的证据就是「换了个名字」');
+  assert.ok(flaky.culprit && flaky.culprit !== '?', '间歇也要给出可点开的地址，只说「每次红的不一样」等于没说');
+});
+
+test('analyze: exit≠0 却没有任何 not ok → 判「基础设施」，不去猜哪个用例', () => {
+  const r = analyze(attemptsSame(3, TAP_INFRA));
+  const [f] = r.findings;
+
+  assert.strictEqual(r.verdict, 'FAIL');
+  assert.strictEqual(f.category, 'INFRA');
+  assert.match(f.nextAction, /runner|npm|内存|磁盘/, '该指向跑不动的环境，而不是代码');
+});
+
+test('analyze: 全绿 → GREEN 且零 findings（不给绿跑制造噪音）', () => {
+  const green = 'TAP version 13\nok 1 - 某用例\n1..1\n# pass 1\n# fail 0\n';
+  const r = analyze([attempt(1, 0, green)]);
+
+  assert.strictEqual(r.verdict, 'GREEN');
+  assert.deepStrictEqual(r.findings, []);
+});
+
+test('analyze: 一次 attempt 里两条独立失败都要报出来', () => {
+  const tap = [
+    'TAP version 13',
+    'not ok 1 - 用例丙：断言失败',
+    '  ---',
+    "  location: 'test/a.test.js:3:1'",
+    '  error: |-',
+    "    +   title: '未知 - 01.mp3'",
+    '  stack: |-',
+    '    TestContext.<anonymous> (test/a.test.js:4:10)',
+    '  ...',
+    'not ok 2 - 用例丁：另一条',
+    '  ---',
+    "  location: 'test/b.test.js:8:1'",
+    '  error: |-',
+    '    Expected: true',
+    '  stack: |-',
+    '    TestContext.<anonymous> (test/b.test.js:9:3)',
+    '  ...',
+    '1..2',
+    '# pass 0',
+    '# fail 2',
+    '',
+  ].join('\n');
+  const r = analyze(attemptsSame(3, tap));
+
+  assert.strictEqual(r.findings.length, 2);
+  assert.strictEqual(new Set(r.findings.map((x) => x.name)).size, 2, '两条失败各自成一条归因，不能折成一条');
+  assert.ok(r.findings.every((x) => x.category === 'DETERMINISTIC_REGRESSION'));
+});
+
+// ── 输出：annotation 必须能被 runner 解析 ────────────────
+
+test('formatAnnotations: 每条 finding 一行，% 与 # 与换行都转义（workflow command 的硬要求）', () => {
+  const r = analyze(attemptsSame(3, TAP_EGRESS));
+  // 刻意用 'a%b'：转义正确时它是 'a%25b'，转义漏掉时原样出现 —— 两者可分辨。
+  // （早先用 '100%' 做样本是自欺：'100%25' 里照样含 '100%'，断言恒真。）
+  r.findings[0].evidence = 'a%b #c\n第二行\r\n';
+  const [line] = formatAnnotations(r);
+
+  assert.ok(line.startsWith('::error::CI-DOCTOR '), `annotation 前缀缺失: ${line}`);
+  assert.ok(line.includes('category=TEST_EGRESS'));
+  assert.ok(!line.includes('\n') && !line.includes('\r'), '一条 annotation 必须是单行');
+  assert.ok(line.includes('a%25b'), '% 必须转义');
+  assert.ok(line.includes('%23c'), '# 必须转义');
+  assert.strictEqual(line.includes('a%b'), false);
+});
+
+test('formatAnnotations: 条数封顶，超出汇总成一条（runner 只显示少量 annotation，多了等于没有）', () => {
+  const many = [];
+  for (let i = 0; i < 12; i++) {
+    many.push(`not ok ${i + 1} - 用例${i}\n  ---\n  error: 'x'\n  stack: |-\n    at (a.test.js:${i + 1}:1)\n  ...\n`);
+  }
+  const tap = `TAP version 13\n${many.join('\n')}\n1..12\n# fail 12\n`;
+  const r = analyze(attemptsSame(3, tap));
+  assert.ok(r.findings.length >= 10, 'fixture 本身要够多失败');
+
+  const lines = formatAnnotations(r);
+  assert.ok(lines.length <= 6, `annotation 应封顶在 6 条内，实得 ${lines.length}`);
+  assert.match(lines.join('\n'), /另有 \d+ 条/, '被截掉的数量要说出来，不能装作只有这些');
+});
+
+test('formatAnnotations: 单条长度受控（runner 会截断，宁可少说也别切掉 next action）', () => {
+  const r = analyze(attemptsSame(3, TAP_EGRESS));
+  r.findings[0].evidence = 'x'.repeat(5000);
+
+  for (const line of formatAnnotations(r)) {
+    assert.ok(line.length <= 1200, `annotation 过长(${line.length})：${line.slice(0, 80)}`);
+  }
+});
+
+test('formatSummary: markdown 表按类别给计数，供人读 step summary', () => {
+  const r = analyze(attemptsSame(3, TAP_ASSERTION));
+  const md = formatSummary(r);
+
+  assert.match(md, /CI 归因/);
+  assert.match(md, /DETERMINISTIC_REGRESSION/);
+  assert.match(md, /用例丙/);
+});
+
+// ── CLI：归因工具自己失败时不能把绿跑弄红 ────────────────
+
+test('run: 读到 attempt-*.tap.txt 就出归因，退出码恒为 0', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-doctor-'));
+  fs.writeFileSync(path.join(dir, 'attempt-1.tap.txt'), TAP_ASSERTION, 'utf8');
+  fs.writeFileSync(path.join(dir, 'attempt-2.tap.txt'), TAP_ASSERTION, 'utf8');
+  fs.writeFileSync(path.join(dir, 'attempt-3.tap.txt'), TAP_ASSERTION, 'utf8');
+
+  const out = run({ dir });
+
+  assert.strictEqual(out.exitCode, 0, '归因不越权改闸门结论，红由原步骤判');
+  assert.match(out.stdout.join('\n'), /CI-DOCTOR category=DETERMINISTIC_REGRESSION/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('run: 目录里没有 tap 文件也照常绿退出，只发一条 warning', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-doctor-empty-'));
+  const out = run({ dir });
+
+  assert.strictEqual(out.exitCode, 0);
+  assert.match(out.stdout.join('\n'), /::warning::/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('run: PowerShell 写的 UTF-8 带 BOM 也能解析（Windows runner 的默认编码）', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-doctor-bom-'));
+  fs.writeFileSync(path.join(dir, 'attempt-1.tap.txt'), '﻿' + TAP_ASSERTION, 'utf8');
+
+  const out = run({ dir });
+  assert.strictEqual(out.exitCode, 0);
+  assert.match(out.stdout.join('\n'), /CI-DOCTOR category=/, 'BOM 没剥掉会让首行 TAP version 认不出来');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('run: 不读目录、显式给 --tap-file 时也能跑（本地复现用同一条路）', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-doctor-file-'));
+  const file = path.join(dir, 'local.tap.txt');
+  fs.writeFileSync(file, TAP_ASYNC_ESCAPE, 'utf8');
+
+  const out = run({ tapFile: file });
+  assert.match(out.stdout.join('\n'), /category=ASYNC_ESCAPE/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('run: 全程不产生任何对外连接（轨道四的承诺：CI 不出网、不花钱）', async () => {
+  const net = require('node:net');
+  const tried = [];
+  const originalConnect = net.Socket.prototype.connect;
+  net.Socket.prototype.connect = function spyConnect(...args) {
+    tried.push(JSON.stringify(args.flat(1)));
+    return originalConnect.apply(this, args);
+  };
+
+  try {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-doctor-egress-'));
+    fs.writeFileSync(path.join(dir, 'attempt-1.tap.txt'), TAP_ASSERTION, 'utf8');
+    run({ dir });
+    assert.deepStrictEqual(tried, [], `归因脚本不该有任何连接: ${tried.join(', ')}`);
+    fs.rmSync(dir, { recursive: true, force: true });
+  } finally {
+    net.Socket.prototype.connect = originalConnect;
+  }
+});
