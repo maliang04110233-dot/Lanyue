@@ -25,6 +25,16 @@ test('parse: 容忍 markdown 代码围栏与前后废话', () => {
   assert.deepStrictEqual(parseSearchQueries(text), ['轻快 中文 晨跑']);
 });
 
+test('parse: 一条回复里两个数组（模型改口）取后面那个', () => {
+  // 真供应商常见形态：先答一组又重想一组。旧的贪婪短匹配 `\[[\s\S]*?\]` 取的是**第一个**，
+  // 也就是模型自己已经丢掉的那份草稿 —— 与助手/智能歌单同一类毛病，方向相反。
+  const text = '["周杰伦"]\n我再想想 ["周杰伦 现场", "Jay Chou"]';
+  assert.deepStrictEqual(parseSearchQueries(text), ['周杰伦 现场', 'Jay Chou']);
+
+  // 元素里带 `]` 时不能被字符串内部的括号带偏
+  assert.deepStrictEqual(parseSearchQueries('["a]b", "c"]'), ['a]b', 'c']);
+});
+
 test('parse: 无数组的垃圾输出 → null（由上层兜底）', () => {
   assert.strictEqual(parseSearchQueries('抱歉，我无法完成这个任务'), null);
   assert.strictEqual(parseSearchQueries(''), null);

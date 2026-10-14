@@ -73,6 +73,20 @@ test('解析：JSON 外面裹解释文字或代码块也要能吃下', () => {
   assert.deepStrictEqual(r.picks, [2]);
 });
 
+/**
+ * 模型改口：一条回复里出现**两个** JSON 对象时取后面那个。
+ * 与助手那条同源同口径（抠 JSON 的活儿抽到 `src/api/services/modelJson.js`，两处共用一份）：
+ * 旧的贪婪正则 `\{[\s\S]*\}` 会把两个对象跨成一段非法 JSON，解析失败 ⇒ picks 全丢 ⇒
+ * 界面如实报「一首都没挑出来」，而那其实是模型答对了、只是答了两遍。
+ */
+test('解析：两个 JSON 对象（模型先答一句又改口）取后面那个，不能整份丢掉', () => {
+  const c = buildCandidates(many(5));
+  const r = parseSelection(
+    '{"name":"先给的","reason":"","picks":[1]}\n我再挑一次 {"name":"改口后的","reason":"更贴主题","picks":[4,2]}', c);
+  assert.strictEqual(r.name, '改口后的');
+  assert.deepStrictEqual(r.picks, [4, 2]);
+});
+
 test('钳制：越界、重复、非数字、字符串数字统统处理，只留合法序号', () => {
   const c = buildCandidates(many(5));
   const r = parseSelection(

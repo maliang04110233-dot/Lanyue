@@ -11,6 +11,8 @@
  * 循环在渲染层：本模块只做「一次回合」——把历史喂给模型、拿回 reply 与 steps。
  */
 
+const { extractModelJson } = require('./modelJson');
+
 const MAX_STEPS_PER_TURN = 4;
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_RESULT_CHARS = 4000;
@@ -52,7 +54,15 @@ function _coerceSteps(raw, allowed) {
   return out;
 }
 
-/** 容错解析：整段 JSON → 抠第一个 {…} → 退化为纯文本回复 */
+/** 协议形状判据：至少要有一个 reply 文本或 steps 数组，否则那只是段普通花括号 */
+function _isProtocolObject(o) {
+  return !!o && typeof o === 'object' && (typeof o.reply === 'string' || Array.isArray(o.steps));
+}
+
+/**
+ * 容错解析：整段 JSON → 配平候选（模型改口吐两个对象时取后面那个）→ 退化为纯文本回复。
+ * 抠 JSON 的口径与智能歌单共用一份，见 `modelJson.js` 的头注。
+ */
 function parseAssistantReply(text) {
   const fallback = { reply: typeof text === 'string' ? text.trim() : '', steps: [] };
   if (typeof text !== 'string' || !text.trim()) return { reply: '', steps: [] };
@@ -60,8 +70,7 @@ function parseAssistantReply(text) {
   try {
     obj = JSON.parse(text.trim());
   } catch (_e) {
-    const m = text.match(/\{[\s\S]*\}/);
-    if (m) { try { obj = JSON.parse(m[0]); } catch (_e2) { obj = null; } }
+    obj = extractModelJson(text, _isProtocolObject);
   }
   if (!obj || typeof obj !== 'object') return fallback;
   const reply = typeof obj.reply === 'string' ? obj.reply.trim() : (fallback.reply || '');

@@ -40,6 +40,38 @@ test('解析：干净 JSON、带解释文字、带代码块三种毛刺都要能
   assert.deepStrictEqual(c.steps, []);
 });
 
+/**
+ * 真供应商最常见的第二种毛刺：一次回复里出现**两个** JSON 对象（模型先答一句又改口重来）。
+ * 为什么单独一条：上一那条只覆盖「全文只有一对花括号」，而旧的容错是贪婪正则
+ * `\{[\s\S]*\}` —— 两个对象会被跨成一段非法 JSON，解析失败后整坨原始 JSON 被当成 reply 上屏，
+ * 而模型真正想执行的 steps 静默消失：用户看到一串花括号，助手什么也没做，看起来却像「答过了」。
+ * 这正是 roadmap 里轨道二那句欠账（「真供应商的回复形态」）在离线就能收掉的部分。
+ * 取后一个对象：改口之后的才是结论。
+ */
+test('解析：一条回复里两个 JSON 对象（模型改口）取后面那个，不能把花括号原文上屏', () => {
+  const a = parseAssistantReply(
+    '{"reply":"先说没找到","steps":[]}\n我再看一下 {"reply":"找到了","steps":[{"tool":"search_music","args":{"keyword":"夜跑"}}]}'
+  );
+  assert.strictEqual(a.reply, '找到了');
+  assert.deepStrictEqual(a.steps.map((s) => s.tool), ['search_music']);
+
+  // 前一个合法、后一个是代码块里的结论，同样取后者
+  const b = parseAssistantReply(
+    '{"reply":"a","steps":[]}\n```json\n{"reply":"b","steps":[{"tool":"list_platforms","args":{}}]}\n```'
+  );
+  assert.strictEqual(b.reply, 'b');
+  assert.deepStrictEqual(b.steps.map((s) => s.tool), ['list_platforms']);
+
+  // 两个对象都不是协议形状（没有 reply/steps）⇒ 仍然退回「整段当话」，不假装解析成功
+  const c = parseAssistantReply('配置 {a: 1} 和 {b: 2} 都不对');
+  assert.strictEqual(c.reply, '配置 {a: 1} 和 {b: 2} 都不对');
+  assert.deepStrictEqual(c.steps, []);
+
+  // reply 文本里带花括号与转义引号时，不能被字符串内部的括号带偏
+  const d = parseAssistantReply('{"reply":"含 { 和 \\"引号\\" 的话","steps":[]}');
+  assert.strictEqual(d.reply, '含 { 和 "引号" 的话');
+});
+
 test('steps 里的非白名单工具、args 非对象、超上限都要被丢掉', () => {
   const fake = [
     { tool: 'rm_rf', args: {} },                       // 不在白名单

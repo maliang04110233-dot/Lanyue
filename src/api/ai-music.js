@@ -10,6 +10,7 @@
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
+const { extractModelJson } = require('./services/modelJson');
 const { readFile, writeFile } = require('fs/promises');
 const path = require('path');
 const logger = require('../utils/logger');
@@ -721,23 +722,16 @@ ${lyrics}
 
 /**
  * 稳健解析 LLM 输出的搜索关键词数组。
- * LLM 常带 markdown 围栏或前后废话，先按纯 JSON 解析，失败再提取第一个
- * [...] 片段。清洗规则：只留字符串、trim、丢空白与超长（>60 字符）、去重、最多 3 个。
+ * LLM 常带 markdown 围栏或前后废话，先按纯 JSON 解析，失败再配平扫描取**最后一个**合形的数组
+ * （模型改口时一条回复里会有两个数组，后面那个才是结论 —— 口径与助手/智能歌单共用一份，
+ * 见 `services/modelJson.js` 头注）。清洗规则：只留字符串、trim、丢空白与超长（>60 字符）、去重、最多 3 个。
  * 无任何可解析数组 → null（由调用方兜底）。
  * @param {string} text
  * @returns {string[]|null}
  */
 function parseSearchQueries(text) {
   if (typeof text !== 'string' || !text.trim()) return null;
-  let arr = null;
-  try {
-    arr = JSON.parse(text.trim());
-  } catch (_) {
-    const m = text.match(/\[[\s\S]*?\]/);
-    if (m) {
-      try { arr = JSON.parse(m[0]); } catch (_) { arr = null; }
-    }
-  }
+  const arr = extractModelJson(text, Array.isArray);
   if (!Array.isArray(arr)) return null;
   const out = [];
   const seen = new Set();

@@ -11,6 +11,8 @@
  * 序号是一一对应、越界即可判废的的最小接口。
  */
 
+const { extractModelJson } = require('./modelJson');
+
 const MAX_CANDIDATES = 400;
 const MAX_PICKS = 100;
 const MAX_FIELD_CHARS = 60;
@@ -79,14 +81,10 @@ function buildSystemPrompt() {
 - 宁缺毋滥：只选真正贴合主题的，一般 5~30 首。主题理解不了就 picks 给空数组。`;
 }
 
-/** 从一段可能有毛刺的模型输出里抠出 JSON 对象（与 parseAssistantReply 同一口径） */
+/** 从一段可能有毛刺的模型输出里抠出 JSON 对象（与助手共用一份口径，见 `modelJson.js` 头注） */
 function _extractJson(text) {
-  const s = String(text == null ? '' : text);
-  if (!s.trim()) return null;
-  try { return JSON.parse(s.trim()); } catch (_e) { /* 继续毛刺路径 */ }
-  const m = s.match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  try { return JSON.parse(m[0]); } catch (_e2) { return null; }
+  // 判据要排除数组：候选里现在两种都配得平，而这里认的是 `{name, reason, picks}`
+  return extractModelJson(text, (o) => !!o && typeof o === 'object' && !Array.isArray(o));
 }
 
 /**
