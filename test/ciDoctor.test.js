@@ -327,7 +327,8 @@ test('ci.yml 与 release.yml 的 Unit tests 命令体逐行相同 —— probe �
   assert.match(ci, /Context\.PreContext/);
   assert.match(ci, /node scripts\/ci-doctor\.cjs --tap-dir \. --summary/);
   assert.ok(!/probe attempt=/.test(ci), '调试探针行不该留在任何一侧 —— 它每次绿跑都发一条 ::error::');
-  assert.ok(!/[^\x00-\x7F]/.test(ci), 'run 块必须纯 ASCII：它会被原样写进 PowerShell 脚本文件，编码由 runner 决定');
+  assert.ok(!ci.split('').some((c) => { const n = c.codePointAt(0); return n < 32 && n !== 10 && n !== 13 || n > 126; }),
+    'run 块必须纯 ASCII：它会被原样写进 PowerShell 脚本文件，编码由 runner 决定');
 });
 
 
