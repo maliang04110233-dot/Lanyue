@@ -17,7 +17,7 @@
 | 1 | MCP 一等公民化 + 调用审计 + 速率限制 | `2026-10-14-mcp-first-class.md` | 无 | 已落地（收尾 e5320a1） |
 | 2 | 应用内 AI 助手（复用 MCP 工具面做 function-calling） | `2026-10-14-in-app-ai-assistant.md` | 轨道 1 的 `auditStore` / `onCall` 钩子 | 已落地（3dcd2a5 起六枚提交，收尾 b8e8059）；推送+CI 已绿（`e44df72` 两条 job success），界面实测：机制四条已在真 DOM 点到（只读直连、写前真弹层、取消零执行、回复含标签只当文本），欠账只剩「真供应商回复形态」一层，待用户 Key |
 | 3 | AI 智能歌单（**打标已砍**，见下方说明） | 无计划文件：范围收到一处 bounded 改动，直接按 TDD 落地 | 轨道 2 的出网通道 `assistantChat` 与严格 JSON 协议 | 已落地（4e28237）；行为单测 16 枚 + CDP 真点离线链（错误分支）+ 成功分支真 DOM（2026-10-14，见下方说明），CI 同上一条一起绿 |
-| 4 | AI 接管研发流水线（CI 归因 + 复审 agent） | 归因：无计划文件（bounded，只碰 `.github/workflows/` 与新脚本，直接按 TDD 落地）；复审：`2026-10-14-ci-review-agent.md`（2026-10-14 新写，**用户拍板：暂不落地**） | 无（与 1-3 并行不冲突） | 归因侧已落地并在 runner 上验绿（`1302f35` → `05e31ed` → `84fa480` → `dec890b`，两个 job 全成功）；归因引擎的**红路**随后也进了日常 —— 新增「CI doctor self-check」步骤每次绿跑都喂合成红 TAP 真跑一遍脚本，`test/doctorSelfCheck.test.js` 四条用例（含两条坏现场的牙齿用例）守它，见下方留白闭合段；复审 agent 一行代码没写 —— 它必然要出网花钱，计划里把「贴标签 = 授权花钱」做成闸门，**用户同日拍板不落地**，留档不删 |
+| 4 | AI 接管研发流水线（CI 归因 + 复审 agent） | 归因：无计划文件（bounded，只碰 `.github/workflows/` 与新脚本，直接按 TDD 落地）；复审：`2026-10-14-ci-review-agent.md`（2026-10-14 新写，**用户拍板：暂不落地**） | 无（与 1-3 并行不冲突） | 归因侧已落地并在 runner 上验绿（`1302f35` → `05e31ed` → `84fa480` → `dec890b`，两个 job 全成功）；归因引擎的**红路**随后也进了日常 —— 新增「CI doctor self-check」步骤每次绿跑都喂合成红 TAP 真跑一遍脚本，`test/doctorSelfCheck.test.js` 四条用例（含两条坏现场的牙齿用例）守它，见下方留白闭合段，并已在 runner 上验绿（`82905c3` 两条 job 全 success，那次 run 的 annotation 里 `CI-DOCTOR` 命中 0）；复审 agent 一行代码没写 —— 它必然要出网花钱，计划里把「贴标签 = 授权花钱」做成闸门，**用户同日拍板不落地**，留档不删 |
 
 **轨道 4 为什么先只做归因**：归因引擎已定**纯确定性规则，CI 不出网、不花钱**
 （2026-10-14 用户选定；LLM 摘要与本地 agent 两个备选都否了）。它读的是一段已经被
@@ -61,6 +61,11 @@
 **为什么没往 `release.yml` 也添一份**：发版流水线要 tag 才跑，一年点不了几次，死角不在那儿；
 `release.yml` 的红路依赖的是同一个 `ci-doctor.cjs`，而它坏掉的时间点已被日常 CI 这一步提前拦下 ——
 两处各跑一遍只会多一条要维护的形状（`Unit tests` 命令体那对逐行相同的钉子已经证明过分叉的代价）。
+**runner 侧证据到了 annotation 一级（`82905c3`，两条 job 全 success）**：`Lint & Unit Tests` 这一步
+没有 `if:`，job 绿就等于是这份合成红在 windows-latest 上被真跑真验过；更硬的一条是那次 run 的
+annotation 清单只有 3 条 warning（Node 20 弃用 + 两枚历史 lint 未用变量）、`CI-DOCTOR` 命中 **0** 条 ——
+「捕获不回显」这条不变量在 runner 上成立，不是只在本地成立。取证据不必 admin：
+`GET /repos/<owner>/<repo>/check-runs/<id>/annotations` 匿名可读（job 原始日志才要 admin）。
 复审 agent 不同：它得读 diff 之外的东西（需求、历史、运行时行为），不出网做不到，
 于是与本轨道的「零成本、零出网」口径正面相撞。解法不是折中，是把「零」的定义挪到**默认路径**上：
 归因在每一次 push 上都跑（纯规则、免费），复审只在人往 PR 上贴 `ai-review` 标签那一刻才花钱 ——
