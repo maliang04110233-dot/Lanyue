@@ -124,11 +124,49 @@ test('assertPublicHttpUrl: 拒绝编码内网 IP 的 http URL', async () => {
   }
 });
 
-test('assertPublicHttpUrl: 公网 URL 放行', async () => {
-  const r = await assertPublicHttpUrl('https://music.163.com/song/media/outer/url?id=1.mp3');
-  assert.strictEqual(r.ok, true);
-  assert.ok(r.url instanceof URL);
-  assert.ok(Array.isArray(r.ips) && r.ips.length > 0);
+// 域名路径要过 dns.promises.lookup —— 真解析让这条用例变成 CI 里的抖动源
+// （全量并发跑时出现过 DNS 超时而红，单独跑又绿）。守卫换成桩：判定逻辑一行没变，
+// 但「公网放行」与「DNS 挂了要拒绝」两个分支从此确定性可复现。
+const dns = require('node:dns');
+
+function withStubLookup(impl, body) {
+  const original = dns.promises.lookup;
+  dns.promises.lookup = impl;
+  return body().finally(() => { dns.promises.lookup = original; });
+}
+
+test('assertPublicHttpUrl: 公网 URL 放行（域名→公网 IP，桩掉 DNS）', async () => {
+  await withStubLookup(
+    async () => [{ address: '115.124.15.30', family: 4 }],
+    async () => {
+      const r = await assertPublicHttpUrl('https://music.163.com/song/media/outer/url?id=1.mp3');
+      assert.strictEqual(r.ok, true);
+      assert.ok(r.url instanceof URL);
+      assert.deepStrictEqual(r.ips, ['115.124.15.30']);
+    }
+  );
+});
+
+test('assertPublicHttpUrl: 域名解析到内网 → 拒绝（SSRF 走 DNS  rebinding 的那一侧）', async () => {
+  await withStubLookup(
+    async () => [{ address: '10.0.0.8', family: 4 }],
+    async () => {
+      const r = await assertPublicHttpUrl('https://evil.example.com/x');
+      assert.strictEqual(r.ok, false);
+      assert.match(String(r.reason), /内网|private|10\.0\.0\.8/);
+    }
+  );
+});
+
+test('assertPublicHttpUrl: DNS 解析失败 → 拒绝而不是放行', async () => {
+  await withStubLookup(
+    async () => { const e = new Error('queryA ENOTFOUND'); e.code = 'ENOTFOUND'; throw e; },
+    async () => {
+      const r = await assertPublicHttpUrl('https://does-not-exist.example/x');
+      assert.strictEqual(r.ok, false);
+      assert.match(String(r.reason), /DNS 解析失败/);
+    }
+  );
 });
 
 // ── DNS 路径（依赖网络；离线环境跳过）─────────────────
