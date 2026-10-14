@@ -52,7 +52,7 @@
 - Consumes: 无
 - Produces: `AGENT_TOOLS[i].mutating?: boolean`、`MUTATING_TOOL_NAMES: Set<string>`、`toolsFromContract()` 输出项多出 `mutating: boolean` 字段（`mcpCore` 的 `publicTools` 只取 `{name, description, inputSchema}`，因此**不会**外泄给 `tools/list`）。Task 3 的确认闸门与 Task 5 的渲染层都读这个字段。
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 新建 `test/mcp-tools-mutating.test.js`：
 
@@ -105,12 +105,12 @@ test('mutating 不外泄给 MCP tools/list（协议面只有 name/description/in
 });
 ```
 
-- [ ] **Step 2: 跑测试确认它失败**
+- [x] **Step 2: 跑测试确认它失败**
 
 Run: `node --test test/mcp-tools-mutating.test.js`
 Expected: FAIL —— `MUTATING_TOOL_NAMES` 是 undefined（`toolsFromContract` 那枚还会报 `find(...).mutating` 读不到）。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `src/main/mcp/tools.js`：给三个动作工具各加一行 `mutating: true`（放在 `paramDocs` 之前，与 `required` 同级）：
 
@@ -146,12 +146,12 @@ module.exports = { AGENT_TOOLS, MUTATING_TOOL_NAMES, TOOLS_VERSION_HINT: '2025-0
  *     必须拿到用户确认（轨道二），外部 Agent 靠白名单本身兜着。
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `node --test test/mcp-tools-mutating.test.js test/mcp-e2e.test.js test/mcpCore.test.js`
 Expected: 全绿 —— `mcp-e2e` 里那枚「不外泄 channel」的断言仍成立（`mutating` 同样被 `publicTools` 剔除）。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/main/mcp/tools.js test/mcp-tools-mutating.test.js
@@ -173,7 +173,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(mcp): �
 - Consumes: `createAuditStore`/`AUDIT_FILE_NAME`（`auditStore.js`）、`createMcpHandler`（`mcpCore.js`）、`toolsFromContract`（`tools.js`）、`getInvokeHandler`（`src/main/ipc/register.js`）
 - Produces: `auditSink.store() → AuditStore|null`、`auditSink.record(entry) → Promise<void>`、`auditSink._setUserDataDirForTest(dir)`；`agentBridge.createAgentBridge({ source, serverVersion?, onCall? }) → handle(msg)`、`agentBridge.callTool(channel, args)`。Task 3 用 `createAgentBridge({ source:'assistant' })`，`ipc/mcp.js` 用 `createAgentBridge({ source:'agent' })`。
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 新建 `test/mcp-agent-bridge.test.js`：
 
@@ -233,12 +233,12 @@ test('装配点唯一：ipc/mcp.js 不得再自己攒一份 createMcpHandler / c
 });
 ```
 
-- [ ] **Step 2: 跑测试确认它失败**
+- [x] **Step 2: 跑测试确认它失败**
 
 Run: `node --test test/mcp-agent-bridge.test.js`
 Expected: FAIL —— `Cannot find module '../src/main/mcp/agentBridge'`。
 
-- [ ] **Step 3: 建 `src/main/mcp/auditSink.js`**
+- [x] **Step 3: 建 `src/main/mcp/auditSink.js`**
 
 ```js
 /**
@@ -290,7 +290,7 @@ function _setUserDataDirForTest(dir) {
 module.exports = { store, record, AUDIT_FILE_NAME, _setUserDataDirForTest };
 ```
 
-- [ ] **Step 4: 建 `src/main/mcp/agentBridge.js`**
+- [x] **Step 4: 建 `src/main/mcp/agentBridge.js`**
 
 ```js
 /**
@@ -334,7 +334,7 @@ function createAgentBridge({ source, serverVersion = '0.0.0', onCall = null }) {
 module.exports = { createAgentBridge, callTool };
 ```
 
-- [ ] **Step 5: `src/main/ipc/mcp.js` 改为复用**
+- [x] **Step 5: `src/main/ipc/mcp.js` 改为复用**
 
 删除 `const path = require('path');`、`const { createAuditStore, AUDIT_FILE_NAME } = require('../mcp/auditStore');` 两处 require（`path` 若别处未用就一并删），加上：
 
@@ -366,7 +366,7 @@ function _auditStore() {
 `createMcpHandler` 的 require 也随之删掉（`mcpCore` 不再被本模块直接引用），`./register` 的 `getInvokeHandler` 也一并去掉（callTool 的家搬进桥了）。
 限流拒绝的计数不在这里：`onRejected` 仍挂在 `createMcpServer({...})` 上，与审计回调互不相干。
 
-- [ ] **Step 6: 搬 `test/mcp-audit-wiring.test.js` 的第一枚钉**
+- [x] **Step 6: 搬 `test/mcp-audit-wiring.test.js` 的第一枚钉**
 
 `onCall` 的家从 `ipc/mcp.js` 搬到 `agentBridge.js`，第一枚测试改成：
 
@@ -383,12 +383,12 @@ test('桥是审计的装配点：默认落盘 + 摘要判据复用 auditStore（
 
 其余四枚不动（契约声明、云同步、限流计数、片段不外泄仍然在 `ipc/mcp.js` 里）。
 
-- [ ] **Step 7: 跑测试确认通过**
+- [x] **Step 7: 跑测试确认通过**
 
 Run: `node --test test/mcp-agent-bridge.test.js test/mcp-audit-wiring.test.js test/mcp-audit-store.test.js test/mcp-e2e.test.js`
 Expected: 全绿。
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add src/main/mcp/auditSink.js src/main/mcp/agentBridge.js src/main/ipc/mcp.js test/mcp-agent-bridge.test.js test/mcp-audit-wiring.test.js
@@ -929,7 +929,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(assista
 - Consumes: `ai-assistant-tools` / `ai-assistant-plan` / `ai-assistant-tool-call`（Task 3）、`askConfirm`（`../confirmDialog.js`）、`showToast`（`../toast.js`）、`t`（`../i18n.js`）、`errBrief`（`../errBrief.js`）
 - Produces: 页面 `#aiAssistantPage`、消息流 `#assistantLog`、输入 `#assistantInput`、函数 `sendAssistant()` / `clearAssistant()` / `toggleAssistantSendKey()`，以及 `window.sendAssistant` 等导出（内联 onclick 只认 window）
 
-- [ ] **Step 1: 写失败的静态守卫**
+- [x] **Step 1: 写失败的静态守卫**
 
 新建 `test/ai-assistant-ui.test.js`：
 
@@ -1022,12 +1022,12 @@ test('入口与页面：侧栏 assistant 条目、switchTab 三处、window 导�
 });
 ```
 
-- [ ] **Step 2: 跑测试确认它失败**
+- [x] **Step 2: 跑测试确认它失败**
 
 Run: `node --test test/ai-assistant-ui.test.js`
 Expected: FAIL —— `ai-assistant.js` 读不到。
 
-- [ ] **Step 3: 文案键（zh/en 各一份，同一提交里加，避免「键存在性」钉红着）**
+- [x] **Step 3: 文案键（zh/en 各一份，同一提交里加，避免「键存在性」钉红着）**
 
 `src/renderer/js/lang/zh.json`（放在 `toast.*` 之前的 `assistant` 对象；与既有词典风格一致：键名英文、值中文）：
 
@@ -1093,7 +1093,7 @@ Expected: FAIL —— `ai-assistant.js` 读不到。
     "assistantNoAnswer": "The assistant did not answer"
 ```
 
-- [ ] **Step 4: 侧栏入口 + 页面骨架**
+- [x] **Step 4: 侧栏入口 + 页面骨架**
 
 `src/renderer/index.html` 「工具」分组内、`data-tab="ai-music"` 那条**之后**插入（顺序决定 `renderer-audit` 那张表，Task 6 要同步）：
 
@@ -1124,7 +1124,7 @@ Expected: FAIL —— `ai-assistant.js` 读不到。
 `nav.assistant` 也加进两份词典（`nav` 段的既有键按字母序排在 `aggregate` 之后）：`"assistant": "AI 助手"` / `"assistant": "AI Assistant"`。
 textarea 的 `data-i18n` 不是笔误：`i18n.js:53-57` 对 INPUT/TEXTAREA 写的是 `.placeholder` 而不是 textContent，所以占位文案就用 `data-i18n="assistant.placeholder"`，静态 `placeholder` 属性留中文兜底。
 
-- [ ] **Step 5: `src/renderer/js/app.js` 三处接线**
+- [x] **Step 5: `src/renderer/js/app.js` 三处接线**
 
 `import './views/subscriptions.js';`（:56）之后加：
 
@@ -1152,7 +1152,7 @@ import './views/ai-assistant.js';
   }
 ```
 
-- [ ] **Step 6: 样式（`src/renderer/styles/content.css` 末尾）**
+- [x] **Step 6: 样式（`src/renderer/styles/content.css` 末尾）**
 
 只用设计令牌，不裸写色值（`test/confirm-dialog.test.js` 与既有的令牌纪律）：
 
@@ -1193,7 +1193,7 @@ import './views/ai-assistant.js';
 .asst-input:focus { outline: none; border-color: var(--neon-cyan); }
 ```
 
-- [ ] **Step 7: 视图模块 `src/renderer/js/views/ai-assistant.js`**
+- [x] **Step 7: 视图模块 `src/renderer/js/views/ai-assistant.js`**
 
 ```js
 /**
@@ -1359,7 +1359,7 @@ window.clearAssistant = clearAssistant;
 
 `_round` 把助手的每一步（含 `reply` 与 steps）以 JSON 文本回喂进 `_history`：模型的上一轮输出必须**原样**回到上下文里，否则下一轮它会重复同一步 —— 这是与 `formatToolResults` 同一套「协议里没有 tool role」的口径，两处都写成 `{"tool_results":…}` / `{"reply":…,"steps":…}` 的 user 消息，`trimHistory` 靠这个前缀判断「不能开头」。
 
-- [ ] **Step 8: 跑静态守卫**
+- [x] **Step 8: 跑静态守卫**
 
 Run: `node --test test/ai-assistant-ui.test.js test/toast-i18n.test.js`
 Expected: `ai-assistant-ui` 全绿；`toast-i18n` 此时仍绿（新文件还没进 `CONQUERED`，Task 6 收编）。
@@ -1377,7 +1377,7 @@ npm run dev   # 或本仓既有的启动方式
 ④ 清空对话按钮可用；⑤ 切英文界面重复 ①，不得漏中文。
 若无法起界面（CI 环境），在提交信息里如实写明「未做界面实测」。
 
-- [ ] **Step 10: 提交**
+- [x] **Step 10: 提交**
 
 ```bash
 git add src/renderer/js/views/ai-assistant.js src/renderer/index.html src/renderer/js/app.js src/renderer/styles/content.css src/renderer/js/lang/zh.json src/renderer/js/lang/en.json test/ai-assistant-ui.test.js
@@ -1398,7 +1398,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(assista
 - Consumes: Task 1-5 的落地事实
 - Produces: 无新接口；五张台账与代码逐字相等
 
-- [ ] **Step 1: toast-i18n 收编**
+- [x] **Step 1: toast-i18n 收编**
 
 `CONQUERED` 数组末尾加一行（顺序即收编史，新增放最后）：
 
@@ -1409,11 +1409,11 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(assista
 
 `CONQUERED_VIEWS` 同样加 `'src/renderer/js/views/ai-assistant.js',`（该文件已 `import { t } from '../i18n.js'`，且不出现 `window.t(`）。
 
-- [ ] **Step 2: 确认框台账 17 → 18**
+- [x] **Step 2: 确认框台账 17 → 18**
 
 `ASK_SITES` 末尾加 `['views/ai-assistant.js', 1],`；`assert.equal(total, 17, '调用点总数必须等于 17——…')` 改为 18（含提示语里的数字）；测试标题 `'17 处不可逆操作…'` 改为 `'18 处…'`；上方分节注释 `// ── 接线钉：17 个调用点…` 同步。
 
-- [ ] **Step 3: 侧栏台账**
+- [x] **Step 3: 侧栏台账**
 
 `test/renderer-audit.test.js:500` 的期望序列在 `'ai-music'` 之后插入 `'assistant'`：
 
@@ -1425,7 +1425,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(assista
 `:521` 的「工具」段改为 `['ai-music', 'assistant', 'converter']`。
 理由注释保持原样（条目增删会破坏 switchTab 兜底查询与 ⌘K 反查 —— 本轮正是这种改动，所以台账必须跟着动，别改 HTML 蒙过它）。
 
-- [ ] **Step 4: 写全链测试（真桥 + 假 handler，含审计两路 source）**
+- [x] **Step 4: 写全链测试（真桥 + 假 handler，含审计两路 source）**
 
 新建 `test/ai-assistant-e2e.test.js`：
 
@@ -1536,12 +1536,12 @@ test('没有 API Key：回合通道回 NO_KEY 且不出网', async () => {
 
 注意：本文件对 `register.js` 的用法（打桩后 `register.handle(...)` 灌假 handler）与 `test/mcp-e2e.test.js` 里对 `createMcpHandler` 的用法是两条不同路径 —— 前者验**通道这一层**（闸门 + 令牌 + 审计落点），后者验**协议层**（tools/list + 限流）。`handle()` 对同一通道重复注册在桩里是覆盖语义（真实 `ipcMain` 会抛，桩只存 Map），所以本文件里灌假 `add-to-queue` / `search-music` 不会影响别的测试文件（node --test 每个文件一个进程）。
 
-- [ ] **Step 5: 跑全链**
+- [x] **Step 5: 跑全链**
 
 Run: `node --test test/ai-assistant-e2e.test.js test/ai-assistant-gate.test.js test/ai-assistant-ui.test.js test/confirm-dialog.test.js test/toast-i18n.test.js test/renderer-audit.test.js`
 Expected: 全绿。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add test/ai-assistant-e2e.test.js test/toast-i18n.test.js test/confirm-dialog.test.js test/renderer-audit.test.js
@@ -1562,7 +1562,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "test(assista
 - Consumes: 前 6 个任务的事实（17 工具、3 写操作、MAX_TURNS=3、`source:'assistant'`）
 - Produces: 无代码接口
 
-- [ ] **Step 1: SECURITY.md**
+- [x] **Step 1: SECURITY.md**
 
 §三 表格「本地服务」那行的「现状」改为同时覆盖两个 caller：
 
@@ -1576,7 +1576,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "test(assista
 - 应用内 AI 助手会把你的对话文本与工具返回的歌曲标题发给 MiniMax（`api.minimaxi.com`）；对话与调用记录只存本机，不进 WebDAV 快照与导出备份
 ```
 
-- [ ] **Step 2: README**
+- [x] **Step 2: README**
 
 `:9` 那条之后新增一条：
 
@@ -1584,7 +1584,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "test(assista
 - **AI 助手（应用内）** — 说一句人话，助手调用本应用自己的 17 个工具去查、去下、去加歌单；写操作逐条要你确认，调用记录进同一份审计
 ```
 
-- [ ] **Step 3: CHANGELOG（`## [未发布]` 的「新增」段末尾追加）**
+- [x] **Step 3: CHANGELOG（`## [未发布]` 的「新增」段末尾追加）**
 
 ```markdown
 - **应用内 AI 助手**：侧栏新增「AI 助手」页，说人话即可驱动本应用的能力（找歌、查词、入队、加歌单、红心）。
@@ -1593,11 +1593,11 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "test(assista
   需要先在「设置 → AI 音乐」里配置 MiniMax API Key；「AI 创作」页仍是关着的，这个开关不受它管。
 ```
 
-- [ ] **Step 4: roadmap 状态更新**
+- [x] **Step 4: roadmap 状态更新**
 
 `docs/superpowers/plans/2026-10-14-ai-program-roadmap.md` 的轨道二条目改为「已落地」并指向本计划与各提交哈希（引用提交用 7 位 short hash，不许写「增量NNN」—— `test/no-increment-numbering.test.js` 连文档一起扫）。
 
-- [ ] **Step 5: 五层闸门全跑**
+- [x] **Step 5: 五层闸门全跑**
 
 ```bash
 npm run lint && npm run audit:deps && npm run check:dead-deps \
