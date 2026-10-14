@@ -126,12 +126,16 @@ jobs:
           for ($i = 1; $i -le 3; $i++) {
             $out = node --test --test-concurrency=2 "test/*.test.js" 2>&1
             $code = $LASTEXITCODE
+            # 探针：无论成败都发一条 annotation。上一轮 annotations 数组存在却全空，
+            # 分不清是「命令格式没被解析」还是「压根没匹配到失败行」—— 一次分清。
+            Write-Output "::error::probe attempt=$i exit=$code lines=$($out.Count)"
             if ($code -eq 0) { Write-Output "passed on attempt $i"; exit 0 }
-            Write-Output "::warning::Unit tests failed on attempt $i"
-            $out | Select-String -Pattern '^not ok |✖ ' | Select-Object -First 15 | ForEach-Object {
-              $msg = ($_ -replace '%', '%25' -replace "`r", '' -replace "`n", ' ')
-              if ($msg.Length -gt 120) { $msg = $msg.Substring(0, 120) + '…' }
-              Write-Output "::error title=单测失败(attempt $i)::$msg"
+            $hits = @($out | Select-String -Pattern '✖|not ok' | Select-Object -First 10)
+            Write-Output "::error::matched $($hits.Count) failure lines"
+            foreach ($h in $hits) {
+              $msg = ($h -replace '%', '%25' -replace "`r", '' -replace "`n", ' ')
+              if ($msg.Length -gt 150) { $msg = $msg.Substring(0, 150) }
+              Write-Output "::error::FAIL-LINE $msg"
             }
             Start-Sleep -Seconds 10
           }
