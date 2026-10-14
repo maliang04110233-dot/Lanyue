@@ -7,6 +7,8 @@
  *     preload 白名单同一套路：契约是唯一事实来源，工具面自动跟随参数钳制
  *   - 白名单纪律：只放「查询 + 加法动作」。cookie/登录、文件路径读写、
  *     set-pref、对话框、更新安装一律不进（外部 Agent 的可信度低于渲染层）
+ *   - mutating 标记：会改变外部世界（入队/改歌单/收藏）的动作。应用内助手
+ *     在执行前必须拿到用户确认（轨道二），外部 Agent 靠白名单本身兜着
  *
  * 新通道要暴露给 Agent = 在这里加一行 + 想清楚它能否被陌生程序驱动。
  */
@@ -96,18 +98,21 @@ const AGENT_TOOLS = [
     name: 'add_to_queue', channel: 'add-to-queue',
     description: '把一首歌加入下载队列（song 对象直接传 search_music 的结果项）。',
     required: ['song'],
+    mutating: true,
     paramDocs: { song: '搜索结果里的歌曲对象（需含 id/source/title/artist）' },
   },
   {
     name: 'add_to_playlist', channel: 'add-to-user-playlist',
     description: '把一首歌加入指定用户歌单。',
     required: ['playlistId', 'song'],
+    mutating: true,
     paramDocs: { playlistId: '歌单 id（来自 list_playlists）', song: '歌曲对象' },
   },
   {
     name: 'toggle_favorite', channel: 'toggle-favorite',
     description: '红心收藏切换一首歌。',
     required: ['source', 'songId'],
+    mutating: true,
     paramDocs: { source: '平台 id', songId: '歌曲 id', song: '歌曲对象（收藏时需要）' },
   },
 ];
@@ -148,10 +153,13 @@ function toolsFromContract(list = AGENT_TOOLS, channels = CHANNELS) {
       description: tool.description,
       inputSchema: { type: 'object', properties },
       channel: tool.channel,
+      mutating: tool.mutating === true,
     };
     if (tool.required && tool.required.length) tdef.inputSchema.required = tool.required;
     return tdef;
   });
 }
 
-module.exports = { AGENT_TOOLS, TOOLS_VERSION_HINT: '2025-03-26', toolsFromContract, specToJsonSchema };
+const MUTATING_TOOL_NAMES = new Set(AGENT_TOOLS.filter(t => t.mutating).map(t => t.name));
+
+module.exports = { AGENT_TOOLS, MUTATING_TOOL_NAMES, TOOLS_VERSION_HINT: '2025-03-26', toolsFromContract, specToJsonSchema };
