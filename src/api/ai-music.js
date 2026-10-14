@@ -19,6 +19,9 @@ const MINIMAX_API_BASE = 'https://api.minimaxi.com';
 
 // 允许上计费接口的模型（其余一律退回默认，见 buildMusicRequestBody）
 const DEFAULT_MUSIC_MODEL = 'music-2.6';
+// 文本回合用的对话模型。三处调用（歌词/翻译/改写）曾各写一遍字面量，
+// 换模型要记三件事——现在只有一个名字可改。
+const CHAT_MODEL = 'MiniMax-Text-01';
 const MUSIC_MODELS = new Set(['music-2.6', 'music-3.0']);
 // 人声偏好：接口没有音色字段，只能作为 prompt 的自然语言片段
 const VOICE_DESC = {
@@ -327,7 +330,7 @@ async function generateLyrics(params) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: {
-        model: 'MiniMax-Text-01',
+        model: CHAT_MODEL,
         messages: [
           {
             role: 'system',
@@ -695,7 +698,7 @@ ${lyrics}
       retries: 0, // 计费 LLM 调用禁自动重试——超时重试会重复扣费
       headers: { 'Authorization': `Bearer ${apiKey}` },
       body: {
-        model: 'MiniMax-Text-01',
+        model: CHAT_MODEL,
         messages: [
           { role: 'system', content: '你是一位专业的歌词翻译家，擅长将各种语言的歌词翻译成目标语言，保持歌词的韵律和结构。' },
           { role: 'user', content: prompt },
@@ -772,7 +775,7 @@ async function rewriteSearchQueries(params) {
     retries: 0, // 计费 LLM 调用禁自动重试
     headers: { 'Authorization': `Bearer ${apiKey}` },
     body: {
-      model: 'MiniMax-Text-01',
+      model: CHAT_MODEL,
       messages: [
         { role: 'system', content: '你是音乐搜索关键词改写器。只输出 JSON 字符串数组，不输出任何解释。' },
         { role: 'user', content: prompt },
@@ -788,6 +791,34 @@ async function rewriteSearchQueries(params) {
   return parseSearchQueries(result.data.choices[0]?.message?.content) || [];
 }
 
+/**
+ * 应用内助手的一轮对话（非流式）。
+ * 计费调用：retries 必须为 0 —— 一次超时换两跳就是双倍扣费（见 request 的 H3 注释）。
+ * @param {Object} params
+ * @param {Array<{role:string,content:string}>} params.messages
+ * @param {string} params.apiKey
+ * @returns {Promise<string>} 模型文本（解析由 aiAssistantService 负责）
+ */
+async function assistantChat({ messages, apiKey }) {
+  if (!apiKey) throw new Error('NO_KEY');
+  const result = await request(`${MINIMAX_API_BASE}/v1/text/chatcompletion_v2`, {
+    method: 'POST',
+    retries: 0,
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    body: {
+      model: CHAT_MODEL,
+      messages,
+      temperature: 0.2,
+      max_tokens: 800,
+    },
+  });
+  if (result.status !== 200 || !result.data || !result.data.choices) {
+    throw new Error((result.data && result.data.error && result.data.error.message) || `LLM_HTTP_${result.status}`);
+  }
+  const choice = result.data.choices[0];
+  return (choice && choice.message && choice.message.content) || '';
+}
+
 module.exports = {
   setHistoryPath,
   generateLyrics,
@@ -796,6 +827,7 @@ module.exports = {
   translateLyrics,
   parseSearchQueries,
   rewriteSearchQueries,
+  assistantChat,
   saveAudioFromHex,
   loadHistory,
   addToHistory,
