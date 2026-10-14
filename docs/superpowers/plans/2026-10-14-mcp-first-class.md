@@ -38,7 +38,7 @@
   - `entry` 形状（Task 3 的 `onCall` 必须产出同形对象）：
     `{ ts:number, tool:string, source:'agent'|'assistant', ok:boolean, ms:number, argsKeys:string[], summary:string, err?:string }`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 新建 `test/mcp-audit-store.test.js`：
 
@@ -133,12 +133,12 @@ test('审计文件里搜不到敏感值（端到端一次）', async () => {
 });
 ```
 
-- [ ] **Step 2: 跑到红**
+- [x] **Step 2: 跑到红**
 
 Run: `node --test test/mcp-audit-store.test.js`
 Expected: FAIL — `Cannot find module '../src/main/mcp/auditStore'`
 
-- [ ] **Step 3: 最小实现**
+- [x] **Step 3: 最小实现**
 
 新建 `src/main/mcp/auditStore.js`：
 
@@ -231,17 +231,17 @@ function createAuditStore({ filePath, maxEntries = 200 }) {
 module.exports = { createAuditStore, summarizeArgs, SENSITIVE_ARG_RE, AUDIT_FILE_NAME };
 ```
 
-- [ ] **Step 4: 跑到绿**
+- [x] **Step 4: 跑到绿**
 
 Run: `node --test test/mcp-audit-store.test.js`
 Expected: PASS，`ℹ pass 8` / `ℹ fail 0`
 
-- [ ] **Step 5: 全量门禁**
+- [x] **Step 5: 全量门禁**
 
 Run: `npm run lint && npm run check:dead-deps && node --test --test-concurrency=2 "test/*.test.js"`
 Expected: lint 0 error；dead-deps 通过（新模块尚未被 require，`check:dead-deps` 只看 npm 包，不看源文件）；`ℹ fail 0`
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/main/mcp/auditStore.js test/mcp-audit-store.test.js
@@ -260,7 +260,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(mcp): �
 - Consumes: 无
 - Produces: `createMcpServer({ token, handleMessage, rateLimit = { capacity: 120, refillPerSec: 30 }, now = Date.now, onRejected = null })`；被限流时返回 `429 { error: 'rate_limited' }` + `Retry-After` 头，并调用 `onRejected({ tool: <method|null>, retryAfterSec })`。默认值 `DEFAULT_RATE_LIMIT` 导出。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 新建 `test/mcp-rate-limit.test.js`：
 
@@ -365,12 +365,12 @@ test('默认容量存在且宽松：正常 Agent 一轮对话（几十次调用�
 });
 ```
 
-- [ ] **Step 2: 跑到红**
+- [x] **Step 2: 跑到红**
 
 Run: `node --test test/mcp-rate-limit.test.js`
 Expected: FAIL — 前四条 429 断言拿到 200（还没限流），第五条 `DEFAULT_RATE_LIMIT` 为 undefined
 
-- [ ] **Step 3: 实现令牌桶**
+- [x] **Step 3: 实现令牌桶**
 
 在 `src/main/mcp/mcpServer.js` 的 `MAX_BODY_BYTES` 下面加：
 
@@ -424,16 +424,16 @@ function createMcpServer({ token, handleMessage, rateLimit = DEFAULT_RATE_LIMIT,
 module.exports = { createMcpServer, MCP_PATH, MAX_BODY_BYTES, LOCAL_ORIGIN_RE, DEFAULT_RATE_LIMIT, createTokenBucket };
 ```
 
-- [ ] **Step 4: 跑到绿**
+- [x] **Step 4: 跑到绿**
 
 Run: `node --test test/mcp-rate-limit.test.js test/mcpServer.test.js`
 Expected: 全 PASS（既有的 401/403/413/-32700/405/404 钉不许因为多了一道 429 而改动）
 
-- [ ] **Step 5: 全量门禁**
+- [x] **Step 5: 全量门禁**
 
 Run: `node --test --test-concurrency=2 "test/*.test.js"` → `ℹ fail 0`
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/main/mcp/mcpServer.js test/mcp-rate-limit.test.js
@@ -459,7 +459,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(mcp): �
   - IPC `mcp-audit-clear`（`invoke`，无参）→ `{ success: true }`
   - `mcp-status` 返回值新增 `auditCount: number`、`rateLimited: number`
 
-- [ ] **Step 1: 写协议层失败测试**
+- [x] **Step 1: 写协议层失败测试**
 
 在 `test/mcpCore.test.js` 末尾追加（沿用该文件既有的 `tools` 构造 helper；若无则用下面内联表）：
 
@@ -502,12 +502,12 @@ test('onCall：未知工具与参数校验失败不产审计，抛错要产 err 
 });
 ```
 
-- [ ] **Step 2: 跑到红**
+- [x] **Step 2: 跑到红**
 
 Run: `node --test test/mcpCore.test.js`
 Expected: FAIL — `entries.length` 为 0（`onCall` 尚未实现）
 
-- [ ] **Step 3: 实现钩子**
+- [x] **Step 3: 实现钩子**
 
 `src/main/mcp/mcpCore.js` 的 `createMcpHandler` 签名加两个参数，`tools/call` 分支改为（保留既有 `namedToPositional`、`toolText` 行为，只加计量与回调）：
 
@@ -545,7 +545,7 @@ const { summarizeArgs } = require('./auditStore');
 const summarizeArgsIn = (a) => summarizeArgs(a);
 ```
 
-- [ ] **Step 4: 契约与接线**
+- [x] **Step 4: 契约与接线**
 
 `src/shared/ipcContract.js` 在 `'mcp-set-config'` 那行下面加两行：
 
@@ -621,7 +621,7 @@ function _auditStore() {
   });
 ```
 
-- [ ] **Step 5: 写接线测试**
+- [x] **Step 5: 写接线测试**
 
 新建 `test/mcp-audit-wiring.test.js` —— 主进程模块 `ipc/mcp.js` 依赖 electron，
 本仓既有做法是静态钉（不 mock electron）。钉三件事：钩子已接、契约已声明、
@@ -674,13 +674,13 @@ test('限流计数随 mcp-status 暴露给设置页', () => {
 });
 ```
 
-- [ ] **Step 6: 跑到绿**
+- [x] **Step 6: 跑到绿**
 
 Run: `node --test test/mcpCore.test.js test/mcp-audit-wiring.test.js test/ipc-contract.test.js`
 Expected: 全 PASS。若 `test/ipc-contract.test.js` 要求「契约通道必须有 handler」，
 本任务已同时补 `handle()`，不该红；红了就是漏注册。
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/main/mcp/mcpCore.js src/main/ipc/mcp.js src/shared/ipcContract.js test/mcpCore.test.js test/mcp-audit-wiring.test.js
@@ -699,7 +699,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(mcp): �
 - Consumes: 无（纯函数）
 - Produces: `buildConnectSnippet({ port, token, serverName = 'lanyue' }) → { text: string, servers: string[] } | { error: string }`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```js
 const test = require('node:test');
@@ -745,11 +745,11 @@ test('serverName 可覆盖但必须过白名单字符（防注入到客户端配
 });
 ```
 
-- [ ] **Step 2: 跑到红**
+- [x] **Step 2: 跑到红**
 
 Run: `node --test test/mcp-connect-snippet.test.js` → Cannot find module
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```js
 /**
@@ -792,7 +792,7 @@ function buildConnectSnippet({ port, token, serverName = 'lanyue' }) {
 module.exports = { buildConnectSnippet, CLIENT_TEMPLATES };
 ```
 
-- [ ] **Step 4: 跑到绿**
+- [x] **Step 4: 跑到绿**
 
 Run: `node --test test/mcp-connect-snippet.test.js`
 Expected: PASS ×5
@@ -814,7 +814,7 @@ Expected: PASS ×5
 > });
 > ```
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/main/mcp/connectSnippet.js test/mcp-connect-snippet.test.js test/mcp-audit-wiring.test.js src/main/ipc/mcp.js src/shared/ipcContract.js
@@ -834,7 +834,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(mcp): �
 - Consumes: IPC `mcp-status`（含 `rateLimited`）、`mcp-audit`、`mcp-audit-clear`、`mcp-connect-snippet`、`mcp-set-config`
 - Produces: 渲染层函数 `loadMcpAudit()`、`copyMcpSnippet()`、`clearMcpAudit()`、`applyMcpPort()`，并挂到 `window`
 
-- [ ] **Step 1: 先补词典（两本都要，键名一致）**
+- [x] **Step 1: 先补词典（两本都要，键名一致）**
 
 `zh.json` 追加：
 
@@ -863,7 +863,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(mcp): �
   "toast.mcpSnippetCopied": "Connection config copied (contains the token — do not share)"
 ```
 
-- [ ] **Step 2: 写门禁测试（先红）**
+- [x] **Step 2: 写门禁测试（先红）**
 
 新建 `test/mcp-settings-ui.test.js`：
 
@@ -924,12 +924,12 @@ test('审计与片段走 IPC 而不是渲染层自己拼 JSON/读文件', () => 
 });
 ```
 
-- [ ] **Step 3: 跑到红**
+- [x] **Step 3: 跑到红**
 
 Run: `node --test test/mcp-settings-ui.test.js`
 Expected: FAIL — 元素与函数都不存在
 
-- [ ] **Step 4: 改 HTML**
+- [x] **Step 4: 改 HTML**
 
 把 `src/renderer/index.html` 的 MCP 卡片（`:1227-1245`）里「本地端口」那行改成带 `onchange`，并在 `mcpHint` 行之后追加三段：
 
@@ -961,7 +961,7 @@ Expected: FAIL — 元素与函数都不存在
             </div>
 ```
 
-- [ ] **Step 5: 改 settings.js**
+- [x] **Step 5: 改 settings.js**
 
 在既有 MCP 段落里（`// ── MCP 本地服务（AI Agent 接入）` 之后）把 `loadMcpConfig` 的硬编码中文换成词典，并补四个函数：
 
@@ -1057,12 +1057,12 @@ window.clearMcpAudit = clearMcpAudit;
 （`loadMcpAudit` 不需 onclick，但测试钉的是「定义了就要挂 window」——若坚持不挂，
 则把该测试的这四元组改成三个 + 单独把 `loadMcpAudit` 列为内部函数。取前者：一致性优先。）
 
-- [ ] **Step 6: 跑到绿**
+- [x] **Step 6: 跑到绿**
 
 Run: `node --test test/mcp-settings-ui.test.js test/toast-i18n.test.js test/i18n-complete.test.js 2>/dev/null || node --test test/mcp-settings-ui.test.js test/toast-i18n.test.js`
 Expected: 全 PASS；若本仓有 i18n 键完整性测试（`grep -l "en.json" test/*.test.js` 找名字），一并跑
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/renderer/index.html src/renderer/js/views/settings.js src/renderer/js/lang/zh.json src/renderer/js/lang/en.json test/mcp-settings-ui.test.js
@@ -1080,7 +1080,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(setting
 - Consumes: `createMcpServer`（Task 2）、`createMcpHandler`（Task 3）、`toolsFromContract`（既有）、`createAuditStore`（Task 1）
 - Produces: 无（纯测试）
 
-- [ ] **Step 1: 写测试**
+- [x] **Step 1: 写测试**
 
 ```js
 /**
@@ -1205,17 +1205,17 @@ test('e2e: 摘要判据与协议层用的是同一份（防第二套敏感参数
 });
 ```
 
-- [ ] **Step 2: 跑到绿（并按需修实现）**
+- [x] **Step 2: 跑到绿（并按需修实现）**
 
 Run: `node --test test/mcp-e2e.test.js`
 Expected: 全 PASS。若 `tools/list` 数量不是 17，先 `git diff src/main/mcp/tools.js` 确认白名单**没有**被本程序意外改动（红线：不扩面），再把数字钉成实际值。
 
-- [ ] **Step 3: 全量门禁**
+- [x] **Step 3: 全量门禁**
 
 Run: `npm run lint && npm run audit:deps && npm run check:dead-deps && node --test --test-concurrency=2 "test/*.test.js" && npm run build && npm run smoke:asar`
 Expected: `ℹ fail 0` + build/asar 冒烟全 PASS
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add test/mcp-e2e.test.js
@@ -1235,7 +1235,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "test(mcp): �
 - Consumes: 前 6 个任务的实现事实
 - Produces: 无代码接口
 
-- [ ] **Step 1: 改写 SECURITY.md §4**
+- [x] **Step 1: 改写 SECURITY.md §4**
 
 现状（`SECURITY.md` §4）：「MCP 服务只靠 Bearer 令牌与 Origin 白名单防误触，没有请求频率限制。」
 改为事实描述，并新增一小节「本地服务调用审计」说明：审计文件 `userData/mcp-audit.json`
@@ -1244,13 +1244,13 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "test(mcp): �
 **不要**把它写成「风险已消除」：令牌仍在明文可读的加密存储里、绑定回环只挡局域网，
 限流只是把「一个坏客户端写满磁盘/刷爆队列」降级为「短时不可用」。
 
-- [ ] **Step 2: README 两处**
+- [x] **Step 2: README 两处**
 
 `:9` 的行尾「（见设置页，默认关闭）」之后补：「，含调用审计与一键接入配置」；
 `:44` 的 🤖 条目补上「令牌桶限流 + 本机调用审计」。数字口径（17 个工具）保持与
 `tools.js` 一致 —— 若 Task 6 里工具数变了，两处都要改。
 
-- [ ] **Step 3: CHANGELOG 追加（进 `## [未发布]`，别动 1.0.36）**
+- [x] **Step 3: CHANGELOG 追加（进 `## [未发布]`，别动 1.0.36）**
 
 ```markdown
 ## [未发布]
@@ -1268,7 +1268,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "test(mcp): �
   现在改动即时应用。
 ```
 
-- [ ] **Step 4: 提交并推 main**
+- [x] **Step 4: 提交并推 main**
 
 ```bash
 git add SECURITY.md README.md CHANGELOG.md

@@ -48,7 +48,7 @@
 | SSRF | 统一 URL 守卫：IP 编码归一化（十进制/十六进制/八进制）、IPv4-mapped IPv6、NAT64、DNS rebinding pinning、重定向逐跳复检、拒绝 https→http 降级、跨 host 剥离 Cookie/Authorization | `src/utils/urlGuard.js`、`src/api/request.js` |
 | 路径沙箱 | 双闸：词法快筛 + `realpath` 复核；无法验证时 **fail-closed**（判否而非放行）；junction 经 `readlinkSync` 逐段解析 | `src/main/approvedDirs.js` |
 | 凭据存储 | 三态模型：可用则 DPAPI（Windows `safeStorage`）加密；**系统加密不可用时拒绝写入**，绝不静默明文落盘 | `src/utils/secretStore.js` |
-| 本地服务 | MCP 仅监听 `127.0.0.1`，Bearer 令牌 `timingSafeEqual` 比较，Origin 白名单只放行回环，请求体 1 MiB 上限，工具白名单排除凭据/文件写入/设置/更新安装，默认关闭 | `src/main/mcp/`、`src/main/ipc/mcp.js` |
+| 本地服务 | MCP 仅监听 `127.0.0.1`，Bearer 令牌 `timingSafeEqual` 比较，Origin 白名单只放行回环，请求体 1 MiB 上限，令牌桶限流（429 + `Retry-After`），工具白名单排除凭据/文件写入/设置/更新安装，调用留审计，默认关闭 | `src/main/mcp/`、`src/main/ipc/mcp.js` |
 | XSS | 8 类远端数据逐条转义后入 DOM；内联事件处理器必须用 `escQ`（有全仓守卫 + 别名绕过检测） | `src/renderer/js/utils.js`、`test/inline-handler-escape.test.js` |
 | 日志脱敏 | 落盘前统一过一遍：URL 敏感查询参数、Cookie/Authorization/token 形态 | `src/utils/redact.js`、`src/utils/logger.js` |
 | 供应链 | `npm audit --omit=dev --audit-level=high` 进 CI；`overrides` 锁上游脆弱子依赖；打包时剔除已验证的死依赖链 | `.github/workflows/ci.yml`、`package.json`、`build/config.cjs` |
@@ -106,10 +106,29 @@
 SSRF 校验（scheme/userinfo/DNS 全记录/内网 IP 判定），且不可达的模板引擎链已
 从产物中移除。
 
-### 4. 本地服务无速率限制
+### 4. 本地服务的频率限制（已闭合，但风险没有消除）
 
-- MCP 服务只靠 Bearer 令牌与 Origin 白名单防误触，没有请求频率限制。
-- 影响面限于**本机**（监听回环），且需要先拿到令牌。
+- 现状：MCP 传输层有令牌桶（默认突发 `capacity 120`、稳态 `refillPerSec 30`/秒），
+  超限返回 **429 + `Retry-After`**，批量 JSON-RPC 按整批计一次。
+- 计量口径：只有**通过鉴权与 Origin 校验**的请求才吃桶。否则任何本机进程都能拿垃圾
+  请求把合法 Agent 饿死——那等于把「无速率限制」换成「拒绝服务」。
+- 这不是风险消除：令牌仍存在本机可读的加密存储里，绑定回环只挡得住局域网，
+  拿到令牌的进程依然能调用白名单内的工具。限流只是把「一个写坏的客户端刷满磁盘 /
+  刷爆下载队列」降级为「短时不可用」。
+- 位置：`src/main/mcp/mcpServer.js`，行为钉在 `test/mcp-rate-limit.test.js`（注入时钟，不靠 sleep）。
+
+### 5. 本地服务调用审计
+
+Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp-audit.json`，
+滚动保留最近 **200** 条，设置页可查看与清空。
+
+- 记什么：工具名、来源、耗时、成败、错误摘要，以及检索词类参数的**截断摘要**（60 字）。
+- 不记什么：密钥 / 令牌 / Cookie / 密码 / session 一类参数**只留键名，值不落盘**
+  （判定规则见 `auditStore.js` 的 `isSensitiveArg`，按驼峰与下划线拆词后整词匹配，
+  因此 `keyword` 不会被误伤、`aiMusicApiKey` 一定会被拦下）。
+- 边界：审计文件不进 WebDAV 快照、不进导出备份；写入是 fire-and-forget，写盘失败只记
+  警告，绝不拖慢或阻塞 Agent 的响应。
+- 位置：`src/main/mcp/auditStore.js`、`src/main/ipc/mcp.js`，端到端链路在 `test/mcp-e2e.test.js`。
 
 ---
 
@@ -117,7 +136,7 @@ SSRF 校验（scheme/userinfo/DNS 全记录/内网 IP 判定），且不可达�
 
 - 平台 Cookie 与 API Key 用系统加密存储在 `userData` 下，**不进 WebDAV 快照、不进导出备份**
 - WebDAV 密码与 MCP 令牌同样加密；日志落盘前脱敏
-- WebDAV 快照只含歌单 / 下载模板 / 下载历史，不含目录等本机设置
+- WebDAV 快照只含歌单 / 下载模板 / 下载历史，不含目录等本机设置，也不含 MCP 调用审计
 - 导出诊断包前会对偏好值再做一次脱敏（`aiMusicApiKey` 等键一律剔除）
 
 ---
