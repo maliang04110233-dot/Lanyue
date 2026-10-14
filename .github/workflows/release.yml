@@ -194,6 +194,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 必须 checkout：下一个步骤读的是 CHANGELOG.md，而这个 job 此前只下载产物、
+      # 没有源码目录 —— `[ -f CHANGELOG.md ]` 恒为假，抽取分支从来没机会执行，
+      # Release notes 每次都落到兜底文案（1.0.36 首跑即如此）。
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: release-assets-${{ github.sha }}
