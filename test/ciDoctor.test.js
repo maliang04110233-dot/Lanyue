@@ -23,6 +23,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const { parseTap, analyze, formatAnnotations, formatSummary, run } = require('../scripts/ci-doctor.cjs');
 
@@ -297,28 +298,29 @@ test('analyze: 中文全成乱码也照样定性 —— 判据只吃 ASCII，不
 
 // ── 形状钉：两条 workflow 的归因口径不许分叉 ─────────────
 
+/** 抠出某个 workflow 里 `Unit tests` 步骤的 run 块正文（去缩进，逐行原样） */
+function unitTestsRunBody(file) {
+  const lines = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', file), 'utf8').split(/\r?\n/);
+  const start = lines.findIndex((l) => /^\s*- name: Unit tests\s*$/.test(l));
+  assert.notStrictEqual(start, -1, `${file} 里找不到 Unit tests 步骤`);
+  const runAt = lines.findIndex((l, i) => i > start && /^\s*run: \|\s*$/.test(l));
+  assert.notStrictEqual(runAt, -1, `${file} 的 Unit tests 步骤没有 run 块`);
+  const indent = lines[runAt].match(/^\s*/)[0].length;
+  const body = [];
+  for (let i = runAt + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.trim() !== '' && l.match(/^\s*/)[0].length <= indent) break;
+    body.push(l.replace(/^ {4}/, ''));
+  }
+  return body.join('\n');
+}
+
 test('ci.yml 与 release.yml 的 Unit tests 命令体逐行相同 —— probe 调试行曾在两处差活四天', () => {
   // 分叉是怎么发生的：详版归因先只加在 ci.yml（release.yml 要 tag 才跑，当时无从验证），
   // 于是同一条 `::error::probe` 调试行在 ci.yml 被删掉后，还在 release.yml 里每次绿跑
   // 都发一条假 error。读一份 yaml 再比对成本极低，分叉成本是一次「发版时才发现两处不一样」。
-  const runBody = (file) => {
-    const lines = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', file), 'utf8').split(/\r?\n/);
-    const start = lines.findIndex((l) => /^\s*- name: Unit tests\s*$/.test(l));
-    assert.notStrictEqual(start, -1, `${file} 里找不到 Unit tests 步骤`);
-    const runAt = lines.findIndex((l, i) => i > start && /^\s*run: \|\s*$/.test(l));
-    assert.notStrictEqual(runAt, -1, `${file} 的 Unit tests 步骤没有 run 块`);
-    const indent = lines[runAt].match(/^\s*/)[0].length;
-    const body = [];
-    for (let i = runAt + 1; i < lines.length; i++) {
-      const l = lines[i];
-      if (l.trim() !== '' && l.match(/^\s*/)[0].length <= indent) break;
-      body.push(l.replace(/^ {4}/, ''));
-    }
-    return body.join('\n');
-  };
-
-  const ci = runBody('ci.yml');
-  const rel = runBody('release.yml');
+  const ci = unitTestsRunBody('ci.yml');
+  const rel = unitTestsRunBody('release.yml');
   assert.strictEqual(rel, ci, '两份 Unit tests 命令体必须逐行一致');
 
   // 钉住关键特征本身（防止有人把两处一起改坏成另一份共同形状）
@@ -454,4 +456,58 @@ test('ci-doctor.cjs 落在 lint 覆盖里 —— 它只在 CI 红的那次才执
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   assert.ok(pkg.scripts.lint.includes('scripts/ci-doctor.cjs'),
     `lint 命令没覆盖归因引擎：${pkg.scripts.lint}`);
+});
+
+/**
+ * 「落盘不烂中文」从本地实测升级为 runner 上每次绿跑都跑的断言（2026-10-14）。
+ *
+ * 背景：workflow 的 Unit tests 步骤把 node 的 stdout **捕获进变量**再 `Out-File` 落盘，
+ * 而 PowerShell 解码原生命令输出用的是 [Console]::OutputEncoding —— Windows runner 的默认码页
+ * 不是 UTF-8。不强令码页时中文用例名会静默烂在 attempt-N.tap.txt 里，而 FAIL-DETAIL 走内存回显
+ * 又按同一码页编回去，看起来一切正常（2026-10-14 本地实测到这一层才看清，写进了 ci.yml 的注释）。
+ * 那条注释与「归因判据只吃 ASCII」的用例都在，**唯独没人证明那两行真能保住中文** ——
+ * 此前只有一次性手工模拟。
+ *
+ * 做法不是复制那两行，而是**从 YAML 里把它们抠出来执行**，只把生产者换成一个吐已知中文用例名的探针。
+ * 牙在哪、不在哪（2026-10-14 实测清楚，别把这条用例读成它能探测一切）：
+ *   ① 有人删掉/改掉那两行 → 抠取断言直接红（「抠不出就无法自证」）—— 这是**环境无关**的那半边牙；
+ *   ② 在默认码页不是 UTF-8 的机器上（CI runner 属此类），绕过码页那行会让落盘中文真烂掉 → 第二个断言红。
+ *      但本机实测这台开发机的控制台码页已经是 UTF-8，把那行去掉照样不烂 —— 所以②是**条件成立**的，
+ *      这条用例的价值主要在 runner 上：那里每次绿跑都会把「落盘 + 归因读回」这条链真走一遍。
+ * 于是复制不会过期，删改会立刻响；而「保住中文」这句话从一次性的本地模拟，变成 runner 上的常态断言。
+ * 非 Windows 机器跳过：CI 就是 windows-latest，本仓测试口径与之对齐。
+ */
+test('真跑一遍 workflow 的落盘两行：中文用例名进 attempt 文件必须原样活着', {
+  // 用 option 形态而不是 t.skip()：后者在部分 node 版本的 TestContext 上没有，
+  // 非 Windows 的开发机该「被跳过」而不是抛 TypeError
+  skip: process.platform !== 'win32' ? '需要 Windows PowerShell（CI runner 就是 windows-latest）' : false,
+}, () => {
+  const body = unitTestsRunBody('ci.yml');
+  const codepageLine = (body.match(/^.*\[Console\]::OutputEncoding.*$/m) || [])[0];
+  const outFileLine = (body.match(/^.*Out-File -FilePath "attempt-\$i\.tap\.txt".*$/m) || [])[0];
+  assert.ok(codepageLine, 'ci.yml 的 Unit tests 步骤里没有强令码页的那一行 —— 抠不出就无法自证');
+  assert.ok(outFileLine, 'ci.yml 的 Unit tests 步骤里没有落盘 attempt 文件的那一行 —— 同上');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-encoding-roundtrip-'));
+  try {
+    // 探针只负责把真 TAP 吐到 stdout；编码链路（PowerShell 解码 → Out-File）由下面抠出来的两行负责
+    fs.writeFileSync(path.join(dir, 'probe.js'),
+      `process.stdout.write(${JSON.stringify(TAP_ASSERTION)});`, 'utf8');
+    const script = ['$i = 1', codepageLine, '$out = node probe.js 2>&1', outFileLine].join('\n');
+    execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { cwd: dir, encoding: 'utf8' });
+
+    const landed = fs.readFileSync(path.join(dir, 'attempt-1.tap.txt'), 'utf8').replace(/^\uFEFF/, '');
+    assert.ok(landed.includes('用例丙：断言失败'),
+      `中文用例名没能活着落盘（拿到的是: ${JSON.stringify(landed.slice(0, 60))}）`);
+    assert.ok(!landed.includes('\uFFFD'), '落盘文件里有替换符 —— 解码链路已经坏了');
+
+    // 光名字活着还不够，归因引擎读这份落盘产物必须照样定对性、叫对名
+    const out = run({ dir });
+    assert.strictEqual(out.result.verdict, 'FAIL');
+    assert.strictEqual(out.result.findings[0].name, '用例丙：断言失败');
+    assert.strictEqual(out.result.findings[0].category, 'DETERMINISTIC_REGRESSION');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
