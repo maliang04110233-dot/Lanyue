@@ -283,6 +283,18 @@ test('analyze: 一次 attempt 里两条独立失败都要报出来', () => {
   assert.ok(r.findings.every((x) => x.category === 'DETERMINISTIC_REGRESSION'));
 });
 
+test('analyze: 中文全成乱码也照样定性 —— 判据只吃 ASCII，不赌 runner 的控制台码页', () => {
+  // Windows runner 上 PowerShell 捕获原生命令 stdout 时按 [Console]::OutputEncoding 解码，
+  // 码页不是 UTF-8 时中文进文件就成了乱码（2026-10-14 本地实测：FAIL-DETAIL 直接回显看着正常，
+  // 落盘的 tap 文件里中文已经烂掉 —— 控制台又按同一码页编回去，把损坏表演成了完好）。
+  // 归因必须在这种文件上仍然给出正确类别，否则「换个 runner 就哑」会重新变成人的活。
+  const mojibake = (s) => Buffer.from(s, 'utf8').toString('latin1');
+
+  assert.strictEqual(analyze(attemptsSame(3, mojibake(TAP_EGRESS))).findings[0].category, 'TEST_EGRESS');
+  assert.strictEqual(analyze(attemptsSame(3, mojibake(TAP_ASYNC_ESCAPE))).findings[0].category, 'ASYNC_ESCAPE');
+  assert.strictEqual(analyze(attemptsSame(3, mojibake(TAP_ASSERTION))).findings[0].category, 'DETERMINISTIC_REGRESSION');
+});
+
 // ── 输出：annotation 必须能被 runner 解析 ────────────────
 
 test('formatAnnotations: 每条 finding 一行，% 与 # 与换行都转义（workflow command 的硬要求）', () => {

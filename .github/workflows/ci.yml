@@ -108,11 +108,19 @@ jobs:
       # 说明写在 YAML 注释而不是 run 块里：run 块每一行都会原样进 PowerShell 脚本文件，
       # 那里的注释还得对 runner 的脚本编码负责 —— 能不冒这个险就不冒
       # （本文件上面审计步骤的 `shell: bash` 注记记的是同一族的坑：解析器选错，红得与代码无关）。
+      # 落盘前先强令控制台码页为 UTF-8：PowerShell 捕获原生命令的 stdout 是按
+      # [Console]::OutputEncoding 解码的，而 Windows runner 的默认码页不是 UTF-8。
+      # 不设为 UTF-8 的后果不是报错，是**静默损坏** —— node 吐的 UTF-8 中文按码页解成乱码再落盘，
+      # 而 FAIL-DETAIL 直接从内存回显到控制台时又按同一码页编回去，看起来一切正常，
+      # 只有落盘的 attempt-N.tap.txt 里用例名已经烂掉（2026-10-14 本地实测到这一层才看清）。
+      # 归因本身不依赖中文（判据全是 ASCII，见 test/ciDoctor.test.js 的乱码用例），
+      # 但「哪个用例红的」这句话丢了，就等于把归因做成了半件。
       - name: Unit tests
         # 与 release.yml 同口径：并发 2 + 重试 3 次 + 失败用例以 annotation 暴露。
         # 判据与理由见 release.yml 同名步骤的注释。
         # （详版归因先只加在这侧：release.yml 要 tag 才跑，今天改它无从验证，等下次动它时跟上。）
         run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           for ($i = 1; $i -le 3; $i++) {
             $out = node --test --test-concurrency=2 "test/*.test.js" 2>&1
             $code = $LASTEXITCODE
