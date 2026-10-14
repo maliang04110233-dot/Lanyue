@@ -143,6 +143,29 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 不是「界面已经问过了」这种口头承诺；被拒的调用不进桥，因此不出现在审计里。
 助手的审计与 Agent 的写在同一个文件，靠 `source` 字段区分（`agent` / `assistant`）。
 
+### 7. AI 智能歌单（轨道三）：只读生成，写库仍是那一下点击
+
+「说一句主题 → 从你已有的歌里挑 → 存成普通歌单」走一条**新的 invoke 通道**
+`smart-playlist-generate`（`src/main/ipc/smart-playlist.js`），它**不在** MCP 的 17 个工具白名单里，
+也不产生审计条目 —— 因为它什么都不改。边界由三处共同保证：
+
+- 主进程侧只读 `prefs` 里的 `userPlaylists`（不用 `ensureFavorites()`，那个在缺单时会建单落盘），
+  只出网**一次**，返回的是候选清单里挑出来的**原歌曲对象**；
+  钉在 `test/smart-playlist-primary.test.js`：生成前后 `userPlaylists` 必须逐字相等。
+- 渲染层侧「存为歌单」是唯一落库出口，走既有 `save-user-playlist` 通道，
+  并且只收用户勾上的那些行；钉在 `test/smart-playlist-ui.test.js`：
+  `api.saveUserPlaylist(` 在整个视图文件里恰好出现一次，且不在生成函数内。
+- 候选上限 **400 行**（`序号 标题 歌手`），超出部分如实回传 `truncated` 并显示在界面上 ——
+  不让人以为模型读完了整个曲库。
+
+挑选范围只有三类，全部是「你已经攒下、且能播」的歌：全部歌单的并集、只看红心、只看某一单。
+**刻意不含本地文件库**（`library-index.json`）：那里的条目只有 `filePath` 没有 `id`/`source`，
+而歌单行的播放路径是 `getDownloadUrlSmart(song)`，存进去就是一排播不动的死行。
+
+一次生成会把你的**歌名与歌手**（上限 400 行）连同主题发给 MiniMax（`api.minimaxi.com`）；
+这是本条功能唯一的出网面，返回的歌单只在界面内存里，落库后与你手建的歌单同一份存储。
+
+
 ---
 
 ## 五、应用自身的数据边界
@@ -154,6 +177,8 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 - 应用内 AI 助手会把你的对话文本与工具返回的歌曲标题发给 MiniMax（`api.minimaxi.com`）；
   对话只存在界面内存里（不写盘、不同步），调用记录落本机 `userData/mcp-audit.json`，
   两者都不进 WebDAV 快照与导出备份
+- AI 智能歌单会把挑选范围内最多 400 行的**歌名与歌手**（不含文件路径、不含 Cookie）
+  连同主题发给 MiniMax；生成的结果只在界面内存里，只有你点「存为歌单」才落本机 prefs
 
 ---
 
