@@ -20,6 +20,7 @@ const { createMcpServer } = require('../mcp/mcpServer');
 const { createMcpHandler } = require('../mcp/mcpCore');
 const { toolsFromContract } = require('../mcp/tools');
 const { createAuditStore, AUDIT_FILE_NAME } = require('../mcp/auditStore');
+const { buildConnectSnippet } = require('../mcp/connectSnippet');
 
 const DEFAULT_PORT = 39217;
 
@@ -144,6 +145,11 @@ function register() {
       }
     }
     return { success: true, status: _status() };
+  });
+
+  handle('mcp-connect-snippet', () => {
+    const st = _status();
+    return buildConnectSnippet({ port: st.port, token: st.token });
   });
 
   handle('mcp-audit', async (_, opts) => {

@@ -177,6 +177,7 @@ const CHANNELS = {
   'mcp-set-config': { invoke: MAIN, args: [['cfg', t.any()]] },
   'mcp-audit':      { invoke: MAIN, args: [['opts', t.obj()]] },
   'mcp-audit-clear': { invoke: MAIN },
+  'mcp-connect-snippet': { invoke: MAIN },
   'check-for-update':   { invoke: MAIN },
   'download-update':    { invoke: MAIN },
   'restart-and-install':{ invoke: MAIN },

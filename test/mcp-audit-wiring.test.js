@@ -45,6 +45,11 @@ test('限流计数随 mcp-status 暴露给设置页', () => {
 
 test('连接片段（含令牌）不进审计与云同步', () => {
   assert.ok(!/mcp-connect-snippet/.test(CLOUD));
-  const auditSeg = MCP_IPC.slice(MCP_IPC.indexOf("handle('mcp-audit'"));
-  assert.ok(!/connectSnippet|buildConnectSnippet/.test(auditSeg), '审计通道顺手返回片段会把令牌带进可观测面');
+  // 只截 mcp-audit 这一条 handler 的函数体：片段 handler 里出现 buildConnectSnippet 是应该的，
+  // 「不该出现」的是审计 handler 顺手把令牌一起返回 —— 那等于把凭证抄进可观测面。
+  const start = MCP_IPC.indexOf("handle('mcp-audit'");
+  assert.ok(start >= 0, 'mcp-audit handler 找不到，钉要重看');
+  const body = MCP_IPC.slice(start, MCP_IPC.indexOf('\n  });', start));
+  assert.ok(body.length > 0 && body.length < 900, 'mcp-audit 函数体切片不靠谱');
+  assert.ok(!/connectSnippet/i.test(body), '审计通道顺手返回片段会把令牌带进可观测面');
 });
