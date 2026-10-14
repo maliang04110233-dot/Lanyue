@@ -1757,3 +1757,53 @@
 .ctx-icon { display: inline-flex; align-items: center; vertical-align: -3px; }
 .ctx-icon svg { width: 14px; height: 14px; display: block; }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+
+/* ── AI 助手页（轨道二）──────────────────────────────── */
+.asst-head { display: flex; align-items: center; gap: var(--sp-2); }
+.asst-title { flex: 1; font-size: 14px; font-weight: 600; color: var(--neon-text); }
+.asst-keyrow { display: flex; gap: var(--sp-2); align-items: center; }
+.asst-key {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.asst-key:focus { outline: none; border-color: var(--neon-cyan); }
+.asst-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.asst-empty { color: var(--neon-dim); font-size: 12.5px; line-height: 1.7; }
+.asst-msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.asst-msg-user { color: var(--neon-text); }
+.asst-msg-assistant { color: var(--text); }
+.asst-step { font-size: 12px; color: var(--neon-dim); }
+.asst-step-failed { color: var(--red); }
+.asst-input-row { display: flex; gap: var(--sp-2); align-items: flex-end; }
+.asst-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+.asst-input:focus { outline: none; border-color: var(--neon-cyan); }

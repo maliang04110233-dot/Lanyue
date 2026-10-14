@@ -54,6 +54,7 @@ import './views/converter.js';
 import './views/playlist.js';
 import './views/aggregate.js';
 import './views/subscriptions.js';
+import './views/ai-assistant.js';
 import './views/clipboard.js';
 import './views/batchImport.js';
 import './views/nameBatch.js';
@@ -678,6 +679,7 @@ function switchTab(tab, btn) {
   const playlistPage = document.getElementById('playlistPage');
   const subscriptionPage = document.getElementById('subscriptionPage');
   const aggregatePage = document.getElementById('aggregatePage');
+  const aiAssistantPage = document.getElementById('aiAssistantPage');
 
   homePage.style.display = 'none';
   searchPage.style.display = 'none';
@@ -690,6 +692,7 @@ function switchTab(tab, btn) {
   if (playlistPage) playlistPage.style.display = 'none';
   if (subscriptionPage) subscriptionPage.style.display = 'none';
   if (aggregatePage) aggregatePage.style.display = 'none';
+  if (aiAssistantPage) aiAssistantPage.style.display = 'none';
 
   if (tab === 'home') {
     homePage.style.display = 'flex';
@@ -718,6 +721,11 @@ function switchTab(tab, btn) {
     aggregatePage.style.display = 'flex';
     // 首次进入才拉数据：反复切页不该反复打 IPC
     if (!_aggLoaded) { _aggLoaded = true; loadAggregated(); }
+  } else if (tab === 'assistant') {
+    if (aiAssistantPage) {
+      aiAssistantPage.style.display = 'flex';
+      if (typeof initAssistant === 'function') initAssistant();
+    }
   } else if (tab === 'ai-music') {
     if (aiMusicPage) {
       aiMusicPage.style.display = 'flex';
