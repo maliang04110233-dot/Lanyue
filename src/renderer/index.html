@@ -1228,7 +1228,7 @@
           <div class="settings-card">
             <div class="setting-row">
               <label class="setting-label" data-i18n="settings.general.mcpPortLabel">本地端口</label>
-              <input class="setting-input" id="mcpPort" type="number" min="1" max="65535">
+              <input class="setting-input" id="mcpPort" type="number" min="1" max="65535" onchange="applyMcpPort()">
             </div>
             <div class="setting-row">
               <label class="setting-label" data-i18n="settings.general.mcpTokenLabel">访问令牌</label>
@@ -1241,6 +1241,24 @@
             </div>
             <div class="setting-row">
               <span class="setting-hint" data-i18n="settings.general.mcpHint">让外部 AI Agent（如支持 MCP 的助手）在本机搜索音乐、加入下载队列、管理歌单。仅监听 127.0.0.1 且必须携带令牌；默认关闭</span>
+            </div>
+            <div class="setting-row">
+              <label class="setting-label" data-i18n="settings.general.mcpSnippetLabel">接入配置</label>
+              <textarea class="setting-input setting-input--wide" id="mcpSnippetBox" rows="6" readonly spellcheck="false"></textarea>
+            </div>
+            <div class="setting-row setting-row--action">
+              <button class="setting-btn" onclick="copyMcpSnippet()" data-i18n="settings.general.mcpSnippetCopy">复制配置</button>
+              <span class="setting-hint" data-i18n="settings.general.mcpSnippetHint">把这段粘进支持 MCP 的助手（Claude / Cursor 等），本机 Agent 即可驱动揽乐。含访问令牌，请勿外发</span>
+            </div>
+            <div class="setting-row">
+              <label class="setting-label" data-i18n="settings.general.mcpAuditTitle">调用审计</label>
+              <span class="setting-hint" id="mcpAuditLine"></span>
+            </div>
+            <div class="setting-row">
+              <pre class="setting-hint" id="mcpAuditList" style="max-height:160px;overflow:auto;margin:0;white-space:pre-wrap"></pre>
+            </div>
+            <div class="setting-row setting-row--action">
+              <button class="setting-btn setting-btn--danger" onclick="clearMcpAudit()" data-i18n="settings.general.mcpAuditClear">清空审计</button>
             </div>
           </div>
 

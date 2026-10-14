@@ -1377,14 +1377,87 @@ async function loadMcpConfig() {
     _mcpRunning = !!st.running;
     portEl.value = st.port || '';
     const tokenEl = document.getElementById('mcpToken');
-    tokenEl.value = st.token || '（启用后自动生成）';
+    tokenEl.value = st.token || t('settings.general.mcpTokenPlaceholder');
     tokenEl.readOnly = !!st.token;
-    document.getElementById('mcpToggle').textContent = _mcpRunning ? '停止服务' : '启用服务';
+    document.getElementById('mcpToggle').textContent = _mcpRunning
+      ? t('settings.general.mcpStop') : t('settings.general.mcpStart');
     document.getElementById('mcpStatusLine').textContent = _mcpRunning
-      ? `运行中: ${st.url}`
-      : (st.enabled ? '已设为开机自启，但当前未监听（端口占用？）' : '未启用');
+      ? t('settings.general.mcpStatusRunning', { url: st.url })
+      : (st.enabled ? t('settings.general.mcpStatusPortBusy') : t('settings.general.mcpStatusOff'));
+    await loadMcpSnippet();
+    await loadMcpAudit();
   } catch (e) {
     logger.error('读取 MCP 状态失败:', e);
+  }
+}
+
+async function loadMcpSnippet() {
+  const box = document.getElementById('mcpSnippetBox');
+  if (!box) return;
+  try {
+    const r = await window.ipcRenderer.invoke('mcp-connect-snippet');
+    box.value = (r && r.text) || '';
+    box.placeholder = (r && r.error) || '';
+  } catch (e) {
+    box.value = '';
+  }
+}
+
+async function loadMcpAudit() {
+  const line = document.getElementById('mcpAuditLine');
+  const list = document.getElementById('mcpAuditList');
+  if (!line || !list) return;
+  try {
+    const r = await window.ipcRenderer.invoke('mcp-audit', { limit: 20 });
+    const items = (r && r.items) || [];
+    line.textContent = t('settings.general.mcpAuditHint', {
+      count: (r && r.count) || 0, max: (r && r.maxEntries) || 0, rateLimited: (r && r.rateLimited) || 0,
+    });
+    // 审计行里有外部 Agent 传进来的任意字符串（检索词、错误文本），
+    // 只能 textContent —— 用 innerHTML 就把设置页变成了注入入口。
+    list.textContent = items.length
+      ? items.map(i => `${new Date(i.ts).toLocaleString()}  ${i.tool}  ${i.ok ? 'OK' : 'FAIL'}`
+        + `${i.summary ? `  ${i.summary}` : ''}${i.err ? `  ${i.err}` : ''}`).join('\n')
+      : t('settings.general.mcpAuditEmpty');
+  } catch (e) {
+    logger.error('读取 MCP 审计失败:', e);
+    line.textContent = t('settings.general.mcpAuditEmpty');
+    list.textContent = '';
+  }
+}
+
+// 端口此前只在点「启用服务」时才应用：改完数字不点开关 = 没改。
+async function applyMcpPort() {
+  await _applyMcpConfig({});
+  showToast(t('toast.mcpPortApplied'), 'success', 2000);
+}
+
+async function copyMcpSnippet() {
+  const box = document.getElementById('mcpSnippetBox');
+  if (!box || !box.value) {
+    showToast(t('toast.mcpFailed', { msg: box && box.placeholder ? box.placeholder : t('settings.general.mcpStatusOff') }), 'error', 5000);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(box.value);
+    showToast(t('toast.mcpSnippetCopied'), 'warn', 5000);
+  } catch (e) {
+    showToast(t('toast.mcpSnippetFailed', { msg: errBrief(e) }), 'error');
+  }
+}
+
+async function clearMcpAudit() {
+  if (!await askConfirm(t('settings.general.mcpAuditClearConfirm'))) return;
+  try {
+    const r = await window.ipcRenderer.invoke('mcp-audit-clear');
+    if (r && r.success) {
+      showToast(t('toast.mcpAuditCleared'), 'success', 2500);
+      await loadMcpAudit();
+    } else {
+      showToast(t('toast.mcpFailed', { msg: (r && r.error) || '' }), 'error');
+    }
+  } catch (e) {
+    showToast(t('toast.mcpFailed', { msg: errBrief(e) }), 'error');
   }
 }
 
@@ -1569,6 +1642,10 @@ window.saveWebdavConfig = saveWebdavConfig;
 window.runWebdavSync = runWebdavSync;
 window.toggleMcpService = toggleMcpService;
 window.rotateMcpToken = rotateMcpToken;
+window.applyMcpPort = applyMcpPort;
+window.copyMcpSnippet = copyMcpSnippet;
+window.clearMcpAudit = clearMcpAudit;
+window.loadMcpAudit = loadMcpAudit;
 window.loadGeneralSettings = loadGeneralSettings;
 window.loadSourceHealth = loadSourceHealth;
 window.probeSourcesUI = probeSourcesUI;
