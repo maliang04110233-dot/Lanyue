@@ -47,3 +47,30 @@ test('空/非字符串输入不成候选，也不抛', () => {
   assert.deepStrictEqual(jsonCandidates(''), []);
   assert.strictEqual(extractModelJson('   '), null);
 });
+
+/**
+ * 口径唯一的钉子：`src/` 里除了本模块，任何文件都不许再出现 `[\s\S]` 这种「跨行捞一段」的取法。
+ * 为什么钉这一条：65ae6dd 修的就是「三处各攒一份、注释还互相指着同一口径」—— 三份取法三种死法
+ * （贪婪的跨坏、短匹配的取到旧草稿），修一处漏一处。写第四份的人不会先读那三段的教训，
+ * 所以让门禁替他读：出现新的一份就红，红字里直接写明复用哪里。
+ * 敏感性验过（2026-10-14）：往 src/ 塞一份写着 `\{[\s\S]*\}` 的临时文件，这条立刻红并点名它。
+ */
+test('口径唯一：src/ 里除 modelJson.js 外不得再出现 [\\s\\S] 取法', () => {
+  const fs = require('node:fs');
+  const p = require('node:path');
+  const root = p.join(__dirname, '..', 'src');
+  const self = p.join(root, 'api', 'services', 'modelJson.js');
+  const hits = [];
+  for (const rel of fs.readdirSync(root, { recursive: true }).map(String)) {
+    if (!rel.endsWith('.js')) continue;
+    const file = p.join(root, rel);
+    if (file === self) continue;
+    const text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+    if (text.includes('[\\s\\S]')) hits.push(rel);
+  }
+  assert.deepStrictEqual(hits, [],
+    '模型输出的 JSON 抠取只准有一份口径：请复用 src/api/services/modelJson.js 的 '
+    + 'extractModelJson(text, 判据)，不要再用 [\\s\\S] 自己捞一段 —— '
+    + '贪婪式会把「模型改口的两段」跨成非法 JSON，短匹配式会拿到已经丢掉的第一份草稿。命中文件：'
+    + hits.join(', '));
+});
