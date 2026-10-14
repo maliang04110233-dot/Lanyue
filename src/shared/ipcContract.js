@@ -178,6 +178,16 @@ const CHANNELS = {
   'mcp-audit':      { invoke: MAIN, args: [['opts', t.obj()]] },
   'mcp-audit-clear': { invoke: MAIN },
   'mcp-connect-snippet': { invoke: MAIN },
+
+  // ── 应用内 AI 助手（invoke）───────────────────────
+  // 助手与外部 Agent 共用工具表白名单（src/main/mcp/tools.js），差别只在：
+  // 写操作必须由渲染层拿到用户确认后把 confirmed 传成 true，否则主进程直接拒。
+  // messages 的 24 是**防巨型数组的上限**，不是裁剪策略：arr 从尾部截（留前 24 条），
+  // 真正的「只保留最近若干条」长在渲染层与 trimHistory（上限 20，永远小于 24，
+  // 所以生产路径碰不到这根栅栏；碰到时说明有人绕过渲染层直接拼 invoke）。
+  'ai-assistant-tools': { invoke: MAIN },
+  'ai-assistant-plan': { invoke: MAIN, args: [['messages', t.arr(24)]] },
+  'ai-assistant-tool-call': { invoke: MAIN, args: [['name', t.str(64)], ['args', t.obj()], ['confirmed', t.bool()]] },
   'check-for-update':   { invoke: MAIN },
   'download-update':    { invoke: MAIN },
   'restart-and-install':{ invoke: MAIN },

@@ -96,7 +96,7 @@ test('契约结构合法（方向、窗口、参数规格）', () => {
 });
 
 test('通道数量钉死（意外增删即失败，逼迫改动者过目契约）', () => {
-  assert.strictEqual(MAIN_INVOKE.size, 105); // +aggregate-cross-source（3-B 跨源聚合） // +ai-cancel-generation（AI 生成中断） // +mcp-audit +mcp-audit-clear（MCP 调用审计） +mcp-connect-snippet（接入配置片段）；余项：-flush-prefs -flush-history（无人调用的僵尸通道）
+  assert.strictEqual(MAIN_INVOKE.size, 108); // +aggregate-cross-source（3-B 跨源聚合） // +ai-cancel-generation（AI 生成中断） // +mcp-audit +mcp-audit-clear（MCP 调用审计） +mcp-connect-snippet（接入配置片段）；+ai-assistant-tools/plan/tool-call（应用内助手）；余项：-flush-prefs -flush-history（无人调用的僵尸通道）
   assert.strictEqual(MAIN_SEND.size, 16);
   assert.strictEqual(MAIN_RECEIVE.size, 26); // 余项：-library-scan-progress（main 发了没人收）
   assert.strictEqual(SEC_SEND.size, 7);

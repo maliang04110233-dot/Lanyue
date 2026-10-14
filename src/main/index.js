@@ -37,6 +37,7 @@ const ipcDownloadTemplates = require('./ipc/downloadTemplates');
 const ipcCloudSync = require('./ipc/cloudSync');
 const ipcSubscriptions = require('./ipc/subscriptions');
 const ipcMcp = require('./ipc/mcp');
+const ipcAssistant = require('./ipc/ai-assistant');
 const subscriptions = require('./subscriptions');
 const clipboardWatch = require('./clipboardWatch');
 const { createLibraryWatcher } = require('./libraryWatcher');
@@ -758,6 +759,9 @@ function registerAllIpcHandlers() {
   ipcMcp.register();
   // MCP 依赖各 ipc 模块已把 handler 挂进注册表，必须在全部 register 之后自启
   ipcMcp.startIfEnabled().catch(e => logger.warn('[mcp] 自启失败:', e));
+
+  // 助手与外部 Agent 共用同一张工具表与同一条桥，所以排在 MCP 之后（口径一致，非依赖）
+  ipcAssistant.register();
 
   // ── 播放队列持久化 IPC ─────────────────────────────
   ipcHandle('save-play-queue', (_, data) => {

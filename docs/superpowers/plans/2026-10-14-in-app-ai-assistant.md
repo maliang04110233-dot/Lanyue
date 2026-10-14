@@ -410,7 +410,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "refactor(mcp
 - Consumes: `createAgentBridge`（Task 2）、`toolsFromContract`/`MUTATING_TOOL_NAMES`（Task 1）
 - Produces: 契约通道 `ai-assistant-tools` → `{tools:[{name,description,mutating}]}`；`ai-assistant-plan`（Task 4 才实现 handler 体，本任务先落 `ai-assistant-tools` 与 `ai-assistant-tool-call`）；`ai-assistant-tool-call(name, args, confirmed)` → `{ok, text, isError, error?}`，错误码是 ASCII 令牌 `UNKNOWN_TOOL` / `NEED_CONFIRM`（**不是中文句子** —— 文案的家在渲染层词典）。Task 5 的渲染层消费这三条。
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 新建 `test/ai-assistant-gate.test.js`：
 
@@ -478,12 +478,12 @@ test('助手入口不受 FEATURES.ai 管（AI 创作关掉时助手仍可用）'
 });
 ```
 
-- [ ] **Step 2: 跑测试确认它失败**
+- [x] **Step 2: 跑测试确认它失败**
 
 Run: `node --test test/ai-assistant-gate.test.js`
 Expected: FAIL —— `Cannot find module '.../src/main/ipc/ai-assistant.js'`。
 
-- [ ] **Step 3: 契约加三条**
+- [x] **Step 3: 契约加三条**
 
 `src/shared/ipcContract.js` 的「MCP 本地服务（invoke）」区块，`'mcp-connect-snippet'` 之后追加：
 
@@ -496,9 +496,9 @@ Expected: FAIL —— `Cannot find module '.../src/main/ipc/ai-assistant.js'`。
   'ai-assistant-tool-call': { invoke: MAIN, args: [['name', t.str(64)], ['args', t.obj()], ['confirmed', t.bool()]] },
 ```
 
-`messages` 用 `t.arr(24)`：超 24 条由契约截断（截的是**最旧的**，这一点在 Task 4 的 `trimHistory` 里保证顺序是「新→尾」）。
+`messages` 用 `t.arr(24)`：这是**防巨型数组的上限**，不是裁剪策略 —— `coerceVal` 的 arr 分支是 `slice(0, max)`，留的是**前** 24 条（丢最新），所以真正的「只保留最近若干条」必须长在渲染层与 `trimHistory`（上限 20，恒小于 24，生产路径碰不到这根栅栏）。
 
-- [ ] **Step 4: 建 `src/main/ipc/ai-assistant.js`**
+- [x] **Step 4: 建 `src/main/ipc/ai-assistant.js`**
 
 ```js
 /**
@@ -586,7 +586,7 @@ const ipcAssistant = require('./ipc/ai-assistant');
   ipcAssistant.register();
 ```
 
-- [ ] **Step 5: 更新通道计数钉**
+- [x] **Step 5: 更新通道计数钉**
 
 `test/ipc-contract.test.js:99` 改成（追加本轮三个的理由，别动既有的历史理由）：
 
@@ -596,12 +596,12 @@ const ipcAssistant = require('./ipc/ai-assistant');
 
 `METHODS` 那枚（:104）**仍是 106**：助手与 `mcp-*` 一样走 `ipcRenderer.invoke`，不进语法糖表。
 
-- [ ] **Step 6: 跑测试确认通过**
+- [x] **Step 6: 跑测试确认通过**
 
 Run: `node --test test/ai-assistant-gate.test.js test/ipc-contract.test.js test/mcp-agent-bridge.test.js`
 Expected: 全绿。此时 `ai-assistant-plan` 的 handler 已经 require 了 Task 4 才建的 `aiAssistantService` —— **本步若报 `Cannot find module`，就现在把 Task 4 的 Step 3、Step 4 做完再回来**（Task 3 与 4 有真实依赖，顺序按此执行，别留半截）。
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/shared/ipcContract.js src/main/ipc/ai-assistant.js src/main/index.js test/ai-assistant-gate.test.js test/ipc-contract.test.js
@@ -621,7 +621,7 @@ git -c user.name=CodeBuddy -c user.email=codebuddy@local commit -m "feat(assista
 - Consumes: `request()`（`ai-music.js` 内部传输层，含 AbortSignal 与「计费调用禁自动重试」纪律）、`toolsFromContract()` 的产物
 - Produces: `assistantChat({ messages, apiKey }) → Promise<string>`；`planAssistantTurn({ messages, tools, chat }) → Promise<{ok:true, reply:string, steps:Array<{tool,args}>} | {ok:false, error:string}>`；常量 `MAX_STEPS_PER_TURN=4`、`MAX_HISTORY_MESSAGES=20`、`MAX_RESULT_CHARS=4000`；纯函数 `buildSystemPrompt`、`parseAssistantReply`、`trimHistory`、`formatToolResults`。Task 3 的 `ai-assistant-plan` handler 消费 `planAssistantTurn`，Task 5 的渲染层消费 `reply`/`steps` 形状。
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 新建 `test/ai-assistant-service.test.js`：
 
@@ -727,12 +727,12 @@ test('planAssistantTurn：chat 抛错时回 ok:false 且不吞掉原因的长度
 });
 ```
 
-- [ ] **Step 2: 跑测试确认它失败**
+- [x] **Step 2: 跑测试确认它失败**
 
 Run: `node --test test/ai-assistant-service.test.js`
 Expected: FAIL —— `Cannot find module '../src/api/services/aiAssistantService'`。
 
-- [ ] **Step 3: 建 `src/api/services/aiAssistantService.js`**
+- [x] **Step 3: 建 `src/api/services/aiAssistantService.js`**
 
 ```js
 /**
@@ -852,7 +852,7 @@ async function planAssistantTurn({ messages, tools, chat }) {
 }
 
 // 默认校验面 = 真实工具白名单（单测与主进程读同一份，不各攒一份）
-const { toolsFromContract } = require('../main/mcp/tools');
+const { toolsFromContract } = require('../../main/mcp/tools');
 const ALLOWED_CACHE = new Set(toolsFromContract().map(t => t.name));
 
 module.exports = {
@@ -861,9 +861,9 @@ module.exports = {
 };
 ```
 
-`parseAssistantReply` 用模块级 `ALLOWED_CACHE` 而非入参：工具名合法与否**只有一个答案**，如果做成参数就会出现「测试传了小表所以通过、生产传大表所以放行」的两套判据；代价是纯函数依赖了 tools 模块，`aiAssistantService` 因此 require `../main/mcp/tools` —— 这条 require 是纯数据（`ipcContract` 的派生表），不拉 electron，`check:dead-deps` 与单测都不受影响。
+`parseAssistantReply` 用模块级 `ALLOWED_CACHE` 而非入参：工具名合法与否**只有一个答案**，如果做成参数就会出现「测试传了小表所以通过、生产传大表所以放行」的两套判据；代价是纯函数依赖了 tools 模块，`aiAssistantService` 因此 require `../../main/mcp/tools`（从 `src/api/services/` 往上两级才到 `src/`）—— 这条 require 是纯数据（`ipcContract` 的派生表），不拉 electron，`check:dead-deps` 与单测都不受影响。
 
-- [ ] **Step 4: `src/api/ai-music.js` 加助手回合的出网函数**
+- [x] **Step 4: `src/api/ai-music.js` 加助手回合的出网函数**
 
 文件顶部常量区（`MINIMAX_API_BASE` 附近）加，并把 `:330`、`:698`、`:775` 三处 `model: 'MiniMax-Text-01'` 改为 `model: CHAT_MODEL`（三处重复的字面量收成一处，否则改模型要记三件事）：
 
@@ -904,12 +904,12 @@ async function assistantChat({ messages, apiKey }) {
 
 导出区 `module.exports = {` 里加 `assistantChat,`。
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `node --test test/ai-assistant-service.test.js test/ai-assistant-gate.test.js test/nl-search*.test.js`
 Expected: 全绿（`nl-search` 那组证明模型字面量换成常量没碰坏既有断言）。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/api/ai-music.js src/api/services/aiAssistantService.js test/ai-assistant-service.test.js
