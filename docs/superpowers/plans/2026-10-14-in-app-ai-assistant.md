@@ -357,15 +357,14 @@ function _auditStore() {
 ```js
   const handleMessage = createAgentBridge({
     source: 'agent',
-    // 限流拒绝次数只有 HTTP 层知道，所以审计回调在桥外面再包一层
     serverVersion: (() => {
       try { return require('electron').app.getVersion(); } catch (_e) { return '0.0.0'; }
     })(),
   });
 ```
 
-`createMcpHandler` 的 require 也随之删掉（`mcpCore` 不再被本模块直接引用）。
-注意：`onCall` 走桥的默认落点，`onRejected` 仍在 `createMcpServer({...})` 上 —— 两者互不相干。
+`createMcpHandler` 的 require 也随之删掉（`mcpCore` 不再被本模块直接引用），`./register` 的 `getInvokeHandler` 也一并去掉（callTool 的家搬进桥了）。
+限流拒绝的计数不在这里：`onRejected` 仍挂在 `createMcpServer({...})` 上，与审计回调互不相干。
 
 - [ ] **Step 6: 搬 `test/mcp-audit-wiring.test.js` 的第一枚钉**
 
@@ -1447,18 +1446,40 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const Module = require('node:module');
 
-const { register } = require('../src/main/ipc/register');
+// ── Electron 打桩（与 test/crossSourceAggregate-primary.test.js 同一套路）──
+// ipc/register 顶部 require('electron')，纯 node 下拿到的是「二进制路径字符串」，
+// ipcMain 是 undefined —— 不打桩的话 register.handle() 第一行就崩，
+// 测试会误判成「助手没接上」而其实是装载失败。
+const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), 'asst-e2e-el-'));
+const originalLoad = Module._load;
+Module._load = function interceptedLoad(request, parent, isMain) {
+  if (request === 'electron') {
+    return {
+      ipcMain: { handle: () => {}, on: () => {} },
+      app: { getPath: () => stubDir, getVersion: () => '1.0.0' },
+    };
+  }
+  return originalLoad.apply(this, arguments);
+};
+
+const register = require('../src/main/ipc/register');
 const auditSink = require('../src/main/mcp/auditSink');
 const assistant = require('../src/main/ipc/ai-assistant');
 
 function tmpDir() { return fs.mkdtempSync(path.join(os.tmpdir(), 'asst-e2e-')); }
 
-/** 从 register.js 的表里取 handler（channel, ...args → 结果） */
+/**
+ * 取「主进程内部复用」的那条路：getInvokeHandler 给的是**未包装**的原始 handler
+ * （不经 ipcMain 的信封与 normalizeArgs）—— 助手的桥自己会做 normalizeArgs，
+ * 所以这里要的就是原始 handler，等价于「渲染层 invoke 之后主进程真正跑的那段」。
+ * 调用时首位传 null 当 event：白名单里的 handler 不依赖 sender。
+ */
 function handlerOf(ch) {
-  const h = register.getInvokeHandler ? register.getInvokeHandler(ch) : null;
-  if (h) return (...args) => h(null, ...args);
-  throw new Error(`测试取不到 handler: ${ch}`);
+  const fn = register.getInvokeHandler(ch);
+  if (!fn) throw new Error(`测试取不到 handler: ${ch}`);
+  return (...args) => fn(null, ...args);
 }
 
 test('目录：17 个工具且恰好 3 个标着 mutating', async () => {
@@ -1513,7 +1534,7 @@ test('没有 API Key：回合通道回 NO_KEY 且不出网', async () => {
 });
 ```
 
-注意：本文件对 `register.js` 的用法（`register.handle(...)` 灌假 handler）与 `test/mcp-e2e.test.js` 里对 `createMcpHandler` 的用法是两条不同路径 —— 前者验**通道这一层**（闸门 + 令牌），后者验**协议层**（tools/list + 限流）。若 `register.js` 未导出 `handle`/`getInvokeHandler` 的同名形态，按 `src/main/ipc/register.js` 的实际导出调整这两处调用（导出名不许改，测试跟着实现走）。
+注意：本文件对 `register.js` 的用法（打桩后 `register.handle(...)` 灌假 handler）与 `test/mcp-e2e.test.js` 里对 `createMcpHandler` 的用法是两条不同路径 —— 前者验**通道这一层**（闸门 + 令牌 + 审计落点），后者验**协议层**（tools/list + 限流）。`handle()` 对同一通道重复注册在桩里是覆盖语义（真实 `ipcMain` 会抛，桩只存 Map），所以本文件里灌假 `add-to-queue` / `search-music` 不会影响别的测试文件（node --test 每个文件一个进程）。
 
 - [ ] **Step 5: 跑全链**
 

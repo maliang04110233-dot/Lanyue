@@ -11,31 +11,23 @@
  */
 
 const crypto = require('crypto');
-const path = require('path');
-const { handle, getInvokeHandler } = require('./register');
+const { handle } = require('./register');
 const prefs = require('../../utils/prefs');
 const logger = require('../../utils/logger');
 const secretStore = require('../../utils/secretStore');
 const { createMcpServer } = require('../mcp/mcpServer');
-const { createMcpHandler } = require('../mcp/mcpCore');
-const { toolsFromContract } = require('../mcp/tools');
-const { createAuditStore, AUDIT_FILE_NAME } = require('../mcp/auditStore');
+const { createAgentBridge } = require('../mcp/agentBridge');
+const auditSink = require('../mcp/auditSink');
 const { buildConnectSnippet } = require('../mcp/connectSnippet');
 
 const DEFAULT_PORT = 39217;
 
 let _server = null;
-let _audit = null;
 let _rateLimited = 0;
 
-/** 审计落在 userData，与 prefs/history 同目录；electron 未就绪时返回 null（服务照跑，只是没审计） */
+/** 审计的家在 auditSink；这里只是本模块的读取口 */
 function _auditStore() {
-  if (_audit) return _audit;
-  let dir = '';
-  try { dir = require('electron').app.getPath('userData'); } catch (_e) { return null; }
-  if (!dir) return null;
-  _audit = createAuditStore({ filePath: path.join(dir, AUDIT_FILE_NAME) });
-  return _audit;
+  return auditSink.store();
 }
 
 function _getPort() {
@@ -62,24 +54,11 @@ async function _start() {
   const token = _ensureToken(false);
   if (!token) return { error: '无法生成访问令牌（系统加密不可用？）' };
 
-  const handleMessage = createMcpHandler({
-    tools: toolsFromContract(),
+  const handleMessage = createAgentBridge({
     source: 'agent',
     serverVersion: (() => {
       try { return require('electron').app.getVersion(); } catch (_e) { return '0.0.0'; }
     })(),
-    // 审计是可观测性，绝不影响调用结果：写盘失败（磁盘满、权限）只记一条 warn。
-    onCall: (entry) => {
-      const s = _auditStore();
-      if (!s) return;
-      s.record(entry).catch(e => logger.warn('[mcp] 审计写入失败:', e));
-    },
-    callTool: async (channel, args) => {
-      const fn = getInvokeHandler(channel);
-      if (!fn) throw new Error(`通道未注册: ${channel}`);
-      // event 传 null：工具白名单里的 handler 均不依赖 sender（有依赖的通道不入白名单）
-      return fn(null, ...args);
-    },
   });
 
   _server = createMcpServer({

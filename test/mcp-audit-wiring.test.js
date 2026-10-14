@@ -18,8 +18,10 @@ const CONTRACT = read('src/shared/ipcContract.js');
 const CLOUD = read('src/main/ipc/cloudSync.js');
 const AUDIT = read('src/main/mcp/auditStore.js');
 
-test('createMcpHandler 收到 onCall，且摘要函数复用 auditStore（不许第二套判据）', () => {
-  assert.match(MCP_IPC, /onCall:/, 'MCP 服务没接审计钩子 —— 审计文件永远为空');
+test('桥是审计的装配点：默认落盘 + 摘要判据复用 auditStore（不许第二套判据）', () => {
+  const bridge = read('src/main/mcp/agentBridge.js');
+  assert.match(bridge, /auditSink\.record/, '桥没把调用接到审计落点 —— 审计文件永远为空');
+  assert.match(bridge, /source,/, '桥没把调用方身份传给协议层');
   const core = read('src/main/mcp/mcpCore.js');
   assert.match(core, /require\('\.\/auditStore'\)/, '协议层没有复用 auditStore 的参数摘要');
   assert.ok(!/SENSITIVE_ARG_RE\s*=/.test(core), '协议层另写了一份敏感参数判据');
