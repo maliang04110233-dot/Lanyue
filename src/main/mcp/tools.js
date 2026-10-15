@@ -99,7 +99,7 @@ const AGENT_TOOLS = [
   },
   {
     name: 'list_subscriptions', channel: 'subscribe-list', risk: 'read',
-    description: '列出用户订阅的歌手/歌单/账号订阅项。',
+    description: '列出用户订阅的歌手与歌单（type 只有 singer / playlist 两类，没有「账号」这一种）。返回 [{key,type,platform,targetId,name}] 形状的数组。',
   },
   {
     // 描述即提示词：这里写的必须是**两边今天就同时成立**的事实。出网脱敏闸按裁定 R-14 只装在
@@ -115,8 +115,8 @@ const AGENT_TOOLS = [
   },
   {
     name: 'aggregate_library', channel: 'aggregate-cross-source', risk: 'read',
-    description: '跨源聚合用户的自建歌单与红心单。opts:{markDuplicates:boolean}。返回按曲目合并的清单。',
-    paramDocs: { opts: '聚合选项对象' },
+    description: '跨源聚合用户的曲库。默认只看本地红心单；要把具体歌单一起纳进来得传 opts.playlists:[{source,id}]。opts 还支持 sources（平台 id 数组，不给则取红心里出现过的 source）与 markDuplicates（默认 true）。返回按曲目合并的清单，单个来源失败按空列表降级并在 failed 里回报。',
+    paramDocs: { opts: '聚合选项对象：{playlists?:[{source,id}], sources?:[string], markDuplicates?:boolean}' },
   },
   // ── 加法动作（可信 Agent 才开到这一层）─────────────
   {
