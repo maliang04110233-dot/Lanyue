@@ -5,7 +5,7 @@
  * 写在 handler 里就得为了测一个分支去起整条桥。
  * 返回 null = 放行；返回字符串 = ASCII 令牌，由渲染层查词典成人话。
  */
-function gateAssistantCall(tool, { confirmed, scope }) {
+function gateAssistantCall(tool, { confirmed, scope } = {}) {
   if (tool.audience === 'app') return 'APP_ONLY';   // 主进程没有执行它的能力
   if (tool.risk !== 'read' && confirmed !== true) return 'NEED_CONFIRM';
   // destructive 只认单项确认：批量令牌换不到「删/清空」。真 IPC 路径下 scope 缺省是

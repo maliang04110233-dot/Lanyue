@@ -200,7 +200,8 @@ P1 → P2 → P3，每期独立可交付、CI 两条 job 绿了才进下期。P4
   补进来后 P2 收口的计数自洽：21 + (10 write + 8 destructive) = 39，本节「非只读 21 条」也才对得上。
 - **R-5｜`scope` 只有 `single` / `batch` 两值**。原设想里「用户只批准只读步骤」要传 `scope:'readOnly'`，
   但契约的 `t.enum` 对枚举外的值不是拒绝而是**静默落回默认值**（`src/shared/ipcContract.js:437`），
-  传它会在审计里留下一个假的 `'single'`。两条批准路径都传 `'batch'`，区别体现在被选中的步骤上，
+  传它会在审计里留下一个假的 `'single'`。只读步骤不需要第三种形态：批量与单项的差别由
+  `scope` 本来的两值表达（见下方 R-19），区别体现在被选中的步骤上，
   审计由 `approved` + risk 分布还原。
 - **R-8｜审计的 `approved` 与「限流按 run 计」落在主进程侧**，且 `risk` 由主进程从登记表取，
   不接受渲染层上报；渲染层预算保留当第一道。本节第六行那句要求由此兑现，实现计划原本把它排漏了。
@@ -213,3 +214,24 @@ P1 → P2 → P3，每期独立可交付、CI 两条 job 绿了才进下期。P4
   是降级形状，改行为时要一起翻。
 - **`clear-finished-queue` 由 `write` 降为 `destructive`**（实现计划改的，本节 P2 清单照此收）。
   它清的是用户看得见的一整排已完成条目，误删不可逆；判据与 `clear-all-queue` 同一档。
+
+### P2 期追加
+
+- **R-19｜`scope` 两值的语义定死了**：`'single'` = 这一步是用户**逐项**确认过的，`'batch'` = 这一步是
+  靠整份计划那一次批准放行的。于是 `destructive` 只认 `'single'` 就是「危险步骤必须单独弹」在主进程侧
+  的兑现 —— 界面不单独问，主进程就不给执行，两侧各留一份判据。契约默认值取 `'single'`
+  （今天的渲染层每条写操作都单独弹，缺省读成逐项确认**是**如实描述，不是放松）；代价是
+  「Task 10 的批量那条路如果偷懒不显式传 `'batch'`，危险步骤会被当成逐项批准」。防线两处：
+  `test/ai-assistant-gate.test.js` 里钉住默认值（改动必须留下痕迹），实现计划 Task 10 的
+  `Produces` 明确要求 `invoke('ai-assistant-tool-call', name, args, confirmed, scope, runId)`
+  把 `scope` 传满 —— 评审时那一枚「界面到底把什么交给主进程」的行为用例就是它的牙齿。
+  反面方案（默认 `'batch'`，fail-closed）被否：那会让 Task 10 落地前的逐项确认全部撞
+  `AGENT_SCOPE_MISMATCH`，把一个理论风险换成一段真实的坏行为。
+- **R-20｜本节第六节测试策略第 3 条的令牌写歪了**。那句「伪造 `{confirmed:true, scope:'batch'}`
+  调 `destructive` → 仍 `NEED_CONFIRM`」与信任边界表、实现计划、全局约束三处给的
+  `AGENT_SCOPE_MISMATCH` 矛盾，按后者落地。理由：`confirmed` 已经是 `true`，回 `NEED_CONFIRM`
+  等于让渲染层去重新询问一个已经答过的问题（死循环），真正的失败是形态不对。
+- **两处陈旧说明留给 Task 12 收**（都在别人正改着的共享文件里，本轮刻意没碰）：
+  `src/shared/ipcContract.js:186-187` 那句只提了 `confirmed` 半把判据（`scope` 那半没提，
+  也没指向 `assistantGate.js`）；`SECURITY.md` §三.7 里「判据是主进程 handler 上的
+  `confirmed === true` 参数」同样落后于 risk + scope 两把闸。

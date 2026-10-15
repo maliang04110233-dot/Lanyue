@@ -49,6 +49,20 @@ test('失败原因是令牌不是文案（中文句子的家在渲染层词典�
   }
 });
 
+// 缺省值这一头得钉住：契约的 t.enum 对没传的参数静默落回默认，所以「调用方没表态」
+// 到主进程时读起来和「调用方表了态」一模一样。今天默认是 single（渲染层逐条确认就是
+// 它的默认形态），Task 10 起批量那条路必须**显式**传 batch —— 这句就是把那条要求
+// 现在就写死的钉子：谁想把默认改成 batch 或者让批量偷懒不传，这枚用例先红。
+test('契约给 scope 的默认值是 single：缺省只能读成逐项确认', () => {
+  const { normalizeArgs } = require('../src/shared/ipcContract');
+  const r = normalizeArgs('ai-assistant-tool-call', ['add_to_queue', {}, true]);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.args[3], 'single', '没传 scope 时主进程收到的必须是 single');
+  const bad = normalizeArgs('ai-assistant-tool-call', ['delete_all_playlists', {}, true, 'nope']);
+  assert.strictEqual(bad.ok, true, '枚举外的值由 t.enum 静默落回默认，不报错（R-5）');
+  assert.strictEqual(bad.args[3], 'single');
+});
+
 test('助手不扩白名单：现取工具表，且不绕开桥碰任意 handler', () => {
   const names = new Set(toolsFromContract().map(t => t.name));
   assert.strictEqual(names.size, AGENT_TOOLS.length);

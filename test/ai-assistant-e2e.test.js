@@ -124,6 +124,10 @@ test('风险闸（纯函数）：read 无条件、write 要 confirmed、destruct
   assert.strictEqual(gateAssistantCall(R('destructive'), { confirmed: true, scope: undefined }), 'AGENT_SCOPE_MISMATCH',
     '没声明 scope 的裸调用不许当成单项确认');
   assert.strictEqual(gateAssistantCall(R('destructive'), { confirmed: true, scope: 'single' }), null);
+  assert.strictEqual(gateAssistantCall(R('destructive'), { confirmed: false, scope: 'single' }), 'NEED_CONFIRM',
+    '危险步骤没确认时先撞确认闸、不是 scope 闸：两把判据的次序也钉住');
+  assert.strictEqual(gateAssistantCall(R('read')), null, '漏传整个参数对象的只读调用不该炸');
+  assert.strictEqual(gateAssistantCall(R('write')), 'NEED_CONFIRM', '漏传整个参数对象的写调用要拒，不是抛');
   assert.strictEqual(gateAssistantCall(R('write', 'app'), { confirmed: true, scope: 'single' }), 'APP_ONLY');
 });
 
