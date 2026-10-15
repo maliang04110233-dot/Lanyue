@@ -133,14 +133,16 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 ### 6. 两个调用方，一张白名单（外部 Agent 与应用内 AI 助手）
 
 应用内助手（侧栏「AI 助手」）不是第二套权限：它能看到、能调用的就是外部 Agent 那
-**17 个工具**，且执行走**同一条进程内桥**（`src/main/mcp/agentBridge.js`），因此参数钳制、
-契约拒绝语义与审计落点两边一致 —— 助手侧比 Agent 松就是实锤的漂移，钉在
-`test/ai-assistant-e2e.test.js`。
+**21 个工具**（P1 起 17 → 21，多出的四条全是只读，见第五节），且执行走**同一条进程内桥**
+（`src/main/mcp/agentBridge.js`），因此参数钳制、契约拒绝语义与审计落点两边一致 ——
+助手侧比 Agent 松就是实锤的漂移，钉在 `test/ai-assistant-e2e.test.js`。
 
-差异只有一处，且是收紧不是放宽：**改动曲库或队列的三个写操作**
+差异只有两处，且两处都是收紧不是放宽。第一处：**改动曲库或队列的三个写操作**
 （`add_to_queue` / `add_to_playlist` / `toggle_favorite`）在应用内必须逐条经用户确认，
 判据是主进程 handler 上的 `confirmed === true` 参数（`src/main/ipc/ai-assistant.js`），
 不是「界面已经问过了」这种口头承诺；被拒的调用不进桥，因此不出现在审计里。
+第二处：**工具返回值的脱敏闸只装在助手 → 厂商那一条路上**（见第五节），
+所以同一个工具在两侧返回的形状不同 —— 助手侧看不到本机路径，Agent 侧看得到。
 助手的审计与 Agent 的写在同一个文件，靠 `source` 字段区分（`agent` / `assistant`）。
 
 助手每回合还会把一段**应用状态摘要**（正在播放 / 队列 / 本次搜索，见上文第五节）随请求递进去。
@@ -153,7 +155,7 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 ### 7. AI 智能歌单（轨道三）：只读生成，写库仍是那一下点击
 
 「说一句主题 → 从你已有的歌里挑 → 存成普通歌单」走一条**新的 invoke 通道**
-`smart-playlist-generate`（`src/main/ipc/smart-playlist.js`），它**不在** MCP 的 17 个工具白名单里，
+`smart-playlist-generate`（`src/main/ipc/smart-playlist.js`），它**不在** MCP 的 21 个工具白名单里，
 也不产生审计条目 —— 因为它什么都不改。边界由三处共同保证：
 
 - 主进程侧只读 `prefs` 里的 `userPlaylists`（不用 `ensureFavorites()`，那个在缺单时会建单落盘），
@@ -210,6 +212,19 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
   Cookie 与任何凭据。
   对话只存在界面内存里（不写盘、不同步），调用记录落本机 `userData/mcp-audit.json`，
   两者都不进 WebDAV 快照与导出备份
+- 助手自 P1（2026-10-15）起多出四条**只读**能力：订阅列表、下载目录模板、持久化播放队列、
+  跨源聚合曲库。工具返回值是**第二条**出网路（它的形状由主进程 handler 产出，界面管不着），
+  所以发给厂商前先过一道键名闸：`src/shared/outboundScrub.js` 的 `LEAK_KEYS` 是这份清单的
+  唯一出处，递归剥掉 `path / localPath / filePath / dir / cookie / cookies / token /
+  accessToken / apiKey / secret / savePath / subpath` 十二个键 —— 下载模板的存储目录、
+  历史里的落盘路径都不出现在发给厂商的文本里。返回值读不出 JSON 就当没有内容（回空串），
+  绝不带着看不见的原文出网。歌词正文**刻意不在闸内**：`get_lyrics` 的存在理由就是把歌词
+  取回来给用户看，把它一起剥掉是砍功能而不是堵泄漏；歌词不上网靠的是上面那条纪律——
+  状态段只带标题/歌手/来源/音质/id。
+  闸拦不住的一类是**把绝对路径写在别的键值里**：本机文件的 `id` 至今仍等于它的路径
+  （`src/renderer/js/favorites.js:40-43`、`src/renderer/js/m3uToPlaylist.js:90`），
+  键名黑名单对此无能为力。要堵这一类得先改数据形状（本地曲目不再拿路径当 id），
+  那是独立一期的活，本轮如实记在这里而不是假装它已经关了。
 - AI 智能歌单会把挑选范围内最多 400 行的**歌名与歌手**（不含文件路径、不含 Cookie）
   连同主题发给同一厂商；生成的结果只在界面内存里，只有你点「存为歌单」才落本机 prefs
 
@@ -221,3 +236,8 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 2. 若启用了 MCP，记住它是一个**本机 HTTP 服务**；不用时在设置里关掉
 3. 分享日志或诊断包前扫一眼：虽然已脱敏，但你的歌名/路径仍属于个人信息
 4. 升级前看 `CHANGELOG.md` 的「安全」小节
+
+**一句话给改这块代码的人**：应用状态摘要与工具返回值是**两条**出网路，两条各有一道闸——
+前者在拼状态段时只取 `title/artist/source/id/quality`，后者在 `src/shared/outboundScrub.js`
+按键名递归剥。所以新增**只读**工具不必重写脱敏（闸在主进程出口一处）；新增**写**工具才需要
+重新想确认形态。还要注意闸认的是键名：路径若写在别的键的**值**里它拦不住，那一类记在第五节。
