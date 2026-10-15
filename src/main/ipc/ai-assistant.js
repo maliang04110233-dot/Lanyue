@@ -40,7 +40,7 @@ function register() {
     tools: toolsFromContract().map(({ name, description, mutating }) => ({ name, description, mutating })),
   }));
 
-  handle('ai-assistant-plan', async (_, messages) => {
+  handle('ai-assistant-plan', async (_, messages, context) => {
     // 取的是「当前厂商那根 Key」，不是整包映射：映射里存着别家的凭据。
     // 界面只填了别家而选了 DeepSeek 时，这里必须照样报 NO_KEY —— 让它带着
     // 空串往下走，用户看到的是一句读不懂的「生成失败」。
@@ -50,6 +50,9 @@ function register() {
       return await planAssistantTurn({
         messages: Array.isArray(messages) ? messages : [],
         tools: toolsFromContract(),
+        // 状态摘要由渲染层每回合现读（只有它有 getState），长度闸有两处、各管一段：
+        // 契约 t.str(1600) 管运输，服务里那枚管提示拼装 —— 两个数是同一个，有钉守着。
+        context,
         chat: (m) => assistantChat({ messages: m, apiKey }),
       });
     } catch (e) {

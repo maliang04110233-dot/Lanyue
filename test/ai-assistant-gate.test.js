@@ -47,3 +47,13 @@ test('助手不扩白名单：现取工具表，且不绕开桥碰任意 handler
   // getInvokeHandler 能取到**任何**通道的 handler —— 助手用它就是绕开白名单
   assert.ok(!/getInvokeHandler\(/.test(ASSISTANT), '助手绕开桥直接取了任意 handler');
 });
+
+// 上限这个数只该有一份：契约按它截运输，服务按它截提示，两边各写一遍迟早飘。
+test('契约里 context 的 t.str 上限 = 服务侧 MAX_CONTEXT_CHARS（同一个数不许有两份）', () => {
+  const { MAX_CONTEXT_CHARS } = require('../src/api/services/aiAssistantService');
+  const line = CONTRACT.split('\n').find((l) => l.includes("'ai-assistant-plan'"));
+  assert.ok(line, '契约里找不到 ai-assistant-plan 那行');
+  const m = line.match(/'context',\s*t\.str\((\d+)\)/);
+  assert.ok(m, `context 没作为位置参数进契约（这行是：${line.trim()}）`);
+  assert.strictEqual(Number(m[1]), MAX_CONTEXT_CHARS, '两处上限飘了');
+});

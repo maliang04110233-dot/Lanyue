@@ -23,10 +23,59 @@ import { askConfirm } from '../confirmDialog.js';
 import { mountProviderPanel, providerErrText } from '../aiProviderPanel.js';
 
 const MAX_TURNS = 3;
+const CTX_QUEUE = 8;
+const CTX_SONGS = 5;
 
 let _history = [];      // [{role,content}]，不含 system
 let _tools = null;      // 助手可见目录（含 mutating）
 let _busy = false;
+
+/** 一首歌缩成一行。只取标题/歌手/来源/id（+正在播那首的音质）：歌词、本地路径不进提示 */
+function _oneLine(s, withQuality) {
+  if (!s || typeof s !== 'object') return '';
+  const title = String(s.title || '').slice(0, 40);
+  const artist = String(s.artist || '').slice(0, 30);
+  const src = s.source ? ` ${s.source}` : '';
+  const q = withQuality && s.quality ? ` 音质=${String(s.quality).slice(0, 12)}` : '';
+  const id = s.id === undefined || s.id === null || s.id === '' ? '' : ` id=${String(s.id).slice(0, 24)}`;
+  return `「${title} - ${artist}」${src}${q}${id}`;
+}
+
+/**
+ * 助手唯一的「眼睛」：把此刻的应用状态缩成一段文本随每次请求递上去。
+ *
+ * 为什么每回合现读而不是开局拼一次：队列会被助手自己的 add_to_queue 改掉，
+ * 第二回合拿着第一回合的快照回「队列里没有这首歌」就是幻觉。为什么不塞进 _history：
+ * 历史会被 trimHistory 削头、被 clearAssistant 清空，状态跟着走要么被裁掉要么留下
+ * 过期快照；当参数走，两者互不干扰。上限那道闸在主进程（契约 t.str + 服务里的同一枚数）。
+ */
+function _appContext() {
+  const g = (k) => (typeof window.getState === 'function' ? window.getState(k) : null);
+  const playing = g('currentPlaying');
+  const queue = g('playQueue') || [];
+  const idx = Number(g('playIdx'));
+  const kw = g('currentKeyword');
+  const songs = g('songs') || [];
+  const lines = [];
+  lines.push(playing && playing.title
+    ? `正在播放：${_oneLine(playing, true)}`
+    : '正在播放：未在播放');
+  if (queue.length) {
+    const head = Number.isFinite(idx) && idx >= 0 && idx < queue.length
+      ? `（第 ${idx + 1}/${queue.length} 首）`
+      : `（共 ${queue.length} 首）`;
+    lines.push(`待播队列${head}：` + queue.slice(0, CTX_QUEUE).map((s, i) => `${i + 1}.${_oneLine(s)}`).join(' '));
+  } else {
+    lines.push('待播队列：队列为空');
+  }
+  if (kw) {
+    const top = songs.slice(0, CTX_SONGS).map((s, i) => `${i + 1}.${_oneLine(s)}`).join(' ');
+    lines.push(`本次搜索：关键词「${String(kw).slice(0, 40)}」` + (top ? `，结果前 ${Math.min(songs.length, CTX_SONGS)} 首：${top}` : '，当前无结果'));
+  } else {
+    lines.push('本次搜索：本会话还没搜过');
+  }
+  return lines.join('\n');
+}
 
 function _log() { return document.getElementById('assistantLog'); }
 
@@ -84,7 +133,7 @@ async function _round(userText) {
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const thinking = _push('asst-msg-assistant', t('assistant.thinking'));
-    const plan = await window.ipcRenderer.invoke('ai-assistant-plan', _history);
+    const plan = await window.ipcRenderer.invoke('ai-assistant-plan', _history, _appContext());
     if (thinking) thinking.remove();
     if (!plan || plan.ok !== true) {
       stopHint = _errText(plan && plan.error, plan && plan.text);
