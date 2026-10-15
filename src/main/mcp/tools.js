@@ -176,7 +176,23 @@ function toolsFromContract(list = AGENT_TOOLS, channels = CHANNELS) {
 
 const MUTATING_TOOL_NAMES = new Set(toolsFromContract().filter(t => t.mutating).map(t => t.name));
 
+/**
+ * 外部 Agent 能看到的工具 —— 判据只有这一处。
+ * destructive（删、清空）与 app（主进程根本没法执行）都不给：前者外部 Agent 的可信度
+ * 撑不起「一次批准就跑删除」，后者给它是个永远调用不通的工具名。
+ */
+function visibleToAgent(def) {
+  return def.audience === 'both' && def.risk !== 'destructive';
+}
+
+/** @param {'agent'|'assistant'} source */
+function toolsForSource(source, list = AGENT_TOOLS, channels = CHANNELS) {
+  const all = toolsFromContract(list, channels);
+  return source === 'agent' ? all.filter(visibleToAgent) : all;
+}
+
 module.exports = {
   AGENT_TOOLS, MUTATING_TOOL_NAMES, TOOLS_VERSION_HINT: '2025-03-26',
   toolsFromContract, specToJsonSchema, RISK_LEVELS, AUDIENCES,
+  visibleToAgent, toolsForSource,
 };

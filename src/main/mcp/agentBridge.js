@@ -11,7 +11,7 @@
 
 const { getInvokeHandler } = require('../ipc/register');
 const { createMcpHandler } = require('./mcpCore');
-const { toolsFromContract } = require('./tools');
+const { toolsForSource } = require('./tools');
 const auditSink = require('./auditSink');
 
 async function callTool(channel, args) {
@@ -28,7 +28,10 @@ async function callTool(channel, args) {
  */
 function createAgentBridge({ source, serverVersion = '0.0.0', onCall = null }) {
   return createMcpHandler({
-    tools: toolsFromContract(),
+    // 外部 Agent 与助手共用这一处装配，但**面按 caller 身份过滤**：
+    // destructive 与 app-only 连 byName 都进不去，指名调用它们拿到的是「未知工具」，
+    // 而不是「看得见但调不动」——少一处能被绕开的地方。
+    tools: toolsForSource(source),
     callTool,
     source,
     serverVersion,
