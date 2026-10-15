@@ -8,12 +8,14 @@
  *
  * 为什么循环在渲染层：确认框只有 UI 拿得到。把它做成主进程↔渲染层的往返
  * （send 问、invoke 答、超时、孤儿请求）是拿三层新机制换一句「先问用户」，
- * 而闸门本身只需要一个布尔参数 —— 谁调都要确认，界面上的按钮只是它的来源。
+ * 而闸门本身只需要两个参数（confirmed + scope）—— 谁调都要确认，危险步骤还多认一道
+ * 单项确认；界面上的按钮只是这两个参数的来源。
  *
  * 错误一律回 ASCII 令牌：主进程不产文案，文案的家是渲染层词典（toast-i18n 的规矩）。
  */
 
 const { handle } = require('./register');
+const { gateAssistantCall } = require('./assistantGate');
 const prefs = require('../../utils/prefs');
 const logger = require('../../utils/logger');
 const { createAgentBridge } = require('../mcp/agentBridge');
@@ -65,11 +67,13 @@ function register() {
     }
   });
 
-  handle('ai-assistant-tool-call', async (_, name, args, confirmed) => {
+  handle('ai-assistant-tool-call', async (_, name, args, confirmed, scope) => {
     const tool = toolsFromContract().find(t => t.name === name);
     if (!tool) return { ok: false, error: 'UNKNOWN_TOOL' };
-    // 闸门：写操作没有 confirmed===true 就不执行。确认来自界面，但判据在这里。
-    if (tool.mutating && confirmed !== true) return { ok: false, error: 'NEED_CONFIRM' };
+    // 闸门按 risk 判：判据抽在 assistantGate.js（四种组合得能逐条断言）。
+    // 确认来自界面，但拒不拒由这里说了算 —— 批量令牌在主进程换不到危险步骤。
+    const deny = gateAssistantCall(tool, { confirmed, scope });
+    if (deny) return { ok: false, error: deny };
     const msg = await _handle()({
       jsonrpc: '2.0', id: 1, method: 'tools/call',
       params: { name, arguments: args && typeof args === 'object' ? args : {} },

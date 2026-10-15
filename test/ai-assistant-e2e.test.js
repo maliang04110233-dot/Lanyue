@@ -107,6 +107,26 @@ test('闸门：写操作不带确认直接拒，带确认才落到 handler，且
   assert.strictEqual(items[0].tool, 'add_to_queue');
 });
 
+/**
+ * 风险闸（Task 6）：判据从 mutating 布尔升级成 risk + scope 两把，所以这里测的是
+ * 抽出来的闸函数而不是 handler —— 本任务不新增工具，登记表里一条 destructive 也没有，
+ * 「批量令牌换不到删除」这一路只能用合成的工具描述喂出来；为了测一个分支去起整条桥
+ * 不值（接线那半由 test/ai-assistant-gate.test.js 静态钉住）。
+ */
+test('风险闸（纯函数）：read 无条件、write 要 confirmed、destructive 还要 scope=single', () => {
+  const { gateAssistantCall } = require('../src/main/ipc/assistantGate');
+  const R = (risk, audience) => ({ name: 'x', risk, audience: audience || 'both' });
+  assert.strictEqual(gateAssistantCall(R('read'), { confirmed: false, scope: 'single' }), null);
+  assert.strictEqual(gateAssistantCall(R('write'), { confirmed: false }), 'NEED_CONFIRM', 'write 无确认必须拒');
+  assert.strictEqual(gateAssistantCall(R('write'), { confirmed: true, scope: 'batch' }), null,
+    'write 两档 scope 都认：整份批准就是为它设计的');
+  assert.strictEqual(gateAssistantCall(R('destructive'), { confirmed: true, scope: 'batch' }), 'AGENT_SCOPE_MISMATCH');
+  assert.strictEqual(gateAssistantCall(R('destructive'), { confirmed: true, scope: undefined }), 'AGENT_SCOPE_MISMATCH',
+    '没声明 scope 的裸调用不许当成单项确认');
+  assert.strictEqual(gateAssistantCall(R('destructive'), { confirmed: true, scope: 'single' }), null);
+  assert.strictEqual(gateAssistantCall(R('write', 'app'), { confirmed: true, scope: 'single' }), 'APP_ONLY');
+});
+
 test('未知工具：令牌化拒绝，不碰桥', async () => {
   const r = await handlerOf('ai-assistant-tool-call')('delete_all_playlists', {}, true);
   assert.strictEqual(r.ok, false);

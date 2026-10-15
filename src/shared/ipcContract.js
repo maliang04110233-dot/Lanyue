@@ -190,7 +190,7 @@ const CHANNELS = {
   // 所以生产路径碰不到这根栅栏；碰到时说明有人绕过渲染层直接拼 invoke）。
   'ai-assistant-tools': { invoke: MAIN },
   'ai-assistant-plan': { invoke: MAIN, args: [['messages', t.arr(24)], ['context', t.str(1600)]] },
-  'ai-assistant-tool-call': { invoke: MAIN, args: [['name', t.str(64)], ['args', t.obj()], ['confirmed', t.bool()]] },
+  'ai-assistant-tool-call': { invoke: MAIN, args: [['name', t.str(64)], ['args', t.obj()], ['confirmed', t.bool()], ['scope', t.enum(['single', 'batch'], 'single')]] },
 
   // ── AI 智能歌单（invoke）──────────────────────────
   // 只读通道：取候选 → 一次出网 → 回真歌曲对象。写不写库由界面那一下

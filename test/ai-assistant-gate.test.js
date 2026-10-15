@@ -3,8 +3,8 @@
  *
  * 「写操作要先问用户」如果只长在界面上，就等于没长：任何绕过界面的调用方
  * （以后新增的快捷键、命令面板、或者助手自己拼的 invoke）都能不确认就改歌单。
- * 所以闸门在主进程的 handler 上，且确认状态是**参数**（confirmed === true），
- * 不是「渲染层已经问过了」这种口头承诺。
+ * 所以闸门在主进程（handler 里调 assistantGate.js 那道纯函数），且确认状态是**参数**
+ * （confirmed === true + scope），不是「渲染层已经问过了」这种口头承诺。
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -26,14 +26,23 @@ test('三条助手通道都在契约里且 invoke 给 main', () => {
   }
 });
 
-test('确认闸门长在 handler 里：写操作不带 confirmed===true 直接拒', () => {
-  assert.match(ASSISTANT, /tool\.mutating && confirmed !== true/, '闸门不在了');
-  assert.match(ASSISTANT, /NEED_CONFIRM/, '拒绝要回可判定的令牌，不是中文句子');
+test('确认闸门在主进程且按 risk 判：判据只有一处', () => {
+  assert.match(ASSISTANT, /gateAssistantCall\(tool, \{ confirmed, scope \}\)/, 'handler 没调用那道闸');
+  assert.match(ASSISTANT, /error: deny/, '拒了要回令牌');
   assert.ok(!/askConfirm/.test(ASSISTANT), '主进程不该出现确认框：确认是 UI 的事');
+  const gate = read('src/main/ipc/assistantGate.js');
+  assert.match(gate, /tool\.risk !== 'read' && confirmed !== true/, 'write 的确认判据不在了');
+  assert.match(gate, /scope !== 'single'/, '批量令牌换不到 destructive 的那道拒不在场');
 });
 
 test('失败原因是令牌不是文案（中文句子的家在渲染层词典，日志除外）', () => {
-  const errs = [...ASSISTANT.matchAll(/error:\s*'([^']*)'/g)].map(m => m[1]);
+  // 令牌现在长在两份文件里：handler 的 `error: '令牌'` 与闸的 `return '令牌'`。
+  // 抽闸把 NEED_CONFIRM 那几枚搬走了，只扫 handler 的话，闸里写句中文也不会红。
+  const GATE = read('src/main/ipc/assistantGate.js');
+  const errs = [
+    ...ASSISTANT.matchAll(/error:\s*'([^']*)'/g).map((m) => m[1]),
+    ...GATE.matchAll(/return '([^']*)'/g).map((m) => m[1]),
+  ];
   assert.ok(errs.length >= 4, `该有若干个令牌化失败点，实得 ${errs.length}`);
   for (const e of errs) {
     assert.ok(!/[\u4e00-\u9fa5]/.test(e), `错误该是可判定令牌: ${e}`);
