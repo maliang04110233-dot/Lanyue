@@ -102,8 +102,12 @@ const AGENT_TOOLS = [
     description: '列出用户订阅的歌手/歌单/账号订阅项。',
   },
   {
+    // 描述即提示词：这里写的必须是**今天**就成立的事实。出网脱敏闸是 Task 4 的活，
+    // 在它落地前 path/subpath 会原样进 JSON 文本（handler 直返 prefs 里的模板，
+    // mcpCore 只把返回值 JSON.stringify，中间没有任何字段过滤），所以这句如实告知模型，
+    // 而不是承诺「路径不回给你」。
     name: 'list_download_templates', channel: 'get-download-templates', risk: 'read',
-    description: '列出下载目录模板与当前启用项。模板的存储路径不会回给你（本机路径不出网），只看得到名字与是否 active。',
+    description: '列出下载目录模板与当前启用项。返回 {templates:[{id,name,path,subpath,createdAt,updatedAt}],active:模板id|null}。注意 path/subpath 是用户本机的绝对目录路径，会原样出现在结果里：那是用户自己的磁盘布局，别原样念给用户，回答里只说模板名与是否启用。',
   },
   {
     name: 'get_play_queue', channel: 'load-play-queue', risk: 'read',

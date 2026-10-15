@@ -73,10 +73,19 @@ assistant.register();
 test('目录：21 个工具且恰好 3 个非只读（P1 只加只读面）', async () => {
   const r = await handlerOf('ai-assistant-tools')();
   assert.strictEqual(r.tools.length, 21);
-  assert.deepStrictEqual(r.tools.filter(t => t.mutating).map(t => t.name).sort(),
-    ['add_to_playlist', 'add_to_queue', 'toggle_favorite']);
-  assert.deepStrictEqual(r.tools.filter(t => t.risk === 'destructive').map(t => t.name), [],
-    'P1 不该出现 destructive');
+  // 断言只能落在**这个 handler 真返回的字段**上。目录项只投影
+  // { name, description, mutating }（见 ai-assistant.js:40），对它 filter(t => t.risk)
+  // 恒为 [] —— 无论登记表里长出什么它都不会红，是一枚死断言（评审 F-C2）。
+  // risk/audience 进目录载荷是 Task 10 的事（循环要按 meta.risk 决定单独弹），
+  // 那一步落地后这枚再升级成按 risk 断言；本轮不给载荷加字段。
+  for (const t of r.tools) {
+    assert.ok('mutating' in t, `${t.name} 的目录项没有 mutating 字段，下面那枚断言会空转`);
+  }
+  const mutating = r.tools.filter(t => t.mutating === true).map(t => t.name).sort();
+  assert.deepStrictEqual(mutating, ['add_to_playlist', 'add_to_queue', 'toggle_favorite'],
+    '非只读集合飘了：P1 只加只读面，写工具恰好这三条，一条不多一条不少');
+  assert.strictEqual(r.tools.filter(t => t.mutating === false).length, 18,
+    '21 条里只该有 18 条只读；多出来的那条就是越红线扩面');
 });
 
 test('闸门：写操作不带确认直接拒，带确认才落到 handler，且被拒的不进审计', async () => {
