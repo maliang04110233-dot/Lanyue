@@ -7,8 +7,9 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { AGENT_TOOLS, RISK_LEVELS, AUDIENCES, toolsFromContract } = require('../src/main/mcp/tools');
-const { toolsForSource, visibleToAgent } = require('../src/main/mcp/tools');
+const {
+  AGENT_TOOLS, RISK_LEVELS, AUDIENCES, toolsFromContract, toolsForSource, visibleToAgent,
+} = require('../src/main/mcp/tools');
 
 test('每条工具都带合法 risk/audience，且 mutating 由 risk 派生', () => {
   for (const def of toolsFromContract()) {
@@ -55,9 +56,42 @@ test('应用内助手看得见全部（含 destructive 与 app-only），确认�
   assert.deepStrictEqual(toolsForSource('assistant', SYNTH, CH).map((t) => t.name), ['r', 'w', 'd', 'a']);
 });
 
-test('判据只有一处：visibleToAgent 与 toolsForSource("agent") 对同一条给出同一个答案', () => {
-  for (const def of toolsFromContract()) {
-    assert.strictEqual(visibleToAgent(def), toolsForSource('agent').some((x) => x.name === def.name),
-      `${def.name} 的两侧视图与判据不一致`);
-  }
+test('source 是白名单：未知或缺失一律抛，不静默当助手把全量面交出去', () => {
+  // 协议层 createMcpHandler 的 source 默认补 'agent'，过滤层若也兜底，
+  // 漏传身份的第三个 caller（CLI、调试端点）会拿到含 destructive / app-only 的全量面。
+  assert.throws(() => toolsForSource(), /source 非法/);
+  assert.throws(() => toolsForSource(undefined), /source 非法: undefined/);
+  assert.throws(() => toolsForSource(null), /source 非法: null/);
+  assert.throws(() => toolsForSource('cli'), /source 非法: cli/);
+  assert.throws(() => toolsForSource('AGENT'), /source 非法: AGENT/); // 大小写也算未知
+  assert.throws(() => toolsForSource('agent', [{ name: 'x', channel: 'nope' }], CH), /risk/);
+  // 两个白名单值本身照走装载期三重校验，不被新抛闸短路
+  assert.ok(Array.isArray(toolsForSource('assistant')));
+  assert.ok(Array.isArray(toolsForSource('agent')));
+});
+
+// 判据本身写对没有：直接把 SYNTH 的产物喂 visibleToAgent，与 toolsForSource('agent') 的结果
+// 集双向相等，且这个集合就是 SYNTH 里 both + 非 destructive 的那几条。
+// 只比「两处一致」抓不到「判据条件写反」（两处用的是同一个判据，写反也一致），
+// 所以 EXPECT 这里独立算出来，判据一反就红。
+test('判据只有一处且判据本身没写反：SYNTH 直接喂 visibleToAgent 与 toolsForSource("agent") 双向相等', () => {
+  const EXPECT = ['r', 'w']; // both 且非 destructive：d 是 destructive、a 是 app-only
+  const byPredicate = toolsFromContract(SYNTH, CH).filter(visibleToAgent).map((t) => t.name);
+  const bySource = toolsForSource('agent', SYNTH, CH).map((t) => t.name);
+  assert.deepStrictEqual([...byPredicate].sort(), EXPECT);
+  assert.deepStrictEqual([...bySource].sort(), EXPECT);
+  assert.ok(!byPredicate.includes('d') && !byPredicate.includes('a'), '判据把 destructive / app-only 放进了外部面');
+  assert.ok(!bySource.includes('d') && !bySource.includes('a'), 'agent 视图绕开了判据');
+});
+
+test('真表上两处仍同一个答案（有人另攒一份条件、不再调 visibleToAgent 时这里红）', () => {
+  const byPredicate = toolsFromContract().filter(visibleToAgent).map((t) => t.name).sort();
+  const bySource = toolsForSource('agent').map((t) => t.name).sort();
+  assert.deepStrictEqual(bySource, byPredicate);
+});
+
+test('助手面与真表全量逐字段一致（深相等，不是条数相等）', () => {
+  assert.deepStrictEqual(toolsForSource('assistant'), toolsFromContract());
+  // 合成表也一致 —— 真表今天还没有 destructive/app 条目，只有 SYNTH 能证明「全量」不是句空话
+  assert.deepStrictEqual(toolsForSource('assistant', SYNTH, CH), toolsFromContract(SYNTH, CH));
 });

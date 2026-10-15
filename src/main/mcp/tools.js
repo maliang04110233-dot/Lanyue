@@ -180,14 +180,32 @@ const MUTATING_TOOL_NAMES = new Set(toolsFromContract().filter(t => t.mutating).
  * 外部 Agent 能看到的工具 —— 判据只有这一处。
  * destructive（删、清空）与 app（主进程根本没法执行）都不给：前者外部 Agent 的可信度
  * 撑不起「一次批准就跑删除」，后者给它是个永远调用不通的工具名。
+ *
+ * 只接 toolsFromContract 的**产物**：那里才把缺省的 audience 补成 'both'，原始登记表行
+ * 没有 audience 字段，直接喂进来会被判成「不可见」。这里不补 `|| 'both'` ——
+ * 那等于给同一个缺省造出第二个出处。
  */
 function visibleToAgent(def) {
   return def.audience === 'both' && def.risk !== 'destructive';
 }
 
-/** @param {'agent'|'assistant'} source */
+/**
+ * 按 caller 身份给视图。source 是**白名单**：除 'agent' / 'assistant' 一律抛。
+ * 不做「未知就当助手」的兜底 —— 协议层 createMcpHandler 的 source 默认补 'agent'，
+ * 过滤层若把未知/漏传也放过去，将来第三个 caller（CLI、调试端点）拿到的是含 destructive
+ * 与 app-only 的全量面，而审计标签却被协议层默认补成 'agent'，两边各说各话。
+ * 与本仓「装载期非法值即抛」（见 toolsFromContract 的 risk/audience 校验）同构。
+ *
+ * @param {'agent'|'assistant'} source 调用方身份
+ * @param {Array} [list] AGENT_TOOLS 覆盖（测试用）
+ * @param {Object} [channels] CHANNELS 覆盖
+ */
 function toolsForSource(source, list = AGENT_TOOLS, channels = CHANNELS) {
+  if (source !== 'agent' && source !== 'assistant') {
+    throw new Error(`[mcp] toolsForSource 的 source 非法: ${String(source)}（只能是 agent/assistant）`);
+  }
   const all = toolsFromContract(list, channels);
+  // agent 走唯一判据；assistant 是全量（确认形态由界面去决定）
   return source === 'agent' ? all.filter(visibleToAgent) : all;
 }
 

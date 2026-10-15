@@ -61,3 +61,11 @@ test('装配点唯一：ipc/mcp.js 不得再自己攒一份 createMcpHandler / c
   assert.ok(!/createAuditStore\(/.test(src), '审计单例的家是 auditSink');
   assert.match(src, /createAgentBridge\(\{[\s\S]{0,240}source:\s*'agent'/, 'HTTP 侧没走桥');
 });
+
+// source 在 toolsForSource 里收成白名单（未知/漏传即抛）之后，漏写身份不再是
+// 「静默拿到某一面」，而是启动期就炸 —— 所以两个生产调用点必须把身份写成字面量。
+// 上面那枚已经钉了 HTTP 侧的 'agent'，这里补助手侧。
+test('助手侧调用点把身份写成字面量 assistant —— 漏传会被白名单闸抛掉', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'ipc', 'ai-assistant.js'), 'utf8');
+  assert.match(src, /createAgentBridge\(\{[\s\S]{0,240}source:\s*'assistant'/, '助手侧没走桥或身份不是字面量');
+});
