@@ -68,19 +68,31 @@
 | `destructive` | `confirmed === true && scope === 'single'` |
 
 渲染层出 bug 也伪造不出「一次批准跑掉删除」：批量令牌在主进程换不到危险步骤。
-拒绝时仍回 ASCII 令牌（新增 `AGENT_SCOPE_MISMATCH`、`AGENT_RISK_REFUSED`），措辞在词典里。
+拒绝时仍回 ASCII 令牌（新增 `AGENT_SCOPE_MISMATCH`、`APP_ONLY`），措辞在词典里。
+原清单里的 `AGENT_RISK_REFUSED` 在 P1 收口时删掉了（裁定 R-7）：主进程闸的三个拒绝分支已各有令牌，
+而「用户不批危险步骤」这件事发生在渲染层 —— 它根本不发起那次调用，于是没有一条路径能走到
+需要第四个令牌的分支。留一个产生不出来的令牌名，违反本仓「不许有走不到的分支」这条纪律。
 
 ## 二、新工具清单（分四期，每期独立可交付）
 
 ### P1 只读扩面（`risk:'read'`、`audience:'both'`）
 
-`subscribe-list`、`get-download-templates`、`load-play-queue`、`aggregate-cross-source`、`probe-sources`。
+`subscribe-list`、`get-download-templates`、`load-play-queue`、`aggregate-cross-source`。
+
+`probe-sources` 原列在这里，P1 收口时移出（裁定 R-2）：这条通道一次调用就是对**每个源**跑一次
+实况搜索，而助手一局允许 24 次工具调用 —— 把它放进只读面等于给模型一台打上游的放大器，
+与「只读扩面不增加上游压力」这条既有纪律冲突。要做它得先有按源的并发与频次闸，那是独立一期。
 
 ### P2 应用内写
 
 - `write`：`cancel-download`、`retry-download`、`remove-queue-item`、`reorder-queue-item`、
   `set-queue-paused`、`clear-finished-queue`、`add-playlist-to-queue`、`remove-from-user-playlist`、
-  `subscribe-add`、`subscribe-mark-seen`、`save-play-queue`
+  `subscribe-add`、`subscribe-mark-seen`
+
+`save-play-queue` 原列在这里，P1 收口时移出（裁定 R-4）：这条通道的参数是**整份队列数组**，
+而模型每回合只在状态段看到前 8 条。让它调这个工具，等于把用户的持久化队列截断成它见过的那几条——
+这是数据丢失，不是权限放宽能覆盖的事。要加回来得先有「整份队列可被模型完整读到」的通道，
+或改成按 item 的加法/删法动作。
 - `destructive`：`clear-all-queue`、`clear-history`、`remove-history`、`delete-user-playlist`、
   `subscribe-remove`、`delete-download-template`、`clear-play-cache`
 
@@ -133,9 +145,20 @@
 ## 五、数据边界
 
 - 新只读工具会把订阅名、队列内容、跨源结果发给厂商：`SECURITY.md` 第五节那条 bullet 逐字段重写。
-- **喂回模型的观察结果走同一份字段白名单**（`title`/`artist`/`id`/`source`/`duration`，
-  剥掉 `localPath`/`lyrics`/cookie/token）。工具返回值是**第二条出网路**，
-  现在「歌词与本地路径不出网」只守住了上下文那条 —— 脱敏必须落在桥里一处，不许各调用方自己剥。
+- **两条出网路各有各的闸，方向相反**（P1 落地后的实况，裁定 R-14/R-15/R-16 回填）：
+  - **状态段**（每回合随请求递进去的那段）用**白名单**：只取 `title`/`artist`/`source`/`id`/`quality`，
+    歌词与本地路径从一开始就不进这段，封顶 1600 字符，钉在 `test/ai-assistant-context.test.js`；
+  - **工具返回值**（助手侧观察结果）用**键名黑名单**：`src/shared/outboundScrub.js` 的 `LEAK_KEYS`
+    递归剥掉 `path`/`localPath`/`filePath`/`dir`/`cookie`/`cookies`/`token`/`accessToken`/`apiKey`/`secret`/`savePath`/`subpath`
+    十二个键，返回值读不出 JSON 就当没有内容（回空串），不许带着看不见的原文出网。
+    这里**刻意不剥 `lyric`**：`get_lyrics` 的存在理由就是把歌词取回来给用户看，剥掉它是砍功能——
+    本节早先那句「剥掉 localPath/lyrics/cookie/token」说的其实是状态段那条白名单，两条路共用一句
+    容易读成「返回值也剥歌词」，故按上面的分法改写。
+  - 闸只装在「助手 → 厂商」这一条路上：外部 Agent 是本机用户自己配的进程，它拿到工具结果
+    不算我们替它出网，那条路仍按原样返回（所以同一个工具在两侧形状不同，且是助手侧更严）。
+  - **闸拦不住的一类**：绝对路径写在别的键的**值**里（本机曲目的 `id` 至今仍等于它的路径）。
+    键名黑名单结构上无能为力，值级正则又得先放行 `url`/`cover`/`link` 这些合法字段。
+    修法在 handler 侧（本地曲目不再拿路径当 id），记为独立一期（裁定 R-17），本轮只在 SECURITY.md 如实写着。
 - 审计每条步留 `runId` / `scope` / `risk` / `approved`；限流按 run 计。
 - CHANGELOG、README、SECURITY 同步。
 
@@ -145,7 +168,9 @@
    **绝不出现在 MCP `tools/list`**。
 2. `mutating` 与 `risk` 不许分叉；`risk` 取值必须在允许集合内；非 `read` 必须有确认路径。
 3. scope 闸：伪造 `{confirmed:true, scope:'batch'}` 调 `destructive` → 仍 `NEED_CONFIRM`。
-4. 观察结果脱敏：返回值里塞 `localPath`/`lyrics`/cookie 假标记，喂回模型的文本里必须找不到。
+4. 观察结果脱敏：返回值里塞 `localPath`/`savePath`/`subpath`/cookie 假标记，喂回模型的文本里必须找不到；
+   同一枚测试还要反向钉住「`name`/`id` 这类业务字段照原样留着」与「`lyric` 不许被剥」——
+   只会把所有字段抹掉的闸不算闸（P1 落地时补的口径，见第五节）。
 5. 界面行为（headless harness）：取消后零执行；去掉勾选后执行载荷恰好少那一步；
    `why` 里的 `<img>` 只当文本。
 6. 契约不漂：每个工具的 `channel` 必须在 `CHANNELS` 且参数规格由契约派生（既有做法）。
@@ -164,3 +189,27 @@ P1 → P2 → P3，每期独立可交付、CI 两条 job 绿了才进下期。P4
   看到工具名 ≠ 它能从主进程调到。
 - 观察结果脱敏集中到桥里，会改变既有工具返回的形态（模型看到的字段变少了）；
   这是刻意的收紧，不是回归。
+
+## P1 收口回填（2026-10-15，实现期裁定清单）
+
+写在这里是为了让下一轮接手的人不必去翻聊天记录。spec 正文里已被就地改写的三条不重复列：
+`probe-sources`（R-2）、`save-play-queue`（R-4）、`AGENT_RISK_REFUSED`（R-7）。
+
+- **R-3｜destructive 是 8 条不是 7 条**。实现计划漏收了本节 P2 清单里的 `clear-play-cache`
+  （通道真实存在：`src/shared/ipcContract.js:127`，handler `src/main/ipc/window.js:246` 不取 event）。
+  补进来后 P2 收口的计数自洽：21 + (10 write + 8 destructive) = 39，本节「非只读 21 条」也才对得上。
+- **R-5｜`scope` 只有 `single` / `batch` 两值**。原设想里「用户只批准只读步骤」要传 `scope:'readOnly'`，
+  但契约的 `t.enum` 对枚举外的值不是拒绝而是**静默落回默认值**（`src/shared/ipcContract.js:437`），
+  传它会在审计里留下一个假的 `'single'`。两条批准路径都传 `'batch'`，区别体现在被选中的步骤上，
+  审计由 `approved` + risk 分布还原。
+- **R-8｜审计的 `approved` 与「限流按 run 计」落在主进程侧**，且 `risk` 由主进程从登记表取，
+  不接受渲染层上报；渲染层预算保留当第一道。本节第六行那句要求由此兑现，实现计划原本把它排漏了。
+- **R-11｜助手运行时视图要能看到 `risk`/`audience`**。`ai-assistant-tools` 的 payload 原本只投影
+  `{name, description, mutating}`，P2 的循环无从判断哪一步要单独弹；这条改动从 P3 提前到 P2（Task 10）。
+- **R-18｜桥自己生成的失败文本在助手侧会降级成空串**（`src/main/mcp/mcpCore.js:96` 契约拒绝、
+  `:103` 执行异常返回的是自由文本，脱敏闸读不出 JSON 就回空串）。这段文本不含本机数据，
+  模型恰恰需要它来重铸一条合规调用。修法是让 `mcpCore` 把自己的错误包成 JSON，不是放松闸；
+  归 Task 7（那张文件本来就是它的），连带 `test/ai-assistant-e2e.test.js:162-170` 现在钉的
+  是降级形状，改行为时要一起翻。
+- **`clear-finished-queue` 由 `write` 降为 `destructive`**（实现计划改的，本节 P2 清单照此收）。
+  它清的是用户看得见的一整排已完成条目，误删不可逆；判据与 `clear-all-queue` 同一档。
