@@ -86,7 +86,7 @@ test('助手可用面 = MCP 白名单，一条通道都不多', () => {
   // 除这三条自身，界面侧不得再 invoke 别的工具通道（扩权要么走白名单要么走不通）
   const others = [...used].filter(c => !c.startsWith('ai-assistant-'));
   assert.deepStrictEqual(others, [], '助手页绕道调了别的通道: ' + others.join(', '));
-  assert.strictEqual(AGENT_TOOLS.length, 17, '工具数变了：SECURITY/README/本钉三处口径要一起改');
+  assert.strictEqual(AGENT_TOOLS.length, 21, '工具数变了：SECURITY/README/本钉三处口径要一起改');
 });
 
 test('循环有上界：回合数封顶，否则坏回复能刷爆队列与计费', () => {

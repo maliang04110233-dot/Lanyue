@@ -26,11 +26,38 @@ test('工具名唯一、通道也唯一（两条工具指向同一通道就是�
   assert.strictEqual(new Set(chans).size, chans.length, '两条工具指向同一通道');
 });
 
-test('改造不许悄悄改面：今天恰 17 条、其中 3 条非只读', () => {
+test('改造不许悄悄改面：今天恰 21 条、其中 3 条非只读', () => {
   const defs = toolsFromContract();
-  assert.strictEqual(defs.length, 17);
+  assert.strictEqual(defs.length, 21);
   assert.deepStrictEqual(defs.filter((d) => d.mutating).map((d) => d.name).sort(),
     ['add_to_playlist', 'add_to_queue', 'toggle_favorite']);
+});
+
+test('P1 新增的只读面：订阅、模板、播放队列、聚合曲库', () => {
+  const defs = toolsFromContract();
+  for (const n of ['list_subscriptions', 'list_download_templates', 'get_play_queue', 'aggregate_library']) {
+    const d = defs.find((x) => x.name === n);
+    assert.ok(d, `少了 ${n}`);
+    assert.strictEqual(d.risk, 'read', `${n} 必须是只读`);
+    assert.strictEqual(d.audience, 'both', `${n} 主进程有 handler，两侧都能给`);
+  }
+});
+
+// 参数面由契约派生，不是这里能凭空多写的：三条无参通道不该长出键来，
+// aggregate_library 只许收契约认识的 opts。收错键＝绕过 normalizeArgs 的那道钳制。
+test('P1 新增四条的 inputSchema 逐一对上契约参数', () => {
+  const byName = Object.fromEntries(toolsFromContract().map((d) => [d.name, d]));
+  const NO_ARG = ['list_subscriptions', 'list_download_templates', 'get_play_queue'];
+  for (const n of [...NO_ARG, 'aggregate_library']) {
+    assert.ok(byName[n], `少了 ${n}`);
+  }
+  for (const n of NO_ARG) {
+    assert.deepStrictEqual(Object.keys(byName[n].inputSchema.properties), [],
+      `${n} 的通道在契约里没有参数，schema 不该凭空多出键`);
+  }
+  assert.deepStrictEqual(Object.keys(byName['aggregate_library'].inputSchema.properties), ['opts'],
+    'aggregate_library 只能收契约认识的 opts');
+  assert.strictEqual(byName['aggregate_library'].inputSchema.properties.opts.type, 'object');
 });
 
 test('risk 非法或漏写时派生直接抛，不许静默当只读', () => {

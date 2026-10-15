@@ -62,7 +62,7 @@ test('e2e: initialize → tools/list 拿到白名单全量工具，且不外泄�
     const l = await rpc(h.url, 2, 'tools/list', {});
     const tools = l.body.result.tools;
     assert.strictEqual(tools.length, AGENT_TOOLS.length, '工具数量与显式白名单不一致');
-    assert.strictEqual(tools.length, 17, '白名单条目数变了 —— 先确认没有越红线扩面，再同步这条钉');
+    assert.strictEqual(tools.length, 21, '白名单条目数变了 —— 先确认没有越红线扩面，再同步这条钉');
     assert.ok(tools.every(t => !('channel' in t)), 'channel 属内部字段，绝不能出现在 tools/list');
     assert.ok(tools.every(t => t.inputSchema && t.inputSchema.type === 'object'));
   } finally { await h.stop(); }

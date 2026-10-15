@@ -97,6 +97,23 @@ const AGENT_TOOLS = [
     name: 'list_playlists', channel: 'get-user-playlists', risk: 'read',
     description: '列出用户自建歌单（含曲目）。',
   },
+  {
+    name: 'list_subscriptions', channel: 'subscribe-list', risk: 'read',
+    description: '列出用户订阅的歌手/歌单/账号订阅项。',
+  },
+  {
+    name: 'list_download_templates', channel: 'get-download-templates', risk: 'read',
+    description: '列出下载目录模板与当前启用项。模板的存储路径不会回给你（本机路径不出网），只看得到名字与是否 active。',
+  },
+  {
+    name: 'get_play_queue', channel: 'load-play-queue', risk: 'read',
+    description: '读持久化的播放队列（上次会话留下的那份）。返回 {queue:[{id,source,title,artist,…}]}。',
+  },
+  {
+    name: 'aggregate_library', channel: 'aggregate-cross-source', risk: 'read',
+    description: '跨源聚合用户的自建歌单与红心单。opts:{markDuplicates:boolean}。返回按曲目合并的清单。',
+    paramDocs: { opts: '聚合选项对象' },
+  },
   // ── 加法动作（可信 Agent 才开到这一层）─────────────
   {
     name: 'add_to_queue', channel: 'add-to-queue',

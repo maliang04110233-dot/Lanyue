@@ -70,11 +70,13 @@ async function flushAudit() {
 
 assistant.register();
 
-test('目录：17 个工具且恰好 3 个标着 mutating', async () => {
+test('目录：21 个工具且恰好 3 个非只读（P1 只加只读面）', async () => {
   const r = await handlerOf('ai-assistant-tools')();
-  assert.strictEqual(r.tools.length, 17);
+  assert.strictEqual(r.tools.length, 21);
   assert.deepStrictEqual(r.tools.filter(t => t.mutating).map(t => t.name).sort(),
     ['add_to_playlist', 'add_to_queue', 'toggle_favorite']);
+  assert.deepStrictEqual(r.tools.filter(t => t.risk === 'destructive').map(t => t.name), [],
+    'P1 不该出现 destructive');
 });
 
 test('闸门：写操作不带确认直接拒，带确认才落到 handler，且被拒的不进审计', async () => {
