@@ -25,6 +25,7 @@ const { handle } = require('./register');
 const prefs = require('../../utils/prefs');
 const logger = require('../../utils/logger');
 const { assistantChat } = require('../../api/ai-music');
+const { chatConfigFrom } = require('../../api/aiProviders');
 const { generateSmartPlaylist, dedupeSongs } = require('../../api/services/smartPlaylistService');
 
 const FAVORITES_ID = 'favorites';
@@ -66,7 +67,7 @@ function register() {
     if (collected.error) return { ok: false, error: collected.error };
     if (!collected.songs.length) return { ok: false, error: 'NO_CANDIDATES' };
 
-    const apiKey = prefs.get('aiMusicApiKey');
+    const { apiKey } = chatConfigFrom((k) => prefs.get(k));
     if (!apiKey) return { ok: false, error: 'NO_KEY' };
 
     try {

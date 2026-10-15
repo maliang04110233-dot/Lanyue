@@ -10,6 +10,7 @@ const { app } = require('electron');
 const path = require('path');
 const logger = require('../../utils/logger');
 const aiMusic = require('../../api/ai-music');
+const prefs = require('../../utils/prefs');
 const { defaultDownloadDir, AI_SUBDIR_NAME } = require('../../shared/downloadDefaults');
 // 主进程即 UI 线程：文件 IO 必须异步
 const fsa = require('../../utils/fsAsync');
@@ -115,6 +116,9 @@ function formatTime(seconds) {
 function register() {
   // 初始化历史存储路径
   aiMusic.setHistoryPath(app.getPath('userData'));
+  // 「当前用哪家大模型」的唯一出处是 prefs：界面写、主进程读。
+  // 出网层（api/ai-music）拿的是读取器而不是快照，用户换厂商不必重启。
+  aiMusic.setPrefsGetter((key) => prefs.get(key));
 
   // 生成歌词
   handle('ai-generate-lyrics', async (_, params) => {

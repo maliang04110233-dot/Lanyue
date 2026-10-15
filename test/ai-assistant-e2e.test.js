@@ -117,3 +117,36 @@ test('没有 API Key：回合通道回 NO_KEY 且不出网', async () => {
   const r = await handlerOf('ai-assistant-plan')([{ role: 'user', content: 'hi' }]);
   assert.deepStrictEqual(r, { ok: false, error: 'NO_KEY' });
 });
+
+/**
+ * 配置类令牌必须原样到界面：闸把端点拒了，用户要改的是配置页；
+ * 报成 LLM_FAILED 的话，界面上是一句「请求失败」，而失败根本不在模型那侧。
+ * 用 169.254.169.254（链路本地，云上是偷元数据那个地址）：IP 字面量不查 DNS，
+ * 闸必然在出网前拒掉。
+ *
+ * 两处接线是本用例的一部分，不是铺垫：
+ *   · setPrefsGetter —— 主进程在 ipc/ai-music 注册时注入，测试里不注入的话
+ *     ai-music 落回 MiniMax 老端点，这条用例就变成打真网络（实测确实打过）；
+ *   · 把 https.request 换成"打出去就抛"—— 闸若在链上被绕过，这里立刻红，
+ *     而不是让"零出网"这件事悄悄靠外网条件成立。
+ */
+test('端点被闸拒：回合通道回 ENDPOINT_BLOCKED，不是 LLM_FAILED', async () => {
+  const https = require('node:https');
+  const prefs = require('../src/utils/prefs');
+  const aiMusic = require('../src/api/ai-music');
+  const realRequest = https.request;
+  https.request = () => { throw new Error('LEAKED_OUTBOUND'); };
+  aiMusic.setPrefsGetter((key) => prefs.get(key));
+  prefs.set('aiProvider', 'deepseek');
+  prefs.set('aiMusicApiKey', JSON.stringify({ deepseek: 'sk-e2e-not-a-real-key' }));
+  prefs.set('aiProviderBaseUrl', 'https://169.254.169.254');
+  try {
+    const r = await handlerOf('ai-assistant-plan')([{ role: 'user', content: 'hi' }]);
+    assert.deepStrictEqual(r, { ok: false, error: 'ENDPOINT_BLOCKED' });
+  } finally {
+    https.request = realRequest;
+    aiMusic.setPrefsGetter(null);
+    prefs.set('aiProviderBaseUrl', '');
+    prefs.set('aiMusicApiKey', '');
+  }
+});

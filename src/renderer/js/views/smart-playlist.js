@@ -18,6 +18,7 @@
 import { t } from '../i18n.js';
 import { errBrief } from '../errBrief.js';
 import { showToast } from '../toast.js';
+import { providerErrText } from '../aiProviderPanel.js';
 
 const SCOPE_LIBRARY = 'library';
 
@@ -25,6 +26,8 @@ let _songs = [];    // 生成回来的真歌曲对象（顺序就是模型给的
 let _keep = [];     // 与 _songs 同长：用户勾掉的不进最后的歌单
 let _busy = false;
 
+// 表里只留这一页特有的令牌；配置类与 HTTP 类交 providerErrText —— 三处（创作页 /
+// 助手 / 本页）打的是同一个出网闸，同一个失败不该各攒一张表。
 const ERR_KEYS = {
   NO_KEY: 'smartPl.errNoKey',
   EMPTY_PROMPT: 'smartPl.errEmptyPrompt',
@@ -38,7 +41,10 @@ function _el(id) { return document.getElementById(id); }
 
 function _errText(code) {
   const k = ERR_KEYS[code];
-  return k ? t(k) : t('smartPl.errLlmFailed');
+  if (k) return t(k);
+  // 陌生令牌不印给用户：本句兜底（smartPl.errLlmFailed）与配置类令牌的分工是
+  // 「面板认得出的说清是哪件事，认不出的只说生成失败稍后再试」
+  return providerErrText(code, t('smartPl.errLlmFailed'));
 }
 
 function _setStatus(text) {

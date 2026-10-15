@@ -12,6 +12,7 @@
  */
 
 const { extractModelJson } = require('./modelJson');
+const { isConfigToken } = require('../aiProviders');
 
 const MAX_CANDIDATES = 400;
 const MAX_PICKS = 100;
@@ -137,9 +138,10 @@ async function generateSmartPlaylist({ prompt, songs, chat }) {
       { role: 'user', content: `主题：${topic.slice(0, 200)}\n\n候选曲目（序号\t标题\t歌手）：\n${candidates.text}` },
     ]);
   } catch (e) {
-    // NO_KEY 是「还没配 Key」，LLM_FAILED 是「这次没成就」——两种失败用户要做的事不同，不能混成一个令牌
+    // 配置类令牌原样回：NO_KEY 是「还没配 Key」、ENDPOINT_BLOCKED 是「端点被闸拒」、
+    // LLM_FAILED 才是「这次没成就」——用户要做的事不同，不能混成一个令牌
     const msg = String((e && e.message) || e);
-    return { ok: false, error: msg === 'NO_KEY' ? 'NO_KEY' : 'LLM_FAILED' };
+    return { ok: false, error: isConfigToken(msg) ? msg : 'LLM_FAILED' };
   }
 
   const { name, reason, picks } = parseSelection(text, candidates);

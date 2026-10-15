@@ -153,6 +153,14 @@ test('生成：出网抛 NO_KEY 原样成令牌（Key 缺失与模型失败是�
   });
 });
 
+test('生成：配置类令牌一律原样回（端点被闸拒时，用户要改的是配置而不是重问一次）', async () => {
+  for (const tok of ['ENDPOINT_BLOCKED', 'BAD_BASE_URL:PRIVATE_RANGE', 'BAD_MODEL:SHAPE',
+    'MUSIC_UNSUPPORTED', 'LLM_HTTP:429']) {
+    const r = await generateSmartPlaylist({ prompt: '夜跑', songs: many(2), chat: async () => { throw new Error(tok); } });
+    assert.strictEqual(r.error, tok, `${tok} 被压成了 ${r.error}`);
+  }
+});
+
 test('生成：出网其它异常收敛成 LLM_FAILED，不把上游原文往外丢', () => {
   return generateSmartPlaylist({
     prompt: '夜跑', songs: many(2),

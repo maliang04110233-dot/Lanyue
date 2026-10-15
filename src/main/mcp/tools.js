@@ -25,7 +25,7 @@ const AGENT_TOOLS = [
   },
   {
     name: 'ai_search_music', channel: 'nl-search-music',
-    description: '自然语言找歌：输入一句话需求（如「适合夜跑的中文摇滚」），由 LLM 改写成多关键词并行聚合搜索后合并去重。需要已在应用内配置 MiniMax API Key。',
+    description: '自然语言找歌：输入一句话需求（如「适合夜跑的中文摇滚」），由 LLM 改写成多关键词并行聚合搜索后合并去重。需要已在应用内配置大模型 API Key（厂商可选，默认 MiniMax）。',
     required: ['phrase'],
     paramDocs: { phrase: '自然语言描述的听歌需求' },
   },

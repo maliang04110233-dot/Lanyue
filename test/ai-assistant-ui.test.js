@@ -61,16 +61,17 @@ test('助手页用到的 assistant.* / toast.* / nav.* 键必须中英齐备且�
 });
 
 /**
- * Key 录入行的三条纪律：type=password（ Shoulder-surfing 与截图都不会漏出）、
- * 写的是既有那个 pref（单一事实源，AI 创作页读同一把）、界面不许把它写进日志
- * 或消息流（曲库日志会被复制进剪贴板/导出）。
+ * Key 录入口的三条纪律（2026-10-15 起是「面板」而不是「Key 行」）：AI 创作页被
+ * FEATURES.ai 关着，助手页必须自带配 Key 的地方；而那个地方是共用面板
+ * （js/aiProviderPanel.js），不是本页自己攒的一根输入框 —— 界面直读直写
+ * aiMusicApiKey 会把 {厂商:Key} 的整包映射拖过进程边界，覆盖式写法还会抹掉别家凭据。
  */
-test('API Key 输入框：password 型、走既有 pref、不出现在日志与消息流里', () => {
-  const at = HTML.indexOf('id="assistantKeyInput"');
-  assert.ok(at > 0, '助手页没有 Key 输入框（AI 创作页被 FEATURES.ai 关着，助手得能自己录 Key）');
-  const row = HTML.slice(at - 120, at + 200);
-  assert.match(row, /type="password"/, 'Key 输入框必须是 password 型');
-  assert.match(VIEW, /setPref\('aiMusicApiKey'/, 'Key 应写既有的 aiMusicApiKey（prefs.set 对它加密）');
+test('助手页的 Key 录入口 = 共用面板容器，界面侧不碰那把 secret', () => {
+  const at = HTML.indexOf('id="assistantProviderPanel"');
+  assert.ok(at > 0, '助手页没有厂商面板容器（配 Key 的入口就没了）');
+  assert.ok(!/id="assistantKeyInput"/.test(HTML), '助手页还留着自家那根 Key 输入框');
+  assert.match(VIEW, /mountProviderPanel\(/, '助手页没挂共用面板');
+  assert.ok(!/aiMusicApiKey/.test(VIEW), '助手页不该再直读直写那把 secret');
   const logs = VIEW.split('\n').filter(l => /logger\.|console\./.test(l));
   const leaks = logs.filter(l => /apiKey|assistantKey|_key\b/.test(l));
   assert.deepStrictEqual(leaks, [], 'Key 不得进日志: ' + leaks.join(' | '));

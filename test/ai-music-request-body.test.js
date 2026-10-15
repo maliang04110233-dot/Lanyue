@@ -95,7 +95,8 @@ test('apiKey 永不进请求体（它只属于 Authorization 头）', () => {
 });
 
 test('缺 key / 非器乐又没词 → 明确抛错，不发请求', () => {
-  assert.throws(() => buildMusicRequestBody({ lyrics: 'x' }), /API Key/);
+  // 令牌而非中文句：界面按 NO_KEY 查词典出文案（主→渲染只走 ASCII 令牌）
+  assert.throws(() => buildMusicRequestBody({ lyrics: 'x' }), /NO_KEY/);
   assert.throws(() => buildMusicRequestBody({ apiKey: 'k' }), /歌词/);
   assert.doesNotThrow(() => buildMusicRequestBody({ apiKey: 'k', instrumental: true, musicPrompt: 'p' }));
 });

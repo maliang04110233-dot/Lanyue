@@ -545,11 +545,9 @@
     <span class="asst-title" data-i18n="assistant.title">AI 助手</span>
     <button class="btn-secondary" onclick="clearAssistant()" data-i18n="assistant.clear">清空对话</button>
   </div>
-  <div class="asst-keyrow">
-    <input type="password" class="asst-key" id="assistantKeyInput" autocomplete="off" spellcheck="false"
-           data-i18n="assistant.keyPlaceholder" placeholder="MiniMax API Key" aria-label="MiniMax API Key">
-    <button class="btn-secondary" onclick="saveAssistantKey()" data-i18n="assistant.keySave">保存 Key</button>
-  </div>
+  <!-- 厂商/型号/端点/Key：与 AI 创作页挂的是同一个共用模块（js/aiProviderPanel.js），
+       名单与判据都在主进程登记表，界面这边一个厂商名都不攒 -->
+  <div class="asst-provider" id="assistantProviderPanel"></div>
   <div class="asst-log" id="assistantLog">
     <div class="asst-empty" data-i18n="assistant.empty">说一句你想听什么、想下什么，助手会调用本应用的能力替你做完。写操作（入队、加歌单、红心）会先跟你确认。</div>
   </div>

@@ -67,6 +67,11 @@ const ALLOWED_PREF_KEYS = new Set([
   'eqPreset', 'eqGains', 'eqBypass',
   // AI 音乐
   'aiMusicApiKey', 'aiMusicSaveDir',
+  // 大模型厂商三件套（2026-10-15）：Key 是 secret（值改成 {厂商:Key} 的 JSON，
+  // 键名不变，SECRET_KEYS/redact/cloudSync 排除那三处口径都不动），
+  // 厂商与型号与自定义端点是非 secret。Base URL 不在这里验 —— 验它的地方是出网闸，
+  // 在这儿再攒一份判据就是将来两处漂移的开始。
+  'aiProvider', 'aiProviderModel', 'aiProviderBaseUrl',
   // 转码输出目录 / 响度归一开关（P0-B）
   'convertOutputDir', 'convertLoudnorm',
   // 队列模板 / 搜索历史（主进程内部写入，但导入流程会经 set）

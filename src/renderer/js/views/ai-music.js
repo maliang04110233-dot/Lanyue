@@ -11,6 +11,7 @@
 import { errBrief } from '../errBrief.js';
 import { askConfirm } from '../confirmDialog.js';
 import { t } from '../i18n.js';
+import { mountProviderPanel, providerErrText } from '../aiProviderPanel.js';
 
 // ══════════════════════════════════════════════════════════
 // 状态
@@ -18,7 +19,13 @@ import { t } from '../i18n.js';
 
 const aiState = {
   tab: 'create',
-  apiKey: '',
+  // 厂商配置的两枚投影（真身在 prefs，面板经 ai-provider-config 拿）。
+  // 这里存的是「当前厂商配过 Key 没有」与「当前厂商能不能合成音乐」——
+  // Key 本体不进界面进程，更早的 `aiState.apiKey` 是把计费密钥拉进渲染层再
+  // 一路传回主进程，那一趟没必要，也少一个泄露面。
+  hasKey: false,
+  supportsMusic: true,
+  musicVendor: '',
   generating: false,
   abortCtrl: null,
   saveDir: '',
@@ -83,9 +90,54 @@ const MUSIC_MODELS = [
 // ══════════════════════════════════════════════════════════
 
 async function initAiMusic() {
-  aiState.apiKey = await api.getPref('aiMusicApiKey') || '';
   aiState.saveDir = await api.getPref('aiMusicSaveDir') || '';
   renderAiMusicPage();
+}
+
+/**
+ * 厂商面板挂在 API 配置卡里。切页与重新生成都会重画整页（renderCreateTab 重写
+ * innerHTML），容器随之换新，所以画完就重挂一次 —— 挂载本身幂等（面板有挂载表，
+ * 配置也只拉第一次），这里不需要额外的"只挂一次"守卫。
+ */
+async function _mountPanel() {
+  const host = document.getElementById('aiProviderPanel');
+  const cfg = await mountProviderPanel(host, { onChange: _applyProvider });
+  if (cfg) _applyProvider(cfg);
+}
+
+/** 配置 → 界面状态：Key 有没有、能不能合成音乐，都从这一处派生，不各算各的 */
+function _applyProvider(cfg) {
+  if (!cfg) return;
+  aiState.hasKey = !!cfg.current.hasKey;
+  aiState.supportsMusic = cfg.supportsMusic === true;
+  // 厂商名从通道给的数据里取，界面侧不写死（名单的家在主进程登记表）
+  aiState.musicVendor = (cfg.providers || []).filter((p) => p.music).map((p) => p.label).join('、');
+  const badge = document.getElementById('aiKeyBadge');
+  if (badge) {
+    badge.className = `ai-api-badge ${aiState.hasKey ? 'ok' : 'warn'}`;
+    badge.textContent = aiState.hasKey ? '✅ 已连接' : '⚠️ 未配置';
+  }
+  _applyMusicGate();
+}
+
+/**
+ * 只有个别厂商提供音乐合成：选了别家时音乐那一档当场关住。
+ * 关在界面不是为了好看 —— 点下去主进程也会回 MUSIC_UNSUPPORTED，但那是一次
+ * 明知会失败的跨进程往返，而且用户要先读完一句英文令牌才知道按钮不该按。
+ */
+function _applyMusicGate() {
+  const ok = aiState.supportsMusic;
+  for (const id of ['btnGenMusicResult', 'btnGenDirectMusic']) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    btn.disabled = !ok;
+    btn.title = ok ? '' : t('ai.musicUnsupported', { vendor: aiState.musicVendor });
+  }
+  const note = document.getElementById('aiMusicUnsupported');
+  if (note) {
+    note.style.display = ok ? 'none' : 'block';
+    if (!ok) note.textContent = t('ai.musicUnsupported', { vendor: aiState.musicVendor });
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -113,6 +165,7 @@ function renderCreateTab(el) {
   const lyricsEl = document.getElementById('aiLyricsPreviewInput');
   const resultArea = document.getElementById('aiResultArea');
   if (lyricsEl?.value && resultArea) resultArea.style.display = 'block';
+  _mountPanel();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -120,7 +173,7 @@ function renderCreateTab(el) {
 // ══════════════════════════════════════════════════════════
 
 function renderSidebar() {
-  const hasKey = !!aiState.apiKey;
+  const hasKey = aiState.hasKey;
   return `
     <div class="ai-sidebar">
       <!-- API 配置 -->
@@ -129,12 +182,10 @@ function renderSidebar() {
           <span class="ai-card-icon">🔑</span>
           <span class="ai-card-title">API 配置</span>
         </div>
-        <div class="ai-api-badge ${hasKey ? 'ok' : 'warn'}">${hasKey ? '✅ 已连接' : '⚠️ 未配置'}</div>
-        <div class="ai-api-input">
-          <input class="ai-input" id="aiApiKeyInput" type="password" placeholder="MiniMax API Key" value="${hasKey ? '••••••••' : ''}">
-          <button class="ai-btn-action" onclick="saveAiApiKey()">保存</button>
-        </div>
-        ${!hasKey ? '<a class="ai-link" href="https://platform.minimaxi.com/user-center/basic-information/interface-key" target="_blank">获取 Key →</a>' : ''}
+        <div class="ai-api-badge ${hasKey ? 'ok' : 'warn'}" id="aiKeyBadge">${hasKey ? '✅ 已连接' : '⚠️ 未配置'}</div>
+        <!-- 厂商/型号/端点/Key 都由共用面板画（助手页挂的是同一个模块）：
+             名单与 Key 映射的判据在主进程登记表，这里镜像一份就会分叉 -->
+        <div class="ai-provider-panel" id="aiProviderPanel"></div>
       </div>
 
       <!-- 风格选择 -->
@@ -269,6 +320,7 @@ function renderLyricsPanel() {
             title="不写歌词，按上面这一句话直接出歌（会计费）"
             style="${directMode ? '' : 'display:none'}">🎶 直接生成歌曲</button>
         </div>
+        <div class="ai-music-note" id="aiMusicUnsupported" style="display:none"></div>
 
         <!-- 生成结果区（初始隐藏，生成后展开显示在输入区下方） -->
         <div id="aiResultArea" class="ai-result-area" style="display:none">
@@ -472,31 +524,13 @@ function switchAiTab(tab) {
 // API 操作
 // ══════════════════════════════════════════════════════════
 
-async function saveAiApiKey() {
-  const input = document.getElementById('aiApiKeyInput');
-  if (!input) return;
-  const key = input.value.trim();
-  if (!key || key.startsWith('•••')) { showToast(t('toast.aiKeyInvalid'), 'warn'); return; }
-  // 审计 P1：安全存储不可用时主进程会拒绝写入（set-pref 返回 false）——
-  // 旧代码无视返回值直接报「已保存」，用户以为存上了，实际盘上什么都没有。
-  const saved = await api.setPref('aiMusicApiKey', key);
-  if (saved === false) {
-    showToast(t('toast.secretStorageUnavailable'), 'error', 8000);
-    return;
-  }
-  aiState.apiKey = key;
-  showToast(t('toast.aiKeySaved'), 'success');
-  input.value = '••••••••';
-  renderAiMusicPage();
-}
-
 async function selectAiSaveDir() {
   const dir = await api.selectDir();
   if (dir) { aiState.saveDir = dir; await api.setPref('aiMusicSaveDir', dir); const el = document.getElementById('aiSaveDirInput'); if (el) el.value = dir; }
 }
 
 async function generateAiLyrics() {
-  if (!aiState.apiKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
+  if (!aiState.hasKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
   const topic = document.getElementById('aiTopic')?.value?.trim();
   if (!topic) { showToast(t('toast.aiTopicRequired'), 'warn'); document.getElementById('aiTopic')?.focus(); return; }
 
@@ -508,10 +542,9 @@ async function generateAiLyrics() {
     const result = await api.aiGenerateLyrics({
       topic,
       style: document.getElementById('aiStyleValue')?.value || 'pop',
-      apiKey: aiState.apiKey,
     });
 
-    if (result.error) { showToast(t('toast.aiLyricsFailed', { msg: result.error }), 'error'); return; }
+    if (result.error) { showToast(t('toast.aiLyricsFailed', { msg: providerErrText(result.error) }), 'error'); return; }
 
     // 存储 AI 生成的音乐描述
     aiState.musicPrompt = result.musicPrompt || '';
@@ -554,7 +587,10 @@ async function generateAiLyrics() {
 }
 
 async function generateAiMusic() {
-  if (!aiState.apiKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
+  if (!aiState.hasKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
+  // 面板会按厂商把按钮关住；这一道是给绕过面板的入口（重生成）兜底，
+  // 免得明知主进程会回 MUSIC_UNSUPPORTED 还去打一次跨进程往返
+  if (!aiState.supportsMusic) { showToast(t('ai.musicUnsupported', { vendor: aiState.musicVendor }), 'warn'); return; }
   if (aiState.generating) { showToast(t('toast.aiGenerating'), 'warn'); return; }
 
   // 确定要生成哪些版本
@@ -667,7 +703,6 @@ async function generateAiMusic() {
         title,
         musicPrompt,
         style: styleLabel,
-        apiKey: aiState.apiKey,
         saveDir: aiState.saveDir || undefined,
         voice: aiState.voice || 'female',
         instrumental,
@@ -898,7 +933,7 @@ function regenerateAiLyrics() {
 // ══════════════════════════════════════════════════════════
 
 async function generateAiPlaylist() {
-  if (!aiState.apiKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
+  if (!aiState.hasKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
   const desc = document.getElementById('aiPlaylistDesc')?.value?.trim();
   if (!desc) { showToast(t('toast.aiPlaylistDescRequired'), 'warn'); document.getElementById('aiPlaylistDesc')?.focus(); return; }
 
@@ -910,7 +945,6 @@ async function generateAiPlaylist() {
     const result = await api.aiGenerateLyrics({
       topic: `为用户生成一个歌单推荐列表。用户描述：${desc}。请推荐 ${count} 首歌曲。`,
       style: 'pop',
-      apiKey: aiState.apiKey,
       mode: 'playlist',
     });
 
@@ -996,7 +1030,7 @@ async function searchAndAddSong(title, artist) {
 // ══════════════════════════════════════════════════════════
 
 async function translateLyricsUI() {
-  if (!aiState.apiKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
+  if (!aiState.hasKey) { showToast(t('toast.aiApiKeyMissing'), 'warn'); return; }
   const lyricsEl = document.getElementById('aiLyricsPreviewInput');
   const lyrics = lyricsEl?.value?.trim();
   if (!lyrics) { showToast(t('toast.aiLyricsEmpty'), 'warn'); return; }
@@ -1046,7 +1080,6 @@ async function executeTranslate() {
     const result = await api.aiTranslateLyrics({
       lyrics,
       targetLang,
-      apiKey: aiState.apiKey,
     });
 
     if (result.error) {
@@ -1104,7 +1137,7 @@ function fmtAiDate(d) { if (!d) return ''; const dt = new Date(d); return `${dt.
 export {
   initAiMusic, renderAiMusicPage, switchAiTab,
   selectAiStyle, selectAiMood, switchLyricsMode, toggleAdvanced, clearAiLyrics,
-  saveAiApiKey, selectAiSaveDir, generateAiLyrics, generateAiMusic,
+  selectAiSaveDir, generateAiLyrics, generateAiMusic,
   cancelAiGeneration, regenerateAiMusic, regenerateAiLyrics, playAiSong, openAiFolder,
   showAiLyricsDetail, regenerateFromHistory, clearAiHistory,
   translateLyricsUI, executeTranslate,
@@ -1115,7 +1148,7 @@ export {
 Object.assign(window, {
   initAiMusic, renderAiMusicPage, switchAiTab,
   selectAiStyle, selectAiMood, switchLyricsMode, toggleAdvanced, clearAiLyrics,
-  saveAiApiKey, selectAiSaveDir, generateAiLyrics, generateAiMusic,
+  selectAiSaveDir, generateAiLyrics, generateAiMusic,
   cancelAiGeneration, regenerateAiMusic, regenerateAiLyrics, playAiSong, openAiFolder,
   showAiLyricsDetail, regenerateFromHistory, clearAiHistory,
   translateLyricsUI, executeTranslate,

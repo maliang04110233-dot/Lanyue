@@ -11,6 +11,7 @@ const api = require('../../api');
 const logger = require('../../utils/logger');
 const prefs = require('../../utils/prefs');
 const { rewriteSearchQueries } = require('../../api/ai-music');
+const { chatConfigFrom } = require('../../api/aiProviders');
 const { searchByPhrase } = require('../../api/services/nlSearchService');
 const { handle } = require('./register');
 
@@ -26,9 +27,9 @@ function register() {
   // 自然语言搜索（P0-A）：LLM 把口语需求改写成 1~3 个关键词，
   // 并行扇出走 'all' 聚合搜索再合并去重。改写失败退回原句，功能不回归。
   handle('nl-search-music', async (_, phrase) => {
-    const apiKey = prefs.get('aiMusicApiKey');
+    const { apiKey } = chatConfigFrom((k) => prefs.get(k));
     if (!apiKey) {
-      return { songs: [], queries: [], error: '请先在「AI 音乐」中配置 MiniMax API Key' };
+      return { songs: [], queries: [], error: '请先在「AI 音乐」中配置 API Key' };
     }
     try {
       return await searchByPhrase({

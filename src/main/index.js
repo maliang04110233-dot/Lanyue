@@ -32,6 +32,7 @@ const ipcPrefs   = require('./ipc/prefs');
 const ipcCheckLocal = require('./ipc/checkLocal');
 const ipcHistory = require('./ipc/history');
 const ipcAiMusic = require('./ipc/ai-music');
+const ipcProvider = require('./ipc/ai-provider');
 const ipcPlaylist = require('./ipc/playlist');
 const ipcDownloadTemplates = require('./ipc/downloadTemplates');
 const ipcCloudSync = require('./ipc/cloudSync');
@@ -753,6 +754,8 @@ function registerAllIpcHandlers() {
   ipcCheckLocal.register();
   ipcHistory.register();
   ipcAiMusic.register();
+  // 厂商配置：AI 创作页与助手页那张厂商下拉的数据源
+  ipcProvider.register();
   ipcPlaylist.register();
   ipcDownloadTemplates.register();
   ipcCloudSync.register();

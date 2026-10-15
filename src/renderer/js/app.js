@@ -725,7 +725,6 @@ function switchTab(tab, btn) {
   } else if (tab === 'assistant') {
     if (aiAssistantPage) {
       aiAssistantPage.style.display = 'flex';
-      if (typeof initAssistant === 'function') initAssistant();
     }
   } else if (tab === 'ai-music') {
     if (aiMusicPage) {

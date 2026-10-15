@@ -1156,6 +1156,20 @@
 .ai-api-badge.ok { background: var(--c-ok); color: var(--green); border: 1px solid var(--c-ok); }
 .ai-api-badge.warn { background: var(--c-warn); color: var(--c-warn); border: 1px solid var(--c-warn); }
 
+/* 厂商配置面板（侧栏里竖排；助手页靠 .asst-provider 横排）。
+   控件本身复用 .ai-input / .ai-btn-action / .ai-link，这里只管排布。 */
+.ai-provider-panel { display: flex; flex-direction: column; gap: var(--sp-2); }
+.aip-row { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.aip-label { font-size: 11px; color: var(--neon-dim); }
+.aip-actions { display: flex; align-items: center; gap: var(--sp-2); }
+.aip-actions .ai-link { margin-top: 0; }
+.aip-note { font-size: 11px; color: var(--neon-dim); line-height: 1.6; }
+.ai-music-note {
+  margin-top: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.6;
+  color: var(--c-warn); background: var(--elev-1);
+  border: 1px solid var(--accent-soft); border-radius: var(--r-sm);
+}
+
 /* 通用输入 */
 .ai-input {
   flex: 1; padding: 7px 10px; border-radius: var(--r-sm);
@@ -1761,19 +1775,13 @@
 /* ── AI 助手页（轨道二）──────────────────────────────── */
 .asst-head { display: flex; align-items: center; gap: var(--sp-2); }
 .asst-title { flex: 1; font-size: 14px; font-weight: 600; color: var(--neon-text); }
-.asst-keyrow { display: flex; gap: var(--sp-2); align-items: center; }
-.asst-key {
-  flex: 1;
-  min-width: 0;
-  padding: 7px 10px;
-  background: var(--bg-input);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  font-size: 12.5px;
-  font-family: inherit;
+.asst-provider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-1);
 }
-.asst-key:focus { outline: none; border-color: var(--neon-cyan); }
+.asst-provider .aip-row { flex: 0 1 190px; min-width: 0; }
 .asst-log {
   flex: 1;
   min-height: 0;

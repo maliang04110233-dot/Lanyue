@@ -151,6 +151,9 @@ const CHANNELS = {
   'ai-history':          { invoke: MAIN },
   'ai-add-history':      { invoke: MAIN, args: [['item', t.obj()]] },
   'ai-clear-history':    { invoke: MAIN },
+  // 大模型厂商配置：名单与判据的家在 src/api/aiProviders.js，界面经这两条通道取，不在渲染层镜像
+  'ai-provider-config':  { invoke: MAIN },
+  'ai-provider-save':    { invoke: MAIN, args: [['patch', t.obj()]] },
 
   // ── 用户歌单（invoke） ────────────────────────────
   'get-user-playlists':        { invoke: MAIN },
@@ -344,6 +347,8 @@ const METHODS = {
   aiGetHistory: 'ai-history',
   aiAddHistory: 'ai-add-history',
   aiClearHistory: 'ai-clear-history',
+  aiProviderConfig: 'ai-provider-config',
+  aiProviderSave: 'ai-provider-save',
   // 用户歌单
   getUserPlaylists: 'get-user-playlists',
   saveUserPlaylist: 'save-user-playlist',

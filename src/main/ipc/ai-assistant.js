@@ -20,6 +20,7 @@ const { createAgentBridge } = require('../mcp/agentBridge');
 const { toolsFromContract } = require('../mcp/tools');
 const { planAssistantTurn } = require('../../api/services/aiAssistantService');
 const { assistantChat } = require('../../api/ai-music');
+const { chatConfigFrom, isConfigToken } = require('../../api/aiProviders');
 
 // 桥是惰性的：第一次工具调用才装配，注册本身不起服务、不读令牌
 let _bridge = null;
@@ -40,7 +41,10 @@ function register() {
   }));
 
   handle('ai-assistant-plan', async (_, messages) => {
-    const apiKey = prefs.get('aiMusicApiKey');
+    // 取的是「当前厂商那根 Key」，不是整包映射：映射里存着别家的凭据。
+    // 界面只填了别家而选了 DeepSeek 时，这里必须照样报 NO_KEY —— 让它带着
+    // 空串往下走，用户看到的是一句读不懂的「生成失败」。
+    const { apiKey } = chatConfigFrom((k) => prefs.get(k));
     if (!apiKey) return { ok: false, error: 'NO_KEY' };
     try {
       return await planAssistantTurn({
@@ -49,8 +53,11 @@ function register() {
         chat: (m) => assistantChat({ messages: m, apiKey }),
       });
     } catch (e) {
-      logger.warn('[assistant] 回合失败:', e && e.message ? e.message : e);
-      return { ok: false, error: 'LLM_FAILED' };
+      const msg = e && e.message ? String(e.message) : '';
+      logger.warn('[assistant] 回合失败:', msg || e);
+      // 配置类令牌（端点被闸拒、Key 没配、型号不合法）得原样递上去：把它们压成
+      // LLM_FAILED，用户读到的是「请求失败」，而真正要改的是配置页。
+      return { ok: false, error: isConfigToken(msg) ? msg : 'LLM_FAILED' };
     }
   });
 

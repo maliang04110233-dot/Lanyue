@@ -40,6 +40,9 @@ Module._load = function interceptedLoad(request, parent, isMain) {
       && request === '../../api/ai-music') {
     return {
       setHistoryPath() { /* no-op */ },
+      // 主进程接线会注入 prefs 读取器（见 ipc/ai-music.js 的 setPrefsGetter 调用），
+      // 桩必须跟上有这个方法，否则 register 直接 TypeError
+      setPrefsGetter() { /* no-op */ },
       generateMusic: (params, callOptions) => new Promise((resolve, reject) => {
         calls.push({ params, callOptions: callOptions || {}, resolve, reject });
       }),

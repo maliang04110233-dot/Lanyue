@@ -10,15 +10,17 @@
  * 文本一律 textContent 上屏（歌名与模型回复都可能含尖括号）；文案全部走词典；
  * 循环有上界（MAX_TURNS），坏回复不该把用户的 API Key 刷爆。
  *
- * Key 输入行存在理由：这把 Key 的既有录入口在 AI 创作页，而那一页由 FEATURES.ai
- * 关着 —— 助手若不带入口，出货配置下每次提问都只会得到 NO_KEY。存的是同一个
- * pref（prefs.set 对 aiMusicApiKey 走系统加密），不是第二个家。
+ * Key 录入行换成共用面板（../aiProviderPanel.js）：AI 创作页由 FEATURES.ai 关着，
+ * 助手若不带入口就没处配 Key；而配 Key 这件事的判据（厂商名单、{厂商:Key} 的合并
+ * 写法、端点合法性）全在主进程那一份登记表里，界面只画只交。两页挂同一个模块，
+ * 于是「两页各攒一套 Key 写法」这种事故没有可发生的地方。
  */
 
 import { t } from '../i18n.js';
 import { errBrief } from '../errBrief.js';
 import { showToast } from '../toast.js';
 import { askConfirm } from '../confirmDialog.js';
+import { mountProviderPanel, providerErrText } from '../aiProviderPanel.js';
 
 const MAX_TURNS = 3;
 
@@ -50,7 +52,9 @@ async function _ensureTools() {
   return _tools;
 }
 
-// 主进程只发 ASCII 令牌，文案在这里（渲染层词典）—— 见 ipc/ai-assistant.js 的口径
+// 主进程只发 ASCII 令牌，文案在这里（渲染层词典）—— 见 ipc/ai-assistant.js 的口径。
+// 表里只留助手自己特有的令牌；配置类与 HTTP 类一律交 providerErrText（三处打的是同
+// 一个出网闸，同一个失败该说同一句话，不该每处各攒一张表再各自漏几行）。
 const ERR_KEYS = {
   NO_KEY: 'assistant.errNoKey',
   NEED_CONFIRM: 'assistant.errNeedConfirm',
@@ -63,8 +67,10 @@ const ERR_KEYS = {
 
 function _errText(code, msg) {
   const key = ERR_KEYS[code];
-  if (!key) return t('assistant.errLlmFailed', { msg: errBrief(code || msg || 'unknown') });
-  return key === 'assistant.errLlmFailed' ? t(key, { msg: errBrief(msg || '') }) : t(key);
+  if (key) {
+    return key === 'assistant.errLlmFailed' ? t(key, { msg: errBrief(msg || '') }) : t(key);
+  }
+  return providerErrText(code, t('assistant.errLlmFailed', { msg: errBrief(code || msg || 'unknown') }));
 }
 
 /**
@@ -153,42 +159,21 @@ function clearAssistant() {
   showToast(t('toast.assistantCleared'), 'success');
 }
 
-/** Key 行：读写既有 pref，值只进输入框与主进程，不进消息流、不进日志 */
-async function saveAssistantKey() {
-  const el = document.getElementById('assistantKeyInput');
-  const v = ((el && el.value) || '').trim();
-  if (!v) {
-    showToast(t('toast.assistantKeyMissing'), 'error');
-    if (el) el.focus();
-    return;
-  }
-  try {
-    await api.setPref('aiMusicApiKey', v);
-    showToast(t('toast.assistantKeySaved'), 'success');
-  } catch (e) {
-    showToast(t('toast.assistantSendFailed', { msg: errBrief(e) }), 'error', 5000);
-  }
-}
-
-async function initAssistant() {
-  const el = document.getElementById('assistantKeyInput');
-  if (!el || el.dataset.asstKeyFilled === '1') return;
-  el.dataset.asstKeyFilled = '1';
-  try {
-    el.value = (await api.getPref('aiMusicApiKey')) || '';
-  } catch (_e) {
-    // pref 读不到就留空，让用户自己填 —— 不该因为一次 IPC 失败把整页废掉
-  }
+/** 面板容器在页首（index.html 里那一行），挂一次就跟着配置刷新自己 */
+function _mountPanel() {
+  mountProviderPanel(document.getElementById('assistantProviderPanel'));
 }
 
 // 回车发送、Shift+回车换行
 function _bindInput() {
   const input = document.getElementById('assistantInput');
-  if (!input || input.dataset.asstBound === '1') return;
-  input.dataset.asstBound = '1';
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAssistant(); }
-  });
+  if (input && !input.dataset.asstBound) {
+    input.dataset.asstBound = '1';
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAssistant(); }
+    });
+  }
+  _mountPanel();
 }
 
 document.addEventListener('DOMContentLoaded', _bindInput);
@@ -196,5 +181,3 @@ if (document.readyState !== 'loading') _bindInput();
 
 window.sendAssistant = sendAssistant;
 window.clearAssistant = clearAssistant;
-window.saveAssistantKey = saveAssistantKey;
-window.initAssistant = initAssistant;

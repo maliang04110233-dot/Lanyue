@@ -1,5 +1,7 @@
 /**
- * AI 音乐生成模块（基于 MiniMax API）
+ * AI 音乐生成模块
+ *
+ * 文本那一跳（歌词 / 翻译 / 关键词改写 / 助手）走厂商登记表，音乐合成只有 MiniMax 提供。
  *
  * 功能：
  *   - 根据歌词+风格生成音乐
@@ -14,16 +16,73 @@ const { extractModelJson } = require('./services/modelJson');
 const { readFile, writeFile } = require('fs/promises');
 const path = require('path');
 const logger = require('../utils/logger');
+const {
+  chatConfigFrom, buildChatRequest, guardAiEndpoint, keyFor,
+} = require('./aiProviders');
 
-// MiniMax API 配置
+// 音乐合成端点：这一跳不是"厂商之一"，是全仓唯一提供音乐生成的服务（文本那一跳见登记表）
 const MINIMAX_API_BASE = 'https://api.minimaxi.com';
 
 // 允许上计费接口的模型（其余一律退回默认，见 buildMusicRequestBody）
 const DEFAULT_MUSIC_MODEL = 'music-2.6';
-// 文本回合用的对话模型。三处调用（歌词/翻译/改写）曾各写一遍字面量，
-// 换模型要记三件事——现在只有一个名字可改。
-const CHAT_MODEL = 'MiniMax-Text-01';
+// 文本那一跳的厂商 / 型号 / Base URL 全在 src/api/aiProviders.js 的登记表里，
+// 本模块不再自己决定发给谁。
 const MUSIC_MODELS = new Set(['music-2.6', 'music-3.0']);
+
+/**
+ * 「当前用哪家」由主进程注入 prefs 读取器（本模块要能在纯 node 下被单测驱动，
+ * 不能 require 用了 electron safeStorage 的 utils/prefs）。没注入时落回 MiniMax
+ * 老口径 —— 升级前的行为一字不变，既有单测也不必先配一遍 prefs。
+ */
+let _getPref = null;
+function setPrefsGetter(fn) {
+  _getPref = typeof fn === 'function' ? fn : null;
+}
+
+/**
+ * 这一次文本调用发给谁、带哪根 Key。prefs 说话；prefs 里没有该家的 Key 才退回
+ * 调用方传来的那根（旧口径）。调用方传来的值若是一整个 {厂商:Key} 映射（渲染层
+ * 直接读 pref 原值传下来的那种写法），只取当前厂商的一根 —— 一个 Bearer 头带
+ * 三家凭据是不能发生的事故。
+ */
+function _callCreds(callerApiKey) {
+  const cfg = chatConfigFrom(_getPref || (() => undefined));
+  if (cfg.apiKey) return cfg;
+  const raw = typeof callerApiKey === 'string' ? callerApiKey.trim() : '';
+  cfg.apiKey = raw.startsWith('{') ? keyFor(raw, cfg.providerId) : raw;
+  return cfg;
+}
+
+/**
+ * 四处文本调用（歌词 / 翻译 / 关键词改写 / 助手）共用的一次出网。
+ * 抽成一处的理由不是省事，是「换厂商」这件事必须只有一个是非：
+ *   · URL 与型号都来自登记表（各家 chat 路径互不相同，写错的表现是 404，
+ *     而 404 在界面上和「Key 无效」一个长相）；
+ *   · 出网前过 urlGuard 闸，**登记表内六家与用户手填的地址同一条路**，不给免检例外；
+ *   · retries 恒为 0 —— 计费调用超时换第二跳就是双倍扣费（见 request 的 H3 注释）。
+ */
+async function _chatCall({ messages, temperature, maxTokens, callerApiKey }) {
+  const cfg = _callCreds(callerApiKey);
+  const req = buildChatRequest({
+    providerId: cfg.providerId,
+    model: cfg.model,
+    baseUrl: cfg.baseUrl,
+    apiKey: cfg.apiKey,
+    messages,
+    temperature,
+    maxTokens,
+  });
+  const guard = await guardAiEndpoint(req.url);
+  if (!guard.ok) throw new Error(guard.reason);
+  return request(req.url, {
+    method: 'POST',
+    retries: 0, // 计费 LLM 调用禁自动重试——超时重试会重复扣费
+    headers: req.headers,
+    body: req.body,
+    lookup: guard.lookup, // 钉在闸已校验的那批 IP 上（防 rebinding）
+  });
+}
+
 // 人声偏好：接口没有音色字段，只能作为 prompt 的自然语言片段
 const VOICE_DESC = {
   female: '女声主唱',
@@ -83,6 +142,10 @@ function request(url, options = {}) {
       },
       timeout: options.timeout || 300000,
     };
+
+    // 出网闸校验过的 IP 由调用方钉进来（见 _chatCall 的 guardAiEndpoint）：
+    // 校验时用的和连接时用的必须是同一批地址，否则 DNS rebinding 又开了。
+    if (typeof options.lookup === 'function') reqOptions.lookup = options.lookup;
 
     // H3: 自动重试（最多 3 次，仅对超时/网络错误）
     const maxRetries = options.retries ?? 3;
@@ -198,7 +261,7 @@ function request(url, options = {}) {
  * @param {Object} params
  * @param {string} params.topic - 主题/关键词（简短，如"夏日海滩"）
  * @param {string} params.style - 风格键名（pop/rock/ballad/electronic 等）
- * @param {string} params.apiKey - MiniMax API Key
+ * @param {string} [params.apiKey] - 调用方兜底 Key；prefs 里当前厂商那根优先（见 _callCreds）
  * @param {string} [params.mode] - 模式：'song'（默认，生成音乐描述+歌词）或 'playlist'（生成歌单列表）
  * @returns {Promise<{lyrics: string, title: string, musicPrompt: string}>}
  */
@@ -209,8 +272,6 @@ async function generateLyrics(params) {
     apiKey,
     mode = 'song',
   } = params;
-
-  if (!apiKey) throw new Error('请先配置 MiniMax API Key');
 
   // L6: 清理 prompt 注入风险 — 移除用户输入中的控制序列和特殊字符
   const cleanTopic = String(topic || '').replace(/[`$\\{}]/g, '').slice(0, 200);
@@ -324,24 +385,14 @@ async function generateLyrics(params) {
   }
 
   try {
-    const result = await request(`${MINIMAX_API_BASE}/v1/text/chatcompletion_v2`, {
-      method: 'POST',
-      retries: 0, // 计费 LLM 调用禁自动重试——超时重试会重复扣费
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: {
-        model: CHAT_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: systemMsg,
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.8,
-        max_tokens: mode === 'playlist' ? 2048 : 4096,
-      },
+    const result = await _chatCall({
+      messages: [
+        { role: 'system', content: systemMsg },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.8,
+      maxTokens: mode === 'playlist' ? 2048 : 4096,
+      callerApiKey: apiKey,
     });
 
     if (result.status !== 200 || !result.data?.choices) {
@@ -483,7 +534,7 @@ function normalizeLyrics(lyrics) {
  * 忽略它。人声偏好因此改成并进 prompt 的自然语言描述，歌手名一律不发。
  *
  * @param {Object} params
- * @param {string} params.apiKey - 必填，仅用于校验；它属于请求头，绝不进 body
+ * @param {string} params.apiKey - 必填（prefs 里当前厂商那根也算），仅用于校验；它属于请求头，绝不进 body
  * @param {string} [params.lyrics] - 歌词（越长生成的歌越长）
  * @param {string} [params.style] - 兜底风格词
  * @param {string} [params.musicPrompt] - 详细音乐描述（优先于 style）
@@ -495,7 +546,7 @@ function normalizeLyrics(lyrics) {
  */
 function buildMusicRequestBody(params = {}) {
   const { lyrics, style, musicPrompt, apiKey, instrumental, autoLyrics, voice, model } = params;
-  if (!apiKey) throw new Error('请先配置 MiniMax API Key');
+  if (!_callCreds(apiKey).apiKey) throw new Error('NO_KEY');
 
   // 器乐优先：既然不要人声，"帮你写词"就没有意义
   const isInstrumental = instrumental === true;
@@ -534,23 +585,35 @@ function buildMusicRequestBody(params = {}) {
  * @returns {Promise<{audioHex: string, status: number}>}
  */
 async function generateMusic(params, callOptions = {}) {
-  const { apiKey, onProgress } = params;
+  const { onProgress } = params;
+
+  // 音乐合成只有 MiniMax 提供（国内主流厂商卖的都只有文本模型）。选了别家时这一条
+  // 必须**零出网**地拒掉 —— 拼好请求体再打出去就是拿用户的额度发一次注定 404 的
+  // 计费请求。界面据这个 ASCII 码把「生成歌曲」置灰并出词典文案。
+  const creds = _callCreds(params.apiKey);
+  if (!creds.supportsMusic) throw new Error('MUSIC_UNSUPPORTED');
+  const musicKey = creds.apiKey || params.apiKey;
 
   // 请求体口径全在 buildMusicRequestBody（收口，便于离线断言）
-  const body = buildMusicRequestBody(params);
+  const body = buildMusicRequestBody({ ...params, apiKey: musicKey });
 
   if (onProgress) onProgress({ status: 'submitting', percent: 10 });
 
   try {
     // M10: 计费接口禁止自动重试——网络抖动/超时后重试可能重复扣费
-    const result = await request(`${MINIMAX_API_BASE}/v1/music_generation`, {
+    const musicUrl = `${MINIMAX_API_BASE}/v1/music_generation`;
+    // 音乐那一跳与文本那一跳同一条闸，没有「大厂免检」这回事
+    const guard = await guardAiEndpoint(musicUrl);
+    if (!guard.ok) throw new Error(guard.reason);
+    const result = await request(musicUrl, {
       method: 'POST',
       retries: 0,
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${musicKey}`,
       },
       body,
       timeout: 300000, // 5 分钟超时
+      lookup: guard.lookup,
       signal: callOptions.signal, // M11：取消链路，主进程侧 AbortController 触发
                                  // （P1-10 前这条是死链：本模块 transport 不读 signal）
     });
@@ -672,13 +735,12 @@ async function clearHistory() {
  * @param {string} params.lyrics - 原始歌词
  * @param {string} params.sourceLang - 源语言（auto/en/zh/ja/ko）
  * @param {string} params.targetLang - 目标语言（zh/en/ja/ko）
- * @param {string} params.apiKey - MiniMax API Key
+ * @param {string} [params.apiKey] - 调用方兜底 Key；prefs 里当前厂商那根优先
  * @returns {Promise<{translated: string}>}
  */
 async function translateLyrics(params) {
   const { lyrics, targetLang = 'zh', apiKey } = params;
 
-  if (!apiKey) throw new Error('请先配置 MiniMax API Key');
   if (!lyrics) throw new Error('歌词不能为空');
 
   const langMap = { zh: '中文', en: '英文', ja: '日文', ko: '韩文', auto: '自动检测' };
@@ -694,19 +756,14 @@ ${lyrics}
 3. 直接输出翻译后的歌词，不要其他解释`;
 
   try {
-    const result = await request(`${MINIMAX_API_BASE}/v1/text/chatcompletion_v2`, {
-      method: 'POST',
-      retries: 0, // 计费 LLM 调用禁自动重试——超时重试会重复扣费
-      headers: { 'Authorization': `Bearer ${apiKey}` },
-      body: {
-        model: CHAT_MODEL,
-        messages: [
-          { role: 'system', content: '你是一位专业的歌词翻译家，擅长将各种语言的歌词翻译成目标语言，保持歌词的韵律和结构。' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 4096,
-      },
+    const result = await _chatCall({
+      messages: [
+        { role: 'system', content: '你是一位专业的歌词翻译家，擅长将各种语言的歌词翻译成目标语言，保持歌词的韵律和结构。' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.3,
+      maxTokens: 4096,
+      callerApiKey: apiKey,
     });
 
     if (result.status !== 200 || !result.data?.choices) {
@@ -750,12 +807,11 @@ function parseSearchQueries(text) {
  * 自然语言 → 平台可搜的关键词数组（P0-A 改写层）
  * @param {Object} params
  * @param {string} params.phrase - 用户的自然语言需求
- * @param {string} params.apiKey - MiniMax API Key
+ * @param {string} [params.apiKey] - 调用方兜底 Key；prefs 里当前厂商那根优先
  * @returns {Promise<string[]>} 0~3 个关键词；解析失败返回空数组（调用方兜底）
  */
 async function rewriteSearchQueries(params) {
   const { phrase, apiKey } = params;
-  if (!apiKey) throw new Error('请先配置 MiniMax API Key');
   if (!phrase) throw new Error('搜索需求不能为空');
 
   const prompt = `用户想在音乐软件里搜索歌曲，但给的是自然语言描述。请把它改写成 1~3 个能直接用于音乐平台搜索的关键词（风格/语言/场景/歌手等词的稀疏组合，不要整句）。
@@ -764,19 +820,14 @@ async function rewriteSearchQueries(params) {
 
 严格只输出一个 JSON 字符串数组，例如 ["轻快 中文 晨跑"]。不要输出其它任何文字。`;
 
-  const result = await request(`${MINIMAX_API_BASE}/v1/text/chatcompletion_v2`, {
-    method: 'POST',
-    retries: 0, // 计费 LLM 调用禁自动重试
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-    body: {
-      model: CHAT_MODEL,
-      messages: [
-        { role: 'system', content: '你是音乐搜索关键词改写器。只输出 JSON 字符串数组，不输出任何解释。' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 200,
-    },
+  const result = await _chatCall({
+    messages: [
+      { role: 'system', content: '你是音乐搜索关键词改写器。只输出 JSON 字符串数组，不输出任何解释。' },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.3,
+    maxTokens: 200,
+    callerApiKey: apiKey,
   });
 
   if (result.status !== 200 || !result.data?.choices) {
@@ -790,24 +841,18 @@ async function rewriteSearchQueries(params) {
  * 计费调用：retries 必须为 0 —— 一次超时换两跳就是双倍扣费（见 request 的 H3 注释）。
  * @param {Object} params
  * @param {Array<{role:string,content:string}>} params.messages
- * @param {string} params.apiKey
+ * @param {string} [params.apiKey] - 调用方兜底 Key；prefs 里当前厂商那根优先
  * @returns {Promise<string>} 模型文本（解析由 aiAssistantService 负责）
  */
 async function assistantChat({ messages, apiKey }) {
-  if (!apiKey) throw new Error('NO_KEY');
-  const result = await request(`${MINIMAX_API_BASE}/v1/text/chatcompletion_v2`, {
-    method: 'POST',
-    retries: 0,
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-    body: {
-      model: CHAT_MODEL,
-      messages,
-      temperature: 0.2,
-      max_tokens: 800,
-    },
+  const result = await _chatCall({
+    messages,
+    temperature: 0.2,
+    maxTokens: 800,
+    callerApiKey: apiKey,
   });
   if (result.status !== 200 || !result.data || !result.data.choices) {
-    throw new Error((result.data && result.data.error && result.data.error.message) || `LLM_HTTP_${result.status}`);
+    throw new Error((result.data && result.data.error && result.data.error.message) || `LLM_HTTP:${result.status}`);
   }
   const choice = result.data.choices[0];
   return (choice && choice.message && choice.message.content) || '';
@@ -815,6 +860,7 @@ async function assistantChat({ messages, apiKey }) {
 
 module.exports = {
   setHistoryPath,
+  setPrefsGetter,
   generateLyrics,
   buildMusicRequestBody,
   generateMusic,
