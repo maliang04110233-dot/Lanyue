@@ -15,16 +15,19 @@ const assert = require('node:assert');
 const { LEAK_KEYS, scrubOutbound, scrubToolText } = require('../src/shared/outboundScrub');
 
 test('键名黑名单是那份唯一清单，且都是「本机路径 / 凭据」类', () => {
-  for (const k of ['path', 'localPath', 'filePath', 'dir', 'cookie', 'token', 'apiKey', 'secret', 'savePath']) {
+  for (const k of ['path', 'localPath', 'filePath', 'dir', 'cookie', 'token', 'apiKey', 'secret', 'savePath', 'subpath']) {
     assert.ok(LEAK_KEYS.includes(k), `少了 ${k}`);
   }
   assert.ok(!LEAK_KEYS.includes('lyric'), 'get_lyrics 的正文不许被剥');
   // 这份清单是「唯一出处」，所以要钉死到具体成员：只允许登记过的这些键。
   // savePath 是控制方裁定 R-15 补进来的（query_history 的返回值里带绝对本机路径，
   // 漏了它这道闸对下载历史等于没装）。要再加键得先有同级别的实测依据，不许顺手扩。
+  // subpath 是裁定 R-16：list_download_templates 的 handler 直返 prefs 里的模板
+  // （src/main/ipc/downloadTemplates.js:33-37），它是 path.relative 的产物 —— 相对下载根目录的
+  // 目录片段（网易云\{artist} 这种），不带盘符却照样是用户本机的目录组织习惯，属于同一类。
   assert.deepStrictEqual([...LEAK_KEYS].sort(), [
     'accessToken', 'apiKey', 'cookie', 'cookies', 'dir', 'filePath',
-    'localPath', 'path', 'savePath', 'secret', 'token',
+    'localPath', 'path', 'savePath', 'secret', 'subpath', 'token',
   ].sort(), '黑名单成员飘了：既多了谁，或少了谁');
 });
 
@@ -54,6 +57,23 @@ test('不改动原对象（审计与真 handler 的返回值还要用）', () =>
   const src = { songs: [{ title: 'x', path: 'D:\\p' }] };
   scrubOutbound(src);
   assert.strictEqual(src.songs[0].path, 'D:\\p', '脱敏写回了原对象');
+});
+
+test('下载模板那条：path 与 subpath 都剥，name 与 id 留着（裁定 R-16）', () => {
+  const out = JSON.parse(scrubToolText(JSON.stringify({
+    templates: [{ id: 3, name: '按歌手归档', path: 'D:\\MUSIC\\{artist}', subpath: '网易云\\{artist}', createdAt: 1 }],
+    active: 3,
+  })));
+  assert.deepStrictEqual(out, { templates: [{ id: 3, name: '按歌手归档', createdAt: 1 }], active: 3 });
+});
+
+test('__proto__ 这类键名不许改掉中转对象的原型', () => {
+  // JSON.parse 出来的 __proto__ 是**自有属性**，`out[k] = v` 会命中 Object.prototype 上的 setter：
+  // 值既没被剥也没被保留，而是把 out 的原型换了，随后 JSON.stringify 只认自有属性 → 整段静默消失。
+  const out = scrubOutbound(JSON.parse('{"__proto__":{"polluted":1},"name":"n"}'));
+  assert.strictEqual(Object.getPrototypeOf(out), Object.prototype, '原型被 __proto__ 键换掉了');
+  assert.strictEqual(out.polluted, undefined, '原型链上读到了脏值');
+  assert.strictEqual(out.name, 'n', '该留的业务字段被顺手剥了');
 });
 
 test('不是 JSON 就当没有可读：回空串，不许把原文丢给厂商', () => {

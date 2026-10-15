@@ -12,7 +12,7 @@
  */
 
 /** 发给大模型厂商的文本里不许出现的键名（本机路径与凭据类）。唯一出处。 */
-const LEAK_KEYS = ['path', 'localPath', 'filePath', 'dir', 'cookie', 'cookies', 'token', 'accessToken', 'apiKey', 'secret', 'savePath'];
+const LEAK_KEYS = ['path', 'localPath', 'filePath', 'dir', 'cookie', 'cookies', 'token', 'accessToken', 'apiKey', 'secret', 'savePath', 'subpath'];
 
 function scrubOutbound(value) {
   if (Array.isArray(value)) return value.map(scrubOutbound);
@@ -20,7 +20,10 @@ function scrubOutbound(value) {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
       if (LEAK_KEYS.includes(k)) continue;
-      out[k] = scrubOutbound(v);
+      // __proto__ 在 JSON.parse 的结果里是**自有属性**，普通赋值命中的是
+      // Object.prototype 上那个 setter：原型被换掉、键本身反而从 stringify 里消失。
+      // defineProperty 才是「照原样搬过去」的意思。
+      Object.defineProperty(out, k, { value: scrubOutbound(v), enumerable: true, writable: true, configurable: true });
     }
     return out;
   }

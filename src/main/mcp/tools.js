@@ -102,12 +102,12 @@ const AGENT_TOOLS = [
     description: '列出用户订阅的歌手/歌单/账号订阅项。',
   },
   {
-    // 描述即提示词：这里写的必须是**今天**就成立的事实。出网脱敏闸是 Task 4 的活，
-    // 在它落地前 path/subpath 会原样进 JSON 文本（handler 直返 prefs 里的模板，
-    // mcpCore 只把返回值 JSON.stringify，中间没有任何字段过滤），所以这句如实告知模型，
-    // 而不是承诺「路径不回给你」。
+    // 描述即提示词：这里写的必须是**两边今天就同时成立**的事实。出网脱敏闸按裁定 R-14 只装在
+    // 「助手 → 厂商」那一条路上，外部 Agent 这条仍拿到 handler 原样返回的模板（prefs 里的
+    // path/subpath，mcpCore 只把返回值 JSON.stringify，中间没有字段过滤），所以这句如实告知形状
+    // 并提醒别原样念，而不是承诺「路径不回给你」。
     name: 'list_download_templates', channel: 'get-download-templates', risk: 'read',
-    description: '列出下载目录模板与当前启用项。返回 {templates:[{id,name,path,subpath,createdAt,updatedAt}],active:模板id|null}。注意 path/subpath 是用户本机的绝对目录路径，会原样出现在结果里：那是用户自己的磁盘布局，别原样念给用户，回答里只说模板名与是否启用。',
+    description: '列出下载目录模板与当前启用项。返回 {templates:[{id,name,path,subpath,createdAt,updatedAt}],active:模板id|null}。path 是用户本机的绝对目录路径，subpath 是它相对下载根目录的片段（可能为空字符串）：那是用户自己的磁盘布局，别原样念给用户，回答里只说模板名与是否启用。',
   },
   {
     name: 'get_play_queue', channel: 'load-play-queue', risk: 'read',
