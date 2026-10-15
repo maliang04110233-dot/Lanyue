@@ -21,6 +21,7 @@ const { toolsFromContract } = require('../mcp/tools');
 const { planAssistantTurn } = require('../../api/services/aiAssistantService');
 const { assistantChat } = require('../../api/ai-music');
 const { chatConfigFrom, isConfigToken } = require('../../api/aiProviders');
+const { scrubToolText } = require('../../shared/outboundScrub');
 
 // 桥是惰性的：第一次工具调用才装配，注册本身不起服务、不读令牌
 let _bridge = null;
@@ -78,7 +79,9 @@ function register() {
     }
     const result = msg && msg.result;
     const content = (result && result.content && result.content[0]) || null;
-    const text = content ? String(content.text || '') : '';
+    // 工具返回值是第二条出网路：它下一步就要进模型上下文，所以在本进程就剥干净，
+    // 不留给渲染层「记得剥」这件事（它会）。外部 Agent 那条不剥——那是本机程序在读本机数据。
+    const text = scrubToolText(content ? String(content.text || '') : '');
     const isError = !!(result && result.isError);
     return { ok: !isError, isError, text: text.slice(0, 8000) };
   });

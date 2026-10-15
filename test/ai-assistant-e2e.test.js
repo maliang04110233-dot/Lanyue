@@ -122,6 +122,52 @@ test('参数钳制与外部 Agent 同一条码：超长 keyword 被截到 200', 
   assert.strictEqual(seen.length, 200, '助手侧的钳制比外部 Agent 松 = 两套规矩');
 });
 
+/**
+ * 出网闸（Task 4 / R-14）：助手这条路，工具返回值在回到渲染层之前就得剥干净。
+ *
+ * 上面几枚只证明「桥打得通、参数被钳、闸门会拒」，没钉过返回值的出网形状 ——
+ * 而闸恰恰装在这段文本上：渲染层拿到它就要原样塞进 tool_results 喂回厂商。
+ * 底仍是真桥（mcpCore + normalizeArgs + 审计），只有业务 handler 是假的：
+ * 「剥」发生在两者之间，替身换不掉这一环，所以这枚测的是真行为。
+ */
+test('闸装在链路上：path/localPath 到不了渲染层，业务字段一个不少', async () => {
+  auditSink._setUserDataDirForTest(tmpDir());
+  register.handle('get-user-playlists', () => ([
+    { id: 'pl1', name: '深夜电台', songs: [{ id: '1', title: '晚风', path: 'D:\\MUSIC\\wanfeng.mp3' }] },
+  ]));
+  const r = await handlerOf('ai-assistant-tool-call')('list_playlists', {}, false);
+  assert.strictEqual(r.ok, true, r.text);
+  assert.ok(!/D:\\\\MUSIC/.test(r.text), `本机路径跟着文本出网了: ${r.text}`);
+  const back = JSON.parse(r.text);
+  assert.strictEqual(back[0].id, 'pl1', 'id 不是黑名单键，被顺手剥掉就是只会抹字段的闸');
+  assert.strictEqual(back[0].name, '深夜电台');
+  assert.strictEqual(back[0].songs[0].title, '晚风');
+});
+
+test('R-15 那枚键：query_history 的 savePath（绝对本机路径）不许进模型上下文', async () => {
+  auditSink._setUserDataDirForTest(tmpDir());
+  register.handle('query-history', () => ({
+    items: [{ id: '9', source: 'netease', title: '晴天', status: 'done', savePath: 'D:\\MUSIC\\qingtian.mp3' }],
+    total: 1,
+  }));
+  const r = await handlerOf('ai-assistant-tool-call')('query_history', { opts: { limit: 5 } }, false);
+  assert.strictEqual(r.ok, true, r.text);
+  assert.ok(!/MUSIC/.test(r.text), `savePath 出网了: ${r.text}`);
+  assert.deepStrictEqual(JSON.parse(r.text), {
+    items: [{ id: '9', source: 'netease', title: '晴天', status: 'done' }],
+    total: 1,
+  }, '该留的 title/status/total 也被剥了');
+});
+
+test('闸的代价要写得住：桥自造的非 JSON 失败句子读不出形状，一律不回原文', async () => {
+  auditSink._setUserDataDirForTest(tmpDir());
+  register.handle('get-user-playlists', () => { throw new Error('ENOENT: no such file, open D:\\MUSIC\\index.db'); });
+  const r = await handlerOf('ai-assistant-tool-call')('list_playlists', {}, false);
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.isError, true, '失败这件事本身还得让渲染层判得出来');
+  assert.strictEqual(r.text, '', '带本机路径的异常文本不许出网；失败理由改由 isError+词典承担');
+});
+
 test('没有 API Key：回合通道回 NO_KEY 且不出网', async () => {
   const prefs = require('../src/utils/prefs');
   prefs.set('aiMusicApiKey', '');
