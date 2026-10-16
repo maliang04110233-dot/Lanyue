@@ -45,6 +45,7 @@ const ipcPlaylistAudit = require('./ipc/playlistAudit');
 const subscriptions = require('./subscriptions');
 const clipboardWatch = require('./clipboardWatch');
 const { createLibraryWatcher } = require('./libraryWatcher');
+const { buildAppMenu } = require('./appMenu');
 
 // 修复 B15：使用 context.js 提供的统一 safeSend，避免代码漂移
 const safeSend = ctxSafeSend;
@@ -391,59 +392,7 @@ function updateGlobalShortcutsEnabled(enabled) {
 }
 
 
-function buildAppMenu() {
-  // 自定义菜单，移除所有「开发者工具」相关项（默认菜单的 Ctrl+Shift+I 加速键也无法触发）
-  const isMac = process.platform === 'darwin';
-  const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
-    {
-      label: '文件',
-      submenu: [
-        { label: '刷新', accelerator: 'CmdOrCtrl+R', click: () => mainWindow && mainWindow.webContents.reload() },
-        { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit', label: '退出' },
-      ],
-    },
-    {
-      label: '编辑',
-      submenu: [
-        { role: 'undo', label: '撤销' },
-        { role: 'redo', label: '重做' },
-        { type: 'separator' },
-        { role: 'cut', label: '剪切' },
-        { role: 'copy', label: '复制' },
-        { role: 'paste', label: '粘贴' },
-        { role: 'selectAll', label: '全选' },
-      ],
-    },
-    {
-      label: '视图',
-      submenu: [
-        { label: '聚焦搜索 🔍', accelerator: 'CmdOrCtrl+K', click: () => { mainWindow?.webContents.send('focus-search'); } },
-        { type: 'separator' },
-        { label: '⏰ 定时停止', submenu: [
-          { label: '🛑 取消定时', click: () => mainWindow?.webContents.send('sleep-timer', null) },
-          { type: 'separator' },
-          { label: '⏰ 15 分钟后', click: () => mainWindow?.webContents.send('sleep-timer', 15) },
-          { label: '⏰ 30 分钟后', click: () => mainWindow?.webContents.send('sleep-timer', 30) },
-          { label: '⏰ 60 分钟后', click: () => mainWindow?.webContents.send('sleep-timer', 60) },
-          { label: '⏰ 90 分钟后', click: () => mainWindow?.webContents.send('sleep-timer', 90) },
-        ]},
-        { type: 'separator' },
-        { role: 'resetZoom', label: '实际大小' },
-        { role: 'zoomIn', label: '放大' },
-        { role: 'zoomOut', label: '缩小' },
-        { type: 'separator' },
-        { role: 'togglefullscreen', label: '切换全屏' },
-      ],
-    },
-    {
-      label: '窗口',
-      submenu: [{ role: 'minimize', label: '最小化' }, { role: 'close', label: '关闭' }],
-    },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
+// ─── 应用菜单已抽到 main/appMenu.js（buildAppMenu）─────────────────
 
 app.whenReady().then(async () => {
   // 流式播放 scheme 就位（根因 1）。旧路径是把整首落盘再给 file://，
@@ -594,7 +543,7 @@ app.whenReady().then(async () => {
   clipboardWatch.start();
 
   // 安装自定义应用菜单（屏蔽开发者工具菜单项及其加速键）
-  buildAppMenu();
+  buildAppMenu({ getMainWindow: () => mainWindow });
 
   // CORS 白名单：本地来源 + 各平台 manifest 声明的域名（派生）
   // ⚠️ 这是本工程唯一的安全边界 —— 它决定哪些源能拿到非 null 的
