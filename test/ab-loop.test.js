@@ -1,6 +1,7 @@
 // A-B 循环纯逻辑（abLoop.js）
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 async function fresh() {
   return import(`../src/renderer/js/abLoop.js?ck=${Math.random()}`);
@@ -50,6 +51,28 @@ test('abAdvance：负时间与脏 cur 归零处理', async () => {
   const { abAdvance } = await fresh();
   assert.deepEqual(abAdvance(-3, {}).st, { a: 0 });
   assert.deepEqual(abAdvance(null, {}).st, { a: 0 });
+});
+
+// 本文件其余判据一律 `!= null`（abAdvance / abRewindTo / abLabel / getAbRegion / loadstart），
+// 唯独「清除」写成过 `if (!_st.a && !_st.b) return;` —— A=0 时它是假值，于是清不掉、
+// 也不弹提示，徽标一直挂着「A 0:00 已选」，用户以为循环还在（其实 abAdvance 早就不回跳了）。
+// 判据收进 abHasPoints 一处，设点与清除共用同一句话。
+test('abHasPoints：设在 0 秒也算设过（判据不许退回假值）', async () => {
+  const { abHasPoints } = await fresh();
+  assert.equal(abHasPoints({ a: 0 }), true, 'A 点落在第 0 秒同样是点过的');
+  assert.equal(abHasPoints({ b: 0 }), true);
+  assert.equal(abHasPoints({ a: 12, b: 45 }), true);
+  assert.equal(abHasPoints({}), false);
+  assert.equal(abHasPoints(null), false, '脏入参不该抛');
+});
+
+test('清除与换曲两条撤销路径共用 abHasPoints', async () => {
+  const src = fs.readFileSync(new URL('../src/renderer/js/abLoop.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(src, /if \(!abHasPoints\(_st\)\) return;/,
+    'clearAbLoop 又用回假值判断了 —— A=0 时清不掉');
+  assert.match(src, /if \(abHasPoints\(_st\)\) \{ _st = \{\}; _syncUi\(\); \}/,
+    'loadstart 那条也要走同一判据，一份判据只留一个出处');
+  assert.ok(!/_st\.a && !_st\.b/.test(src), '假值判断残留');
 });
 
 test('abLabel：三态徽标文案', async () => {

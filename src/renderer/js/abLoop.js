@@ -34,6 +34,15 @@ export function abAdvance(cur, st) {
   return { st: { a: t }, msg: '已设 A 点 ' + mmss(t) + '，播到结尾处再点一次设 B' };
 }
 
+/**
+ * 是否设过任一端点。判据必须是 != null：A 点落在第 0 秒也是设过。
+ * 「清除」和「换曲自动清」两条路共用它 —— 一份判据只留一个出处，
+ * 曾经清除那处用假值判断端点，A=0 时就永远清不掉。
+ */
+export function abHasPoints(st) {
+  return !!(st && (st.a != null || st.b != null));
+}
+
 /** 菜单徽标文案：'' | 'A 1:20 已选' | '1:20–2:45' */
 export function abLabel(st) {
   if (st && st.a != null && st.b != null) return mmss(st.a) + '–' + mmss(st.b);
@@ -64,7 +73,7 @@ function abLoopClick() {
 }
 
 function clearAbLoop() {
-  if (!_st.a && !_st.b) return;
+  if (!abHasPoints(_st)) return;
   _st = {};
   _syncUi();
   showToast('已清除 A-B 循环', 'success', 2000);
@@ -87,7 +96,7 @@ if (typeof document !== 'undefined') {
     if (back != null) au.currentTime = back;
   }, true);
   document.addEventListener('loadstart', () => {
-    if (_st.a != null || _st.b != null) { _st = {}; _syncUi(); }
+    if (abHasPoints(_st)) { _st = {}; _syncUi(); }
   }, true);
   window.abLoopClick = abLoopClick;
   window.clearAbLoop = clearAbLoop;
