@@ -27,6 +27,8 @@
  * ----
  *   createResumeSeeker({ onSeek }) → { attach(audio, savedTime), cancel() }
  *   attach 幂等：重复调用只保留最后一次的 pending 监听。
+ *   监听只活一次：loadedmetadata 触发后（无论 seek 是否成立）即自我撤销 ——
+ *   渲染层共用同一个 audio 元素，留着它等于把上一首的进度带给下一首。
  *   seek 条件：audio.duration > savedTime（进度不能超过时长）。
  */
 
@@ -50,29 +52,42 @@ export function createResumeSeeker(deps = {}) {
     return true;
   }
 
+  /** 撤掉尚未触发的监听。抽成函数是因为处理函数自己也要调它 —— 见 attach 里那句 */
+  function clearPending() {
+    if (!pending) return;
+    pending.audio.removeEventListener('loadedmetadata', pending.handler);
+    pending = null;
+  }
+
   return {
     /**
      * 挂上"metadata 就绪后 seek 到 savedTime"
      * 已经就绪（竞态已发生）则立即 seek，不等下一次事件。
      */
     attach(audio, savedTime) {
-      this.cancel();
-      const handler = () => doSeek(audio, savedTime);
+      clearPending();
+      const handler = () => {
+        // loadedmetadata 每个 src 只发一次，所以这次触发就是这条监听的最后一次
+        // 用处；不管 seek 成不成立都得先把自己摘掉。渲染层共用同一个 audio 元素，
+        // 摘不干净它就活到下一首歌上：下一首若没有进度记忆（压根不会 attach），
+        // 陈旧监听照样会在它的 metadata 上把新歌 seek 到上一首的位置 ——
+        // 用户看到的是"没听过的歌从中间开始播"。
+        clearPending();
+        doSeek(audio, savedTime);
+      };
       pending = { audio, handler };
       audio.addEventListener('loadedmetadata', handler);
       // TOCTOU 补口：await 期间 metadata 已到，此刻 readyState 已 >= 1。
       // 少了这一句，事件早已发完，seek 永远不执行。
       if (audio.readyState >= HAVE_METADATA) {
-        this.cancel();
+        clearPending();
         doSeek(audio, savedTime);
       }
     },
 
-    /** 撤掉尚未触发的监听（切歌时调，防泄漏到下一首） */
+    /** 撤掉待触发监听（切歌时调，防泄漏到下一首） */
     cancel() {
-      if (!pending) return;
-      pending.audio.removeEventListener('loadedmetadata', pending.handler);
-      pending = null;
+      clearPending();
     },
 
     /** 供诊断/测试读取当前是否还有挂着的监听 */

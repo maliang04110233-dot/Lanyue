@@ -169,7 +169,54 @@ test('duration 未就绪（NaN / 0）时不 seek，等就绪后由事件路径�
   assert.equal(audio.currentTime, 100);
 });
 
-// ── 4. player.js 接线 ──────────────────────────────────
+// ── 4. 事件路径的自我撤销（真实症状：下一首从中间开始播）─────
+//
+// 上面那组 M7 测试给每首歌一个假 audio 元素，但渲染层只有一个
+// （player.js:25 `document.getElementById('audioPlayer')`，整棵应用生命周期共用）。
+// 于是「新 attach 撤掉旧监听」这条撤销路径只覆盖了一半：
+// 走事件路径 seek 成功之后，处理函数自己还挂在那个共用元素上。
+// 下一首没有进度记忆的歌压根不会 attach，那个陈旧监听就会在它
+// 自己的 loadedmetadata 上把新歌 seek 到上一首的进度 —— 用户看到的
+// 是「没听过的歌从中间开始播」，还会跟着弹一次「继续播放」提示。
+
+/** 模拟换 src：浏览器会把 currentTime 归零、readyState 退回未就绪 */
+function reloadAudio(audio, duration = 300) {
+  audio.currentTime = 0;
+  audio.readyState = 0;
+  audio.duration = duration;
+}
+
+test('事件路径 seek 之后监听要自我撤销（否则下一首无进度的歌吃到上一首的 savedTime）', () => {
+  const audio = fakeAudio();          // 整个应用共用的那一个元素
+  const seeker = createResumeSeeker({});
+
+  seeker.attach(audio, 60);           // 歌 A：有 60s 的记忆，metadata 还没到
+  audio.becomeReady(300);
+  assert.equal(audio.currentTime, 60, '歌 A 应续播到 60s');
+
+  reloadAudio(audio);                  // 切到歌 B（换了 src，进度归零）
+  // 歌 B 没有任何进度记忆 —— 这一步不会 attach
+  audio.becomeReady(300);
+  assert.equal(audio.currentTime, 0,
+    '歌 B 被歌 A 残留的 loadedmetadata 监听 seek 了 —— 这就是"从中间播放"');
+  assert.equal(seeker.hasPending(), false, '触发过一次就该没有挂着的监听');
+});
+
+test('条件不满足（savedTime >= 时长）时同样要撤销：坏数据不许常驻', () => {
+  const audio = fakeAudio();
+  const seeker = createResumeSeeker({});
+
+  seeker.attach(audio, 999);
+  audio.becomeReady(300);
+  assert.equal(audio.currentTime, 0, '超过时长不该 seek');
+
+  reloadAudio(audio, 1200);            // 换了一首足够长的歌
+  audio.becomeReady(1200);
+  assert.equal(audio.currentTime, 0,
+    '上一首的坏进度若在 metadata 上不撤销，这次条件反而成立了');
+});
+
+// ── 5. player.js 接线 ──────────────────────────────────
 
 test('player.js 两处续播都走 createResumeSeeker（不许再有裸 addEventListener 挂法）', () => {
   assert.ok(!/addEventListener\(\s*['"]loadedmetadata['"]/.test(PLAYER),
@@ -181,4 +228,15 @@ test('player.js 两处续播都走 createResumeSeeker（不许再有裸 addEvent
 test('player.js 已 import resumeSeek 且旧函数名不再存在', () => {
   assert.match(PLAYER, /import\s*\{\s*createResumeSeeker\s*\}\s*from\s*['"]\.\/player\/resumeSeek\.js['"]/);
   assert.ok(!/attachResumeSeekListener/.test(PLAYER), '旧实现应被替换掉，不能留两套并存');
+});
+
+// 剩下的那条路在 await 里：restorePlayProgress 还没回来时用户已经切了歌，
+// 回来的 savedTime 属于上一首，却照样 attach 到共用的 audio 元素上。
+// 与歌词那处同一味药（M8 的请求序号），这里钉两处都有序号守卫。
+test('player.js 续播 attach 要带换歌序号守卫（慢响应的旧进度不得 seek 新歌）', () => {
+  assert.match(PLAYER, /let _loadSeq = 0/, '缺换歌序号计数器');
+  const bumps = PLAYER.match(/\+\+_loadSeq/g) || [];
+  assert.equal(bumps.length, 2, 'audio.src 赋值处（本地 + 网络两个分支）都要抬序号，实际 ' + bumps.length);
+  const guards = PLAYER.match(/seq !== _loadSeq/g) || [];
+  assert.equal(guards.length, 2, '两个分支的 attach 前都要比序号，实际 ' + guards.length);
 });

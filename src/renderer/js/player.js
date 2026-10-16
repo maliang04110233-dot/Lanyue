@@ -211,6 +211,11 @@ const _resumeSeeker = createResumeSeeker({
   },
 });
 
+// 与 _lyricRequestId 同一味药：换 src 时抬序号，await 回来后发现已切歌就丢弃结果。
+// 进度恢复是两次 getPref IPC，这期间用户完全可能已经点了下一首 —— 那个 savedTime
+// 属于上一首，attach 到共用的 audio 元素上会把新歌 seek 到旧位置。
+let _loadSeq = 0;
+
 export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
   if (!song) return;
 
@@ -257,6 +262,7 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
     if (artistEl) artistEl.textContent = song.artist || '未知艺术家';
     _applyTitleMarquee();
 
+    const seq = ++_loadSeq;
     audio.src = localUrl;
     // 首播延迟（2026-10-13）：**先发起播放**，进度恢复并行做。
     //
@@ -271,6 +277,7 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
       showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
     });
     restorePlayProgress(song).then((savedTime) => {
+      if (seq !== _loadSeq) return; // 已切歌，这份进度属于上一首
       if (savedTime > 0) _resumeSeeker.attach(audio, savedTime);
     });
 
@@ -326,13 +333,15 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
 
   // 如果有预获取的 URL（来自 proxyPlay），则播放音频
   if (localUrl) {
+    const seq = ++_loadSeq;
     audio.src = localUrl;
     // 与上面同一处修正：播放先发起，进度恢复并行（少两个 IPC 往返的首播延迟）
     audio.play().catch(() => {
       showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
     });
-    restorePlayProgress(song).then((savedTime2) => {
-      if (savedTime2 > 0) _resumeSeeker.attach(audio, savedTime2);
+    restorePlayProgress(song).then((savedTime) => {
+      if (seq !== _loadSeq) return; // 已切歌，这份进度属于上一首
+      if (savedTime > 0) _resumeSeeker.attach(audio, savedTime);
     });
   }
 
