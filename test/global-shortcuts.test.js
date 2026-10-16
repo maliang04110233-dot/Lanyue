@@ -231,12 +231,14 @@ test(' 恢复默认也会重注册（借道 change 事件，不新开第二个�
 
 test(' 主进程不再自带第二份媒体键清单', () => {
   const m = acc();
-  const code = stripComments(read('src/main/index.js'));
+  // 快捷键实现已从 index.js 抽到 main/globalShortcuts.js；判据之家 / 白名单
+  // 不重复的约束随之钉在新模块上（主进程源码改走 shared 判据之家）。
+  const code = stripComments(read('src/main/globalShortcuts.js'));
   assert.ok(/require\('\.\.\/shared\/accelerators'\)/.test(code),
-    '主进程没有走 shared 判据之家');
+    '全局快捷键模块没有走 shared 判据之家');
   const leaked = m.ALLOWED_ACCELERATORS.filter((a) => code.includes(`'${a}'`));
   assert.deepStrictEqual(leaked, [],
-    '这些 accelerator 字面量又回到 index.js 了（改一处漏一处的老毛病）：' + leaked.join(', '));
+    '这些 accelerator 字面量又回到主进程源码了（改一处漏一处的老毛病）：' + leaked.join(', '));
 });
 
 test(' 显示/隐藏窗口是主进程内动作，不借道新 IPC 通道', () => {

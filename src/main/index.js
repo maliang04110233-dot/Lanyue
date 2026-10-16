@@ -1,8 +1,7 @@
-const { app, BrowserWindow, session, Notification, globalShortcut, protocol } = require('electron');
+const { app, BrowserWindow, session, Notification, protocol } = require('electron');
 const { handle: ipcHandle, on: ipcOn, assertContractCoverage } = require('./ipc/register');
 const { buildContractArg } = require('../shared/ipcContract');
 const { defaultDownloadDir } = require('../shared/downloadDefaults');
-const { readBindings } = require('../shared/accelerators');
 const path = require('path');
 const { setCookieStore } = require('../api');
 const logger = require('../utils/logger');
@@ -47,6 +46,7 @@ const clipboardWatch = require('./clipboardWatch');
 const { createLibraryWatcher } = require('./libraryWatcher');
 const { buildAppMenu } = require('./appMenu');
 const trayMod = require('./tray');
+const globalShortcuts = require('./globalShortcuts');
 
 // 修复 B15：使用 context.js 提供的统一 safeSend，避免代码漂移
 const safeSend = ctxSafeSend;
@@ -217,51 +217,7 @@ function createWindow() {
 // 导出供其他模块调用
 module.exports = { updateTrayMenu: trayMod.updateTrayMenu };
 
-// ── 全局快捷键（可自定义）─────────────────────────────
-// 动作清单、accelerator 白名单、默认值与「一键一动作」的去重规则全在
-// src/shared/accelerators.js（设置页与主进程同源，由 test/global-shortcuts.test.js 对账）。
-// 通道沿用托盘那几条：渲染层已有 tray-* 监听，不新增 IPC。
-// prefs.globalShortcuts 是总开关（默认开），四个 shortcut* 键是每枚动作的绑法。
-function sendToMainWindow(channel) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(channel);
-  }
-}
-
-function runShortcutAction(binding) {
-  if (binding.channel) sendToMainWindow(binding.channel);
-  else trayMod.toggleMainWindow();
-}
-
-function registerGlobalShortcuts() {
-  if (prefs.get('globalShortcuts') === false) return; // 默认开
-  const bindings = readBindings((key) => prefs.get(key));
-  let registered = 0;
-  for (const binding of bindings) {
-    try {
-      // 注册失败（键已被系统或其它应用抢走）时 Electron 只回 false，不抛
-      if (globalShortcut.register(binding.accelerator, () => runShortcutAction(binding))) registered++;
-      else logger.warn(`[shortcuts] ${binding.accelerator} 注册失败（可能已被系统或其它应用占用）`);
-    } catch (e) {
-      logger.warn(`[shortcuts] 注册 ${binding.accelerator} 失败:`, e.message);
-    }
-  }
-  if (registered > 0) logger.log(`[shortcuts] 全局快捷键已注册 ${registered}/${bindings.length}`);
-}
-
-function unregisterGlobalShortcuts() {
-  try { globalShortcut.unregisterAll(); } catch (_e) { /* 退出路径忽略 */ }
-}
-
-function updateGlobalShortcutsEnabled(enabled) {
-  try {
-    globalShortcut.unregisterAll();
-    if (enabled !== false) registerGlobalShortcuts();
-  } catch (e) {
-    logger.warn('[shortcuts] 切换失败:', e.message);
-  }
-}
-
+// ── 全局快捷键已抽到 main/globalShortcuts.js（register / unregister / updateGlobalShortcutsEnabled）──
 
 // ─── 应用菜单已抽到 main/appMenu.js（buildAppMenu）─────────────────
 
@@ -455,6 +411,10 @@ app.whenReady().then(async () => {
     getMainWindow: () => mainWindow,
     getDownloadQueueEngine: () => downloadQueueEngine,
   });
+  globalShortcuts.init({
+    getMainWindow: () => mainWindow,
+    toggleMainWindow: trayMod.toggleMainWindow,
+  });
   createWindow();
   trayMod.createTray();
   // 任务栏进度/托盘提示的落地目标（context.safeSend 在队列事件时驱动刷新）
@@ -462,7 +422,7 @@ app.whenReady().then(async () => {
     getWindows: () => (mainWindow && !mainWindow.isDestroyed() ? [mainWindow] : []),
     getTray: () => trayMod.getTray(),
   });
-  registerGlobalShortcuts();
+  globalShortcuts.registerGlobalShortcuts();
 });
 
 app.on('window-all-closed', () => {
@@ -476,7 +436,7 @@ app.on('window-all-closed', () => {
   // 防抖定时器由 flushPlayQueueNow() 内部清理，无需在此重复
   subscriptions.stopScheduler();
   clipboardWatch.stop();
-  unregisterGlobalShortcuts();
+  globalShortcuts.unregisterGlobalShortcuts();
   try { prefs.flush(); } catch (e) { logger.warn('prefs.flush 失败:', e.message); }
   try { history.flush(); } catch (e) { logger.warn('history.flush 失败:', e.message); }
   // 日志缓冲同步冲刷：异步写在 app.quit() 后可能来不及落盘（同上方的队列/偏好）
@@ -560,7 +520,7 @@ function registerAllIpcHandlers() {
 
   // ── 全局快捷键开关（设置页实时切换）─────────────────
   ipcOn('set-global-shortcuts', (_, enabled) => {
-    updateGlobalShortcutsEnabled(!!enabled);
+    globalShortcuts.updateGlobalShortcutsEnabled(!!enabled);
     logger.log(`[shortcuts] 全局媒体键: ${enabled ? '已启用' : '已停用'}`);
   });
 
