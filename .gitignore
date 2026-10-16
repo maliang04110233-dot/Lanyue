@@ -85,3 +85,44 @@ scripts/cdp-toolbar-probe.mjs
 # **刻意不入库**：基准是单进程计时，数值受机器/JIT/GC 影响，跨机器比较无意义。
 # 入库反而会让人拿别人的数字当自己的基线。需要的开发者在本地生成后自行保留。
 bench-baseline.json
+
+# ── 非代码资产（创作/交付/工具）────────────────────────────
+# 短剧创作产出物
+短剧/
+# 产品策略交付物
+deliverables/
+# 开发团队配置包
+fullstack-dev-team/
+fullstack-share/
+avatars/
+*.artifact.json
+*.zip
+
+# ── 日志与诊断输出 ────────────────────────────────────────
+*.log
+package-smoke*.log
+dep-upgrade*.log
+dep-restore.log
+build-after-upgrade.log
+build-story.log
+focused-test*.log
+full-test*.log
+ls-mm.log
+ipc-check*.log
+song-story-test*.log
+smoke-*.log
+test-after-upgrade.log
+package-dir-diagnostic.log
+
+# ── 临时脚本与探针 ────────────────────────────────────────
+tmp-*.sh
+tmp-*.bat
+tmp-*.py
+cookie-helper.html
+
+# ── 分析工具产物 ──────────────────────────────────────────
+.understand-anything/
+.understandignore
+
+# ── 杂项 ──────────────────────────────────────────────────
+imageed*.png

@@ -12,64 +12,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { installBrowserGlobals } = require('./helpers/fake-dom');
-const { loadView } = require('./helpers/view-module');
+const { boot, send, SONG } = require('./helpers/assistant-boot');
 
-const VIEW = 'src/renderer/js/views/ai-assistant.js';
-const IDS = ['assistantLog', 'assistantInput', 'assistantSendBtn', 'assistantProviderPanel', 'toastContainer'];
-
-const SONG = (id, title) => ({
-  id,
-  source: 'netease',
-  title,
-  artist: '张三',
-  quality: 'hires',
-  // 这两枚真在歌曲对象里（歌词与本地路径），最容易被「顺手全塞进提示」带出去：
-  lyrics: 'LYRICS-LEAK 一行歌词',
-  localPath: 'D:\\MUSIC\\path-leak.mp3',
-});
-
-/**
- * 起一个真视图。state 由调用方掌管（可在桩里改），plan(msgs, ctx, round) 决定模型
- * 每回合答什么；tool 桩在「工具执行完成」这一刻拿到 state 与 calls，用来模拟
- * 助手自己把队列改了 —— 那是②那条牙齿用例唯一诚实的做法。
- */
-async function boot(state, { plan, tool } = {}) {
-  const calls = { plan: [], tool: [] };
-  const dom = installBrowserGlobals({
-    ids: IDS,
-    extraGlobals: {
-      getState: (k) => (k in state ? state[k] : null),
-      ipcRenderer: {
-        invoke: async (channel, ...args) => {
-          if (channel === 'ai-assistant-tools') {
-            return { tools: [{ name: 'search_music', description: '搜歌', mutating: false }] };
-          }
-          if (channel === 'ai-assistant-plan') {
-            calls.plan.push({ messages: args[0], context: args[1] });
-            const round = calls.plan.length;
-            return plan ? plan(args[0], args[1], round) : { ok: true, reply: '好', steps: [] };
-          }
-          if (channel === 'ai-assistant-tool-call') {
-            calls.tool.push(args);
-            if (tool) tool(state, calls, args);
-            return { ok: true, text: 'done' };
-          }
-          // 厂商面板挂起来时要读配置：给一份最小的合法包，本文件不测它
-          return { providers: [], current: { providerId: 'minimax', hasKey: true }, supportsMusic: true, keys: {} };
-        },
-      },
-    },
-  });
-  const mod = await loadView(VIEW, dom);
-  return { mod, dom, calls };
-}
-
-/** 走真实用户路径：往输入框里写字，再点发送（sendAssistant 只认 window 上那个） */
-async function send(dom, text) {
-  dom.element('assistantInput').value = text;
-  await globalThis.sendAssistant();
-}
+/** 递归走一棵伪 DOM 子树（找计划卡上的决定按钮） */
+const walk = (n, out = []) => { out.push(n); (n.children || []).forEach((c) => walk(c, out)); return out; };
 
 test('上下文带正在播放、队列与搜索结果，且带 id（不然它只能再搜一遍）', async () => {
   const state = {
@@ -109,13 +55,22 @@ test('状态每回合现读：助手入队之后第二回合看到的是新歌',
     currentPlaying: null, playQueue: [SONG('q1', '早班车')], playIdx: 0,
     currentKeyword: '', songs: [],
   };
-  const { calls, dom } = await boot(state, {
+  const h = await boot(state, {
     plan: (messages, context, round) => (round === 1
       ? { ok: true, reply: '先看一眼', steps: [{ tool: 'search_music', args: { keyword: '夜' } }] }
       : { ok: true, reply: '都加进来了', steps: [] }),
     tool: (st) => { st.playQueue.push(SONG('q9', '新来的歌')); },
   });
-  await send(dom, '把夜航加进队列');
+  const { calls, dom } = h;
+  const p = h.sendAssistant('把夜航加进队列');
+  // 计划卡出现时点「批准」：sendAssistant 会等用户决定，不能裸 await（Task 10 起的行为）
+  await h.tick(3);
+  const log = dom.element('assistantLog');
+  const card = log.children[log.children.length - 1];
+  const btn = walk(card).find((n) => n.dataset && n.dataset.asstDecide === 'approve');
+  assert.ok(btn, '计划卡上找不到 approve 按钮');
+  btn.dispatch('click');
+  await p;
 
   assert.strictEqual(calls.plan.length, 2, '应跑了两回合');
   assert.ok(!calls.plan[0].context.includes('新来的歌'), '第一回合不该已经看到后来入队的歌');

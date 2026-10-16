@@ -225,20 +225,26 @@ jobs:
       #   - 本地实测 nsis 收尾阶段会触发文件清理问题导致退出非 0，
       #     会把「内容正确」误报成构建失败
       - name: Package (win, dir only)
-        run: npx electron-builder --config build/config.cjs --win --x64 --dir --publish never
+        run: npm run package:smoke
         env:
           # 跳过 electron-builder 的代码签名探测（CI 无证书，不跳会报错）
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Asar smoke test
-        run: npm run smoke:asar
+        run: node scripts/smoke-asar.js .preview/release-smoke/win-unpacked/resources/app.asar
 
-      # 产物留存：CI 挂了可以直接下载现场排查，不必本地重打一遍
+      # 真正启动刚打出来的 exe：asar 内容正确 ≠ 应用能启动。
+      # 同时验证首实例持续存活、第二实例被单实例锁拒绝、进程输出与 main.log 无致命错误。
+      - name: Windows release runtime smoke
+        run: npm run smoke:release
+
+      # 产物留存：运行期失败可能来自 exe / dll / resources 任一层，只上传 app.asar
+      # 不足以复现，因此保留完整解包目录。
       - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: app-asar-${{ github.sha }}
-          path: release/win-unpacked/resources/app.asar
+          name: win-unpacked-${{ github.sha }}
+          path: .preview/release-smoke/win-unpacked
           if-no-files-found: warn
           retention-days: 7

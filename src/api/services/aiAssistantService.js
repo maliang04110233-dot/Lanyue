@@ -13,7 +13,7 @@
 
 const { extractModelJson } = require('./modelJson');
 
-const MAX_STEPS_PER_TURN = 4;
+const MAX_STEPS_PER_TURN = 8;
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_RESULT_CHARS = 4000;
 const MAX_CONTEXT_CHARS = 1600;
@@ -52,7 +52,8 @@ ${lines.join('\n')}
 规则：
 - 不需要动手就 "steps":[]。
 - 一次最多 ${MAX_STEPS_PER_TURN} 个 steps；拿不准先查后动。
-- 查询类工具可以直接执行；加入队列、加入歌单、红心收藏这三类会改动用户的东西，主进程会逐条向用户请求确认，你照常提交即可。
+- 每个 step 都要带 "why"：一句给用户看的中文，说清这一步在他应用里做什么。界面会把它们列在一张计划卡上。
+- 确认的三种形态照这个来，别自己替用户决定：查询类直接跑；会改数据但可逆的（入队、加歌单、订阅、取消/重试下载）整份计划一次性请用户批准；会删或清空的（删除、清空队列与历史、移除订阅）会单独弹确认。
 - 用户没给具体歌手/歌名时，用 search_music 或 ai_search_music 找。
 - 「这首」「刚才那首」这类指代，只在下面有状态段时才按状态回答；没有状态段就是不知道，该问清楚别猜。
 - reply 用中文，一句话说清你做了什么或需要什么信息，不要复述 JSON。${_section(_clipContext(context))}`;
@@ -76,7 +77,8 @@ function _coerceSteps(raw, allowed) {
     if (!s || typeof s !== 'object') continue;
     if (!allowed.has(s.tool)) continue;            // 白名单外的指令在这里就消失
     if (!s.args || typeof s.args !== 'object' || Array.isArray(s.args)) continue;
-    out.push({ tool: String(s.tool), args: s.args });
+    const why = typeof s.why === 'string' ? s.why.trim().slice(0, 120) : '';
+    out.push(why ? { tool: String(s.tool), args: s.args, why } : { tool: String(s.tool), args: s.args });
     if (out.length === MAX_STEPS_PER_TURN) break;
   }
   return out;

@@ -70,22 +70,18 @@ async function flushAudit() {
 
 assistant.register();
 
-test('目录：21 个工具且恰好 3 个非只读（P1 只加只读面）', async () => {
+test('目录：38 个工具、非只读 20 条、其中 destructive 7 条（P2 扩面后）', async () => {
   const r = await handlerOf('ai-assistant-tools')();
-  assert.strictEqual(r.tools.length, 21);
-  // 断言只能落在**这个 handler 真返回的字段**上。目录项只投影
-  // { name, description, mutating }（见 ai-assistant.js:40），对它 filter(t => t.risk)
-  // 恒为 [] —— 无论登记表里长出什么它都不会红，是一枚死断言（评审 F-C2）。
-  // risk/audience 进目录载荷是 Task 10 的事（循环要按 meta.risk 决定单独弹），
-  // 那一步落地后这枚再升级成按 risk 断言；本轮不给载荷加字段。
+  assert.strictEqual(r.tools.length, 38);
   for (const t of r.tools) {
     assert.ok('mutating' in t, `${t.name} 的目录项没有 mutating 字段，下面那枚断言会空转`);
   }
-  const mutating = r.tools.filter(t => t.mutating === true).map(t => t.name).sort();
-  assert.deepStrictEqual(mutating, ['add_to_playlist', 'add_to_queue', 'toggle_favorite'],
-    '非只读集合飘了：P1 只加只读面，写工具恰好这三条，一条不多一条不少');
+  const destructiveCount = require('../src/main/mcp/tools').toolsFromContract().filter((d) => d.risk === 'destructive').length;
+  assert.strictEqual(destructiveCount, 7, 'destructive 应是 7 条');
+  assert.strictEqual(r.tools.filter(t => t.mutating === true).length, 20,
+    '非只读 = 13 条 write（3 既有 + 10 新增）+ 7 条 destructive，一条不多一条不少');
   assert.strictEqual(r.tools.filter(t => t.mutating === false).length, 18,
-    '21 条里只该有 18 条只读；多出来的那条就是越红线扩面');
+    '只读面仍是 18 条；P2 只加写/破坏性，不该动只读');
 });
 
 test('闸门：写操作不带确认直接拒，带确认才落到 handler，且被拒的不进审计', async () => {
@@ -135,6 +131,16 @@ test('未知工具：令牌化拒绝，不碰桥', async () => {
   const r = await handlerOf('ai-assistant-tool-call')('delete_all_playlists', {}, true);
   assert.strictEqual(r.ok, false);
   assert.strictEqual(r.error, 'UNKNOWN_TOOL');
+});
+
+test('指名 destructive 也不给外部 Agent 跑：byName 里没有它，回的是「未知工具」', async () => {
+  const { createAgentBridge } = require('../src/main/mcp/agentBridge');
+  let executed = 0;
+  register.handle('clear-all-queue', async () => { executed += 1; return { ok: true }; });
+  const h = createAgentBridge({ source: 'agent', serverVersion: '9.9.9', onCall: () => {} });
+  const r = await h({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'clear_all_downloads', arguments: {} } });
+  assert.strictEqual(r.error.code, -32602);
+  assert.strictEqual(executed, 0, '被拒的破坏性操作一次都不该落到 handler');
 });
 
 test('参数钳制与外部 Agent 同一条码：超长 keyword 被截到 200', async () => {
@@ -230,4 +236,30 @@ test('端点被闸拒：回合通道回 ENDPOINT_BLOCKED，不是 LLM_FAILED', a
     prefs.set('aiProviderBaseUrl', '');
     prefs.set('aiMusicApiKey', '');
   }
+});
+
+test('审计里能看出「这一步是谁批准的、什么形态、几档风险、哪一轮」', async () => {
+  auditSink._setUserDataDirForTest(tmpDir());
+  register.handle('add-to-queue', async () => ({ ok: true }));
+  await handlerOf('ai-assistant-tool-call')('add_to_queue', { song: { id: '1', title: 'x' } }, true, 'batch', 'run-42');
+  const items = await flushAudit();
+  assert.strictEqual(items.length, 1);
+  assert.strictEqual(items[0].scope, 'batch', '批量批准形态要落进审计');
+  assert.strictEqual(items[0].risk, 'write', '风险档要落进审计');
+  assert.strictEqual(items[0].runId, 'run-42', '属于哪一轮要落进审计');
+  assert.strictEqual(items[0].source, 'assistant');
+});
+
+test('外部 Agent 那条路不许把 auditContext 塞进审计（日志投毒）', async () => {
+  auditSink._setUserDataDirForTest(tmpDir());
+  const { createAgentBridge } = require('../src/main/mcp/agentBridge');
+  register.handle('search-music', async () => ({ songs: [] }));
+  const h = createAgentBridge({ source: 'agent', serverVersion: '9.9.9', onCall: (e) => auditSink.record(e) });
+  await h({ jsonrpc: '2.0', id: 1, method: 'tools/call',
+    params: { name: 'search_music', arguments: { keyword: 'x', page: 1 }, auditContext: { scope: 'single', risk: 'destructive', runId: 'forged' } } });
+  const items = await flushAudit();
+  assert.strictEqual(items.length, 1);
+  assert.ok(!('scope' in items[0]) && !('runId' in items[0]) && !('risk' in items[0]),
+    'agent 身份下 auditContext 必须被忽略，否则外部能伪造审批形态');
+  assert.strictEqual(items[0].tool, 'search_music');
 });

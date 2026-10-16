@@ -26,11 +26,35 @@ test('工具名唯一、通道也唯一（两条工具指向同一通道就是�
   assert.strictEqual(new Set(chans).size, chans.length, '两条工具指向同一通道');
 });
 
-test('改造不许悄悄改面：今天恰 21 条、其中 3 条非只读', () => {
+test('改造不许悄悄改面：今天恰 21 条、其中 3 条非只读（P1 基线，P2 落地后由 39 条那枚接管）', () => {
   const defs = toolsFromContract();
-  assert.strictEqual(defs.length, 21);
-  assert.deepStrictEqual(defs.filter((d) => d.mutating).map((d) => d.name).sort(),
-    ['add_to_playlist', 'add_to_queue', 'toggle_favorite']);
+  // P2 Task 11 会把面扩到 38：这里钉的是「扩面只准发生在那一次」，此后由 38 条那枚守
+  assert.ok(defs.length === 21 || defs.length === 38, `工具面数量飘了：${defs.length}`);
+});
+
+test('P2 面：38 条工具，destructive 恰 7 条，且都进不了外部 Agent 的面', () => {
+  const defs = toolsFromContract();
+  // 38 = 18 只读 + 13 写 + 7 destructive（计划文档里写的 39 是算术笔误：
+  // 它自己点名的 13+7 两份清单 + 既有 18 只读，加出来就是 38）
+  assert.strictEqual(defs.length, 38);
+  const destructive = defs.filter((d) => d.risk === 'destructive').map((d) => d.name).sort();
+  assert.deepStrictEqual(destructive, [
+    'clear_all_downloads', 'clear_finished_downloads', 'clear_history', 'delete_download_template',
+    'delete_user_playlist', 'remove_history', 'unsubscribe',
+  ]);
+  const agentView = toolsForSource('agent');
+  for (const n of destructive) {
+    assert.ok(!agentView.some((d) => d.name === n), `外部 Agent 不该看到 ${n}`);
+  }
+});
+
+test('P2 的写面点名（少了哪条、多了哪条都算红）', () => {
+  const writes = toolsFromContract().filter((d) => d.risk === 'write').map((d) => d.name).sort();
+  assert.deepStrictEqual(writes, [
+    'add_playlist_to_downloads', 'add_to_playlist', 'add_to_queue', 'cancel_download', 'remove_from_playlist',
+    'remove_queue_item', 'reorder_queue_item', 'retry_download', 'save_download_template',
+    'set_download_queue_paused', 'subscribe_add', 'subscribe_mark_seen', 'toggle_favorite',
+  ]);
 });
 
 test('P1 新增的只读面：订阅、模板、播放队列、聚合曲库', () => {

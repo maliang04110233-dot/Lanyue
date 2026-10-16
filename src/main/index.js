@@ -32,6 +32,8 @@ const ipcPrefs   = require('./ipc/prefs');
 const ipcCheckLocal = require('./ipc/checkLocal');
 const ipcHistory = require('./ipc/history');
 const ipcAiMusic = require('./ipc/ai-music');
+const ipcSongStory = require('./ipc/songStory');
+const ipcTasteProfile = require('./ipc/tasteProfile');
 const ipcProvider = require('./ipc/ai-provider');
 const ipcPlaylist = require('./ipc/playlist');
 const ipcDownloadTemplates = require('./ipc/downloadTemplates');
@@ -40,6 +42,7 @@ const ipcSubscriptions = require('./ipc/subscriptions');
 const ipcMcp = require('./ipc/mcp');
 const ipcAssistant = require('./ipc/ai-assistant');
 const ipcSmartPlaylist = require('./ipc/smart-playlist');
+const ipcPlaylistAudit = require('./ipc/playlistAudit');
 const subscriptions = require('./subscriptions');
 const clipboardWatch = require('./clipboardWatch');
 const { createLibraryWatcher } = require('./libraryWatcher');
@@ -754,6 +757,8 @@ function registerAllIpcHandlers() {
   ipcCheckLocal.register();
   ipcHistory.register();
   ipcAiMusic.register();
+  // 歌曲讲解（候选方向 1）：播放页「讲讲这首歌」
+  ipcSongStory.register();
   // 厂商配置：AI 创作页与助手页那张厂商下拉的数据源
   ipcProvider.register();
   ipcPlaylist.register();
@@ -769,6 +774,12 @@ function registerAllIpcHandlers() {
 
   // 智能歌单只读曲库、只出一次网，写库仍走 save-user-playlist，所以排在助手之后即可
   ipcSmartPlaylist.register();
+
+  // 品味解读（候选方向 2）：设置页「品味画像」，读 playStats 出网一次
+  ipcTasteProfile.register();
+
+  // 歌单语义运维（候选方向 3）：给已有歌单做体检，只读，写库仍走既有通道
+  ipcPlaylistAudit.register();
 
   // ── 播放队列持久化 IPC ─────────────────────────────
   ipcHandle('save-play-queue', (_, data) => {

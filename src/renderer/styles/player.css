@@ -1170,6 +1170,8 @@ audio { display: none; }
    听歌报告
    ══════════════════════════════════════════════════════════ */
 .report-panel { width: 480px; }
+/* 品味画像正文更长，弹层加宽一档；复用 report-* 与 stats-overlay 令牌，不新造样式 */
+.report-panel--wide { width: 560px; }
 .report-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3);
   margin-bottom: 20px;

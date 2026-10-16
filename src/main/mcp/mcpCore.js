@@ -88,6 +88,12 @@ function createMcpHandler({ tools, serverVersion, callTool, onCall = null, sourc
         const tool = byName.get(name);
         if (!tool) return rpcError(id, -32602, `未知工具: ${String(name).slice(0, 64)}`);
         const base = { ts: Date.now(), tool: name };
+        // auditContext 是**进程内**给助手用的扩展字段（哪一轮、批量还是单项、几档风险）：
+        // 外部 Agent 的 JSON-RPC 体里也能塞这个键，所以只在 source==='assistant' 时采信，
+        // 否则外部调用方可以伪造「这步已被单项批准/属某一轮」污染审计（日志投毒）。
+        const auditContext = (source === 'assistant' && params && params.auditContext
+          && typeof params.auditContext === 'object') ? params.auditContext : null;
+        if (auditContext) Object.assign(base, auditContext);
         const named = params && params.arguments;
         const r = namedToPositional(tool.channel, named);
         if (!r.ok) {

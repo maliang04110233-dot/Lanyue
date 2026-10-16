@@ -16,11 +16,14 @@
     "setup:hooks": "node scripts/setup-hooks.js",
     "lint": "eslint src/ test/ scripts/ci-doctor.cjs",
     "smoke:asar": "node scripts/smoke-asar.js",
+    "package:smoke": "electron-builder --config build/smoke.config.cjs --win --x64 --dir --publish never",
+    "smoke:release": "node scripts/smoke-test-manual.js .preview/release-smoke/win-unpacked/Lanyue.exe",
     "check:dead-deps": "node scripts/check-dead-deps.cjs",
     "check:icons": "node scripts/check-icons.cjs",
     "gen:icons": "node scripts/gen-icon.js",
     "audit:deps": "node scripts/audit-gate.cjs",
-    "verify": "npm run lint && npm test && npm run check:dead-deps && npm run check:icons && npm run build && npm run smoke:asar"
+    "verify": "npm run lint && npm test && npm run check:dead-deps && npm run check:icons && npm run build && npm run smoke:asar",
+    "verify:release": "npm run verify && npm run smoke:release"
   },
   "keywords": [
     "music",
@@ -59,8 +62,8 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "iconv-lite": "^0.6.3",
-    "music-metadata": "^11.15.0",
+    "iconv-lite": "^0.7.3",
+    "music-metadata": "^12.2.0",
     "NeteaseCloudMusicApi": "^4.32.0",
     "node-id3": "^0.2.9",
     "qq-music-api": "^1.1.2"
@@ -72,7 +75,7 @@
     "proxy-addr": "^2.0.8",
     "moment": "^2.31.0",
     "qs": "^6.16.0",
-    "music-metadata": "^11.15.0",
+    "music-metadata": "^12.2.0",
     "xml2js": "^0.6.2",
     "morgan": "^1.12.1",
     "on-headers": "^1.1.0",

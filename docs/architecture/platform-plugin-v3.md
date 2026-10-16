@@ -1,6 +1,12 @@
 # MusicDL 音源平台架构重设计（v3）
 
-> 状态：**设计稿，待评审** ｜ 目标版本：1.1.0 ｜ 2026-09-17
+> 状态：**已实施** ｜ 目标版本：1.1.0 ｜ 2026-09-17 设计
+> 实施证据（2026-10-15 核验）：`src/api/pluginRegistry.js`（PluginRegistry + PlatformManifest 自描述
+> 契约 + 自动发现 + validate 抛错）、`src/api/gateway.js`（能力检查/cookie 注入/统一出口）、
+> 8 个平台文件均导出 manifest；能力由方法存在性推导（CAPABILITY_METHODS 表），策略字段由
+> manifest 显式声明（fallbackSource/probeable/order/aggregateLimit）；UI 平台清单从 registry 派生
+> （index.html 仅留"全部"一个 option）。`test/platform-contract.test.js` + `test/gateway.test.js`
+> 68/68 通过。能力声明驱动源接口层的研究提案（P1）就此闭合。
 > 触发：平台从 1 个增长到 8 个（netease / qq / bilibili / kugou / kuwo / migu / fivesing / soda），
 > 「加一个平台」的成本与出错率随数量线性上升，已到了必须收敛的临界点。
 

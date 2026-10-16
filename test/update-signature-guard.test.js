@@ -198,17 +198,21 @@ test('守卫：package.json 不得有 build 段（裸跑 electron-builder 会产
   );
 });
 
-test('守卫：所有 electron-builder 调用都显式带 --config build/config.cjs', () => {
-  const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+test('守卫：所有 electron-builder 调用都显式带 --config build/*.cjs', () => {
+  // 归一化 CRLF：`.` 不匹配 \r，不剥掉行尾 \r 的话 `^\s*#.*$` 认不出注释行
+  const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
   const scripts = JSON.parse(read('package.json')).scripts;
   const callers = Object.entries(scripts).filter(([, cmd]) => /electron-builder/.test(cmd));
   assert.ok(callers.length > 0, '没找到 electron-builder 调用点 —— 是脚本改名了吗？');
   for (const [name, cmd] of callers) {
     // install-app-deps 是子命令，不需要 config
     if (/\binstall-app-deps\b/.test(cmd)) continue;
+    // 显式 config 是底线：build/config.cjs 是发布真源，build/smoke.config.cjs
+    // 是冒烟专用隔离配置（2026-10-14 新增，输出到 .preview/release-smoke，
+    // 与正式 release/ 隔离）。两者都满足「不许裸跑 electron-builder」的意图。
     assert.match(
-      cmd, /--config\s+build\/config\.cjs/,
-      `npm run ${name} 调 electron-builder 却没带 --config build/config.cjs`,
+      cmd, /--config\s+build\/[\w.-]+\.cjs/,
+      `npm run ${name} 调 electron-builder 却没带显式 --config`,
     );
   }
   const ci = read(path.join('.github', 'workflows', 'ci.yml'));
@@ -217,6 +221,6 @@ test('守卫：所有 electron-builder 调用都显式带 --config build/config.
     .map((l) => l.replace(/^\s*#.*$/, ''))
     .filter((l) => /electron-builder/.test(l) && !/install-app-deps/.test(l));
   for (const line of ciCalls) {
-    assert.match(line, /--config\s+build\/config\.cjs/, `CI 里有一行 electron-builder 漏了 --config: ${line.trim()}`);
+    assert.match(line, /--config\s+build\/[\w.-]+\.cjs/, `CI 里有一行 electron-builder 漏了 --config: ${line.trim()}`);
   }
 });

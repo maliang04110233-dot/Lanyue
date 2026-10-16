@@ -95,6 +95,7 @@ const COMMANDS = [
   { id: 'pl-prev', icon: '⏮', group: '播放', label: '上一首', keywords: ['prev', 'previous'], run: () => _call('prevSong') },
   { id: 'pl-fav', icon: '♥', group: '播放', label: '收藏 / 取消收藏当前播放的歌', keywords: ['favorite', 'fav', 'heart', '收藏', '红心', '当前播放'], run: () => _call('toggleFavoriteCurrent') },
   { id: 'pl-report', icon: '📈', group: '播放', label: '听歌报告（播放统计）', keywords: ['report', 'stats', '统计'], run: () => _call('generatePlayReport') },
+  { id: 'pl-taste', icon: '🎯', group: '播放', label: '品味画像（AI 解读口味）', keywords: ['taste', 'profile', '画像', '口味', '品味', 'AI'], run: () => _call('openTasteProfile') },
   { id: 'pl-rcopy', icon: '📋', group: '播放', label: '复制听歌报告为纯文本', keywords: ['report', 'copy', '报告', '复制'], run: () => _call('copyPlayReportText') },
   { id: 'pq-dedupe', icon: '🧹', group: '播放', label: '播放队列去重（保留首次出现）', keywords: ['dedupe', 'queue', '队列', '去重'], run: () => _call('dedupePlayQueue') },
   { id: 'pq-save', icon: '💾', group: '播放', label: '播放队列存为歌单', keywords: ['save', 'queue', 'playlist', '队列', '歌单', '保存'], run: () => _call('saveQueueAsPlaylist') },

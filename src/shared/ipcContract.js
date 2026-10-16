@@ -190,13 +190,29 @@ const CHANNELS = {
   // 所以生产路径碰不到这根栅栏；碰到时说明有人绕过渲染层直接拼 invoke）。
   'ai-assistant-tools': { invoke: MAIN },
   'ai-assistant-plan': { invoke: MAIN, args: [['messages', t.arr(24)], ['context', t.str(1600)]] },
-  'ai-assistant-tool-call': { invoke: MAIN, args: [['name', t.str(64)], ['args', t.obj()], ['confirmed', t.bool()], ['scope', t.enum(['single', 'batch'], 'single')]] },
+  'ai-assistant-tool-call': { invoke: MAIN, args: [['name', t.str(64)], ['args', t.obj()], ['confirmed', t.bool()], ['scope', t.enum(['single', 'batch'], 'single')], ['runId', t.str(32)]] },
+
+  // ── 歌曲讲解（invoke，候选方向 1：背景卡片）────────
+  // 只读 + 缓存：同一首歌第二次点不再出网（计费调用不因重复点击重复扣费）。
+  // 出网走与 AI 助手同一条 assistantChat → urlGuard；凭据取当前厂商那根 Key。
+  'get-song-story': { invoke: MAIN, args: [['title', t.str(200)], ['artist', t.str(200)], ['lang', t.str(8)]] },
+
+  // ── 品味解读（invoke，候选方向 2：口味画像）────────
+  // 只读 + 缓存：同一份统计摘要第二次点不再出网。
+  // 出网文本在服务层收口 —— 只含歌手聚合与聚合数字，不含具体歌名/曲库明细。
+  'get-taste-profile': { invoke: MAIN, args: [['lang', t.str(8)]] },
 
   // ── AI 智能歌单（invoke）──────────────────────────
   // 只读通道：取候选 → 一次出网 → 回真歌曲对象。写不写库由界面那一下
   // 「存为歌单」经既有的 save-user-playlist 决定，所以这条通道不进 MCP 工具表白名单
   // （外部 Agent 要同样的效果，用 get_user_playlists 自己挑，无需 LLM 代劳）。
   'smart-playlist-generate': { invoke: MAIN, args: [['prompt', t.str(200)], ['scope', t.str(64)]] },
+
+  // ── 歌单语义运维（invoke，候选方向 3）────────────────
+  // 只读通道：给**一个已经存在**的歌单做体检——AI 逐首给契合度与建议动作。
+  // 不写库：改名/删歌/挪歌全部走既有的 save-user-playlist / remove-from-user-playlist
+  // 由界面里那几下按钮决定（与智能歌单同一取舍，也不进 MCP 工具表白名单）。
+  'playlist-audit': { invoke: MAIN, args: [['playlistId', t.str(64)], ['prompt', t.str(200)]] },
   'check-for-update':   { invoke: MAIN },
   'download-update':    { invoke: MAIN },
   'restart-and-install':{ invoke: MAIN },
@@ -349,6 +365,12 @@ const METHODS = {
   aiClearHistory: 'ai-clear-history',
   aiProviderConfig: 'ai-provider-config',
   aiProviderSave: 'ai-provider-save',
+  // 歌曲讲解（候选方向 1：背景卡片）
+  getSongStory: 'get-song-story',
+  // 品味解读（候选方向 2：口味画像）
+  getTasteProfile: 'get-taste-profile',
+  // 歌单语义运维（候选方向 3）
+  playlistAudit: 'playlist-audit',
   // 用户歌单
   getUserPlaylists: 'get-user-playlists',
   saveUserPlaylist: 'save-user-playlist',

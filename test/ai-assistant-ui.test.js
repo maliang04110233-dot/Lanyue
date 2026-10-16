@@ -25,16 +25,18 @@ function pick(dict, key) {
   return typeof dict[key] === 'string' ? dict[key] : undefined;
 }
 
-test('写操作确认：mutating 步骤必须先 await askConfirm，且拒绝时不执行', () => {
+test('危险步骤仍走模态：askConfirm 恰一处，且判据是 risk === destructive', () => {
   const calls = VIEW.match(/await\s+askConfirm\(/g) || [];
   assert.strictEqual(calls.length, 1, '助手页应恰有一处 await askConfirm(');
-  assert.match(VIEW, /const meta = tools\.find/, '没按 mutating 判定就不该弹确认');
-  assert.match(VIEW, /meta && meta\.mutating/, '确认框只该为写操作弹');
-  // 认「被拒分支里到底做了什么」，不认字符数窗口：拒绝后不得 invoke，且要 continue 跳过
-  const declined = VIEW.match(/if \(!okAsk\) \{([\s\S]*?)\n {8}\}/);
-  assert.ok(declined, '确认返回 false 必须有跳过这一步的分支');
-  assert.ok(!/\binvoke\(/.test(declined[1]), '被拒后不得调用工具通道');
-  assert.match(declined[1], /continue;/, '被拒后应跳过这一步继续下一个');
+  assert.match(VIEW, /meta\.risk === 'destructive'/, '单项弹确认的判据不在了');
+  assert.match(VIEW, /scope = 'single'/, '危险步骤必须发 single，批量令牌换不到它');
+  // 认「被拒分支里到底做了什么」，不认缩进字符数：确认后的 `if (!confirmed)` 块
+  // 里不得出现 invoke，且必须以 continue 跳过这一步（两个事实，谁被删了都会红）。
+  const seg = VIEW.split('if (!confirmed) {')[1];
+  assert.ok(seg, '确认返回 false 必须有跳过这一步的分支');
+  const block = seg.slice(0, seg.indexOf('\n    } else'));
+  assert.ok(!/\binvoke\(/.test(block), '被拒后不得调用工具通道');
+  assert.match(block, /continue;/, '被拒后应跳过这一步继续下一个');
   assert.ok(VIEW.includes("import { askConfirm } from '../confirmDialog.js';"));
 });
 
@@ -86,11 +88,11 @@ test('助手可用面 = MCP 白名单，一条通道都不多', () => {
   // 除这三条自身，界面侧不得再 invoke 别的工具通道（扩权要么走白名单要么走不通）
   const others = [...used].filter(c => !c.startsWith('ai-assistant-'));
   assert.deepStrictEqual(others, [], '助手页绕道调了别的通道: ' + others.join(', '));
-  assert.strictEqual(AGENT_TOOLS.length, 21, '工具数变了：SECURITY/README/本钉三处口径要一起改');
+  assert.strictEqual(AGENT_TOOLS.length, 38, '工具数变了：SECURITY/README/本钉三处口径要一起改');
 });
 
 test('循环有上界：回合数封顶，否则坏回复能刷爆队列与计费', () => {
-  assert.match(VIEW, /MAX_TURNS\s*=\s*3/);
+  assert.match(VIEW, /MAX_TURNS\s*=\s*6/);
   assert.match(VIEW, /turn < MAX_TURNS/, '循环必须有上界');
 });
 

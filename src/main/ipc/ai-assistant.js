@@ -67,7 +67,7 @@ function register() {
     }
   });
 
-  handle('ai-assistant-tool-call', async (_, name, args, confirmed, scope) => {
+  handle('ai-assistant-tool-call', async (_, name, args, confirmed, scope, runId) => {
     const tool = toolsFromContract().find(t => t.name === name);
     if (!tool) return { ok: false, error: 'UNKNOWN_TOOL' };
     // 闸门按 risk 判：判据抽在 assistantGate.js（四种组合得能逐条断言）。
@@ -76,7 +76,13 @@ function register() {
     if (deny) return { ok: false, error: deny };
     const msg = await _handle()({
       jsonrpc: '2.0', id: 1, method: 'tools/call',
-      params: { name, arguments: args && typeof args === 'object' ? args : {} },
+      params: {
+        name,
+        arguments: args && typeof args === 'object' ? args : {},
+        // 审批形态/风险档/轮次随桥一路记进审计（mcpCore 只在 source==='assistant' 时采信）：
+        // 渲染层能在审计页回看「这一步是谁批准的、什么形态、几档风险、哪一轮」。
+        auditContext: { scope: scope || 'single', risk: tool.risk, runId: runId || '' },
+      },
     });
     if (msg && msg.error) {
       return { ok: false, error: 'TOOL_FAILED', text: String(msg.error.message || '').slice(0, 200) };

@@ -130,6 +130,8 @@ async function openPlaylistDetail(playlistId) {
 
     document.getElementById('playlistDetailTitle').textContent = pl.name;
     document.getElementById('playlistDetailDesc').textContent = pl.desc || t('pl.detail.noDesc');
+    // 语义运维面板（候选方向 3）通过它拿当前歌单 id：模块变量 HTML onclick 拿不到
+    window._plDetailId = pl.id;
     renderPlaylistDetailSongs(pl.songs || []);
 
     document.getElementById('playlistDetailModal').classList.remove('hidden');
@@ -142,6 +144,7 @@ function closePlaylistDetail() {
   document.getElementById('playlistDetailModal').classList.add('hidden');
   _currentPlaylistId = null;
   _currentDetailSongs = [];
+  window._plDetailId = null;
   _resetPlSel();
 }
 

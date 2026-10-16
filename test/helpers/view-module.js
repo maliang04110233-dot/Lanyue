@@ -24,12 +24,14 @@ const REPO = path.join(__dirname, '..', '..');
 let _registered = false;
 let _seq = 0;
 
-function registerI18nRedirect() {
+function registerI18nRedirect(data) {
   if (_registered) return;
   // 用绝对 file URL 而不是相对 specifier：parentURL 的基准在不同入口下不一致
   // （从 test/*.test.js 走和从本文件自己走会解析到不同目录），绝对路径没这个歧义。
+  // data 会传给钩子的 initialize()（如 { stubConfirm: true }）——钩子跑在独立
+  // loader 线程，测试进程的 globalThis 在那里不可见，开关只能走这条注册期通道。
   const hooks = pathToFileURL(path.join(__dirname, 'i18n-redirect-hooks.js')).href;
-  register(hooks, pathToFileURL(__filename).href);
+  register(hooks, { parentURL: pathToFileURL(__filename).href, data: data || {} });
   _registered = true;
 }
 
@@ -41,8 +43,8 @@ function registerI18nRedirect() {
  * 那种红灯是"顺序不对"而不是"逻辑写错"，比假绿还难查。依赖模块（state.js 等）仍共享 ——
  * 它们是被 import 的单例，本来就该共享。
  */
-async function loadView(rel, dom) {
-  registerI18nRedirect();
+async function loadView(rel, dom, hookData) {
+  registerI18nRedirect(hookData);
   const url = pathToFileURL(path.join(REPO, rel)).href;
   const mod = await import(`${url}?ck=${++_seq}`);
   // state.js 模块顶层把 window.getState/setState 换成真 store，import 之后必须把

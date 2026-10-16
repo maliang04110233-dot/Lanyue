@@ -71,6 +71,16 @@ test('助手不扩白名单：现取工具表，且不绕开桥碰任意 handler
   assert.ok(!/getInvokeHandler\(/.test(ASSISTANT), '助手绕开桥直接取了任意 handler');
 });
 
+// 渲染层本地拼 tool_results 的那枚上限（视图不能跨层 import 服务模块），
+// 与服务侧 MAX_RESULT_CHARS 必须同数 —— 两处各一份，飘了提示口径就分家。
+test('渲染层 tool_results 上限 = 服务侧 MAX_RESULT_CHARS（同一个数不许有两份）', () => {
+  const { MAX_RESULT_CHARS } = require('../src/api/services/aiAssistantService');
+  const VIEW_SRC = read('src/renderer/js/views/ai-assistant.js');
+  const m = VIEW_SRC.match(/MAX_RESULT_CHARS_LOCAL\s*=\s*(\d+)/);
+  assert.ok(m, '视图里找不到 MAX_RESULT_CHARS_LOCAL 声明');
+  assert.strictEqual(Number(m[1]), MAX_RESULT_CHARS, '两处上限飘了');
+});
+
 // 上限这个数只该有一份：契约按它截运输，服务按它截提示，两边各写一遍迟早飘。
 test('契约里 context 的 t.str 上限 = 服务侧 MAX_CONTEXT_CHARS（同一个数不许有两份）', () => {
   const { MAX_CONTEXT_CHARS } = require('../src/api/services/aiAssistantService');

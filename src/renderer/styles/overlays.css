@@ -850,3 +850,20 @@ kbd {
 .confirm-dialog.danger .confirm-dialog-ok {
   background: var(--red); color: #fff;
 }
+
+/* ══ 歌单语义运维（候选方向 3）══════════════════
+   歌单详情弹窗「修」面板里的契合度 / 建议动作徽标。
+   色值一律走令牌（--neon-*-dim / --red-dim / --neon-*），换主题时整块跟变。 */
+.plA-row { background: var(--bg-card); }
+.plA-badge {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 600;
+  padding: 1px 8px; border-radius: var(--r-full);
+  line-height: 1.6;
+}
+.plA-fitHigh { background: var(--neon-cyan-dim); color: var(--neon-cyan); }
+.plA-fitMid  { background: var(--neon-blue-dim); color: var(--neon-blue); }
+.plA-fitLow  { background: var(--red-dim); color: var(--red); }
+.plA-sugKeep   { background: var(--neon-cyan-dim); color: var(--neon-cyan); }
+.plA-sugMove   { background: var(--neon-blue-dim); color: var(--neon-blue); }
+.plA-sugRemove { background: var(--red-dim); color: var(--red); }

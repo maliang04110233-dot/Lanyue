@@ -56,6 +56,7 @@ import './views/aggregate.js';
 import './views/subscriptions.js';
 import './views/ai-assistant.js';
 import './views/smart-playlist.js';
+import './playlistAudit.js';
 import './views/clipboard.js';
 import './views/batchImport.js';
 import './views/nameBatch.js';
@@ -90,6 +91,8 @@ import './player/fade.js';
 import './player/visualizer.js';
 import { resolvePlayingIndex, flashRow } from './locatePlaying.js';
 import './songGroups.js';
+import './songStory.js';
+import './tasteProfile.js';
 
 // 初始化模块（副作用引入：init.js 内部自挂 window.persistPlayQueue）
 import './init.js';

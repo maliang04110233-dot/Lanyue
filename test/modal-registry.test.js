@@ -457,6 +457,8 @@ test('⑬ 动态层 Esc 契约全量对账：28 枚自报点逐枚授契约或�
     'shortcuts.js': ['-:pri=100'],
     'sleepTimer.js': ['-'],
     'songGroups.js': ['fn:closeSongGroupsModal'],
+    'playlistAudit.js': ['fn:closePlAudit'],
+    'tasteProfile.js': ['-'],
     'views/ai-music.js': ['-', '-'],
     'views/batchImport.js': ['fn:closeBatchImport'],
     'views/home.js': [null],

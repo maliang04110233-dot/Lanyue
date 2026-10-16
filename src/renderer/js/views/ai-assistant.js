@@ -21,14 +21,28 @@ import { errBrief } from '../errBrief.js';
 import { showToast } from '../toast.js';
 import { askConfirm } from '../confirmDialog.js';
 import { mountProviderPanel, providerErrText } from '../aiProviderPanel.js';
+import { renderPlanCard } from '../assistantPlanCard.js';
 
-const MAX_TURNS = 3;
+const MAX_TURNS = 6;
+const MAX_RUN_CALLS = 24;
+const MAX_RUN_MUTATIONS = 12;
 const CTX_QUEUE = 8;
 const CTX_SONGS = 5;
+// 工具结果回喂的文本上限：与服务侧 MAX_RESULT_CHARS 同数（两处各一份，静态钉守着同数，
+// 见 test/ai-assistant-gate.test.js）。不跨层 import 服务的原因见 _toolResultsMessage 头注。
+const MAX_RESULT_CHARS_LOCAL = 4000;
 
 let _history = [];      // [{role,content}]，不含 system
-let _tools = null;      // 助手可见目录（含 mutating）
+let _tools = null;      // 助手可见目录（含 mutating/risk/audience）
 let _busy = false;
+
+/** 一轮（用户的一句话到循环收束）的编号：审计靠它把同一步的几次调用串起来 */
+function _newRunId() {
+  const c = globalThis.crypto;
+  return (c && typeof c.randomUUID === 'function')
+    ? String(c.randomUUID()).slice(0, 32)
+    : `r${Date.now().toString(36)}`;
+}
 
 /** 一首歌缩成一行。只取标题/歌手/来源/id（+正在播那首的音质）：歌词、本地路径不进提示 */
 function _oneLine(s, withQuality) {
@@ -112,6 +126,8 @@ const ERR_KEYS = {
   TOOL_FAILED: 'assistant.errLlmFailed',
   EMPTY: 'assistant.errEmpty',
   EMPTY_REPLY: 'assistant.errEmpty',
+  AGENT_SCOPE_MISMATCH: 'assistant.errScopeMismatch',
+  APP_ONLY: 'assistant.errAppOnlyTool',
 };
 
 function _errText(code, msg) {
@@ -122,13 +138,125 @@ function _errText(code, msg) {
   return providerErrText(code, t('assistant.errLlmFailed', { msg: errBrief(code || msg || 'unknown') }));
 }
 
+/** 把界面词全部在视图里取好再传进卡：本文件里的 assistant.* 字面量才扫得到那枚中英齐备的钉 */
+function _cardLabels() {
+  return {
+    riskRead: t('assistant.riskRead'),
+    riskWrite: t('assistant.riskWrite'),
+    riskDestructive: t('assistant.riskDestructive'),
+    approve: t('assistant.planApprove'),
+    readOnly: t('assistant.planReadOnly'),
+    cancel: t('assistant.planCancel'),
+    summary: (n, w) => t('assistant.planSummary', { n, w }),
+  };
+}
+
+/** 等用户在卡上做一个决定。resolve 之后卡就不再接受第二次点击。 */
+function _awaitDecision(card) {
+  return new Promise((resolve) => {
+    let done = false;
+    const settle = (kind) => {
+      if (done) return;
+      done = true;
+      for (const b of Object.values(card.buttons)) b.disabled = true;
+      resolve(kind);
+    };
+    card.buttons.approve.addEventListener('click', () => settle('approve'));
+    card.buttons.readOnly.addEventListener('click', () => settle('readOnly'));
+    card.buttons.cancel.addEventListener('click', () => settle('cancel'));
+  });
+}
+
 /**
- * 一个回合：问 →（写操作先确认）执行 → 结果回喂再问，直到没有 steps 或触上界。
+ * 一轮执行结果回喂成一条 user 消息。
+ *
+ * 不跨层 import api/services/aiAssistantService.js 的 formatToolResults：那个模块顶层
+ * require 了主进程的 mcp/tools，渲染层打包路径取不到它。所以这里本地拼同一形状的消息，
+ * 上限常数 MAX_RESULT_CHARS_LOCAL 由静态钉（test/ai-assistant-gate.test.js）钉成与服务侧同数。
+ */
+function _toolResultsMessage(results) {
+  return {
+    role: 'user',
+    content: JSON.stringify({
+      tool_results: (results || []).map(r => ({
+        tool: String(r.tool || ''),
+        ok: r.ok === true,
+        text: String(r.text || '').slice(0, MAX_RESULT_CHARS_LOCAL),
+      })),
+    }),
+  };
+}
+
+/**
+ * 执行一批步骤。三种确认形态在这里分岔，而**判据在主进程**（assistantGate）：
+ * 界面只负责发出正确的 scope/confirmed 组合，发错了主进程拒，拒了界面如实上屏。
+ */
+async function _execSteps(steps, tools, grant, run) {
+  const results = [];
+  for (const step of steps) {
+    if (run.calls >= MAX_RUN_CALLS) {
+      results.push({ tool: step.tool, ok: false, text: t('assistant.planStoppedBudget') });
+      _push('asst-step asst-step-failed', t('assistant.planStoppedBudget'));
+      run.outOfBudget = true;
+      break;
+    }
+    const meta = tools.find((x) => x.name === step.tool) || { risk: 'read', audience: 'both' };
+    const isWrite = meta.risk !== 'read';
+    if (isWrite && run.mutations >= MAX_RUN_MUTATIONS) {
+      results.push({ tool: step.tool, ok: false, text: t('assistant.planStoppedBudget') });
+      _push('asst-step asst-step-failed', t('assistant.planStoppedBudget'));
+      run.outOfBudget = true;
+      break;
+    }
+    let confirmed = false;
+    let scope = grant;
+    if (meta.risk === 'destructive') {
+      // 危险步骤即使在批确认里也单独弹。askConfirm 仍是本文件里唯一的模态确认入口 ——
+      // test/ai-assistant-ui.test.js 那枚「恰好一处 await askConfirm」就是它还在的证据。
+      scope = 'single';
+      confirmed = await askConfirm({
+        text: t('assistant.confirmText', { tool: step.tool, args: JSON.stringify(step.args).slice(0, 200) }),
+      });
+      if (!confirmed) {
+        const declined = t('assistant.toolDeclined', { tool: step.tool });
+        results.push({ tool: step.tool, ok: false, text: declined });
+        _push('asst-step', declined);
+        continue;
+      }
+    } else {
+      confirmed = isWrite;   // 只读不需要批准；非只读需要「这一批被批准了」那个事实
+    }
+    run.calls += 1;
+    if (isWrite) run.mutations += 1;
+    _push('asst-step', t('assistant.toolRunning', { tool: step.tool }));
+    const out = await window.ipcRenderer.invoke(
+      'ai-assistant-tool-call', step.tool, step.args, confirmed, scope, run.id);
+    const ok = !!(out && out.ok);
+    if (!ok) {
+      const key = `${step.tool}|${JSON.stringify(step.args)}`;
+      run.failures[key] = (run.failures[key] || 0) + 1;
+    }
+    results.push({ tool: step.tool, ok, text: ok ? out.text : _errText(out && out.error, out && out.text) });
+    _push(ok ? 'asst-step' : 'asst-step asst-step-failed',
+      ok ? t('assistant.toolDone', { tool: step.tool })
+        : t('assistant.toolFailed', { tool: step.tool, msg: errBrief(out && out.text) }));
+  }
+  return results;
+}
+
+/** 同 tool + 同 args 连续失败两次就停：模型会对着一个坏工具反复试，那是刷额度不是思考 */
+function _stuck(run) {
+  return Object.values(run.failures || {}).some((n) => n >= 2);
+}
+
+/**
+ * 一个回合：问 → 计划卡批准 → 执行 → 结果回喂再问，直到没有 steps、触上界或触预算。
  * 返回值是「为什么停」的提示文案（空串 = 模型自己收了尾）。
  */
 async function _round(userText) {
   _history.push({ role: 'user', content: userText });
   const tools = await _ensureTools();
+  const run = { calls: 0, mutations: 0, id: _newRunId(), failures: Object.create(null) };
   let stopHint = '';
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
@@ -144,30 +272,20 @@ async function _round(userText) {
     if (plan.reply) _push('asst-msg-assistant', plan.reply);
     if (!plan.steps.length) return '';
 
-    const results = [];
-    for (const step of plan.steps) {
-      const meta = tools.find(x => x.name === step.tool);
-      if (meta && meta.mutating) {
-        const okAsk = await askConfirm({
-          text: t('assistant.confirmText', { tool: step.tool, args: JSON.stringify(step.args).slice(0, 200) }),
-        });
-        if (!okAsk) {
-          const declined = t('assistant.toolDeclined', { tool: step.tool });
-          results.push({ tool: step.tool, ok: false, text: declined });
-          _push('asst-step', declined);
-          continue;
-        }
-      }
-      _push('asst-step', t('assistant.toolRunning', { tool: step.tool }));
-      const out = await window.ipcRenderer.invoke(
-        'ai-assistant-tool-call', step.tool, step.args, meta && meta.mutating === true);
-      const ok = !!(out && out.ok);
-      results.push({ tool: step.tool, ok, text: ok ? out.text : _errText(out && out.error, out && out.text) });
-      _push(ok ? 'asst-step' : 'asst-step asst-step-failed',
-        ok ? t('assistant.toolDone', { tool: step.tool })
-          : t('assistant.toolFailed', { tool: step.tool, msg: errBrief(out && out.text) }));
+    const card = renderPlanCard({ host: _log(), steps: plan.steps, tools, labels: _cardLabels() });
+    const kind = await _awaitDecision(card);
+    if (kind === 'cancel') {
+      _push('asst-step', t('assistant.planCancelled'));
+      return '';
     }
-    _history.push({ role: 'user', content: JSON.stringify({ tool_results: results }) });
+    const chosen = kind === 'readOnly'
+      ? card.selected().filter((s) => ((tools.find((x) => x.name === s.tool) || {}).risk === 'read'))
+      : card.selected();
+    if (!chosen.length) { _push('asst-step', t('assistant.planCancelled')); return ''; }
+    const results = await _execSteps(chosen, tools, kind === 'approve' ? 'batch' : 'readOnly', run);
+    _history.push(_toolResultsMessage(results));
+    if (run.outOfBudget) { stopHint = t('assistant.planStoppedBudget'); break; }
+    if (_stuck(run)) { stopHint = t('assistant.planStoppedRepeat'); break; }
     stopHint = t('assistant.loopStopped');
   }
   return stopHint;

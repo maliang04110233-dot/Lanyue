@@ -80,11 +80,17 @@ test('steps 里的非白名单工具、args 非对象、超上限都要被丢掉
     { tool: 'get_lyrics', args: { id: '1' } },
     { tool: 'list_platforms', args: {} },
     { tool: 'history_stats', args: {} },
-    { tool: 'source_health', args: {} },                // 第 5 个 → 截断
+    { tool: 'source_health', args: {} },
+    { tool: 'parse_link', args: { url: 'u' } },
+    { tool: 'search_singer', args: { keyword: 'b' } },
+    { tool: 'list_subscriptions', args: {} },           // 第 9 个合法 → 上限 8 处截断
   ];
   const r = parseAssistantReply(JSON.stringify({ reply: 'x', steps: fake }));
   assert.strictEqual(r.steps.length, MAX_STEPS_PER_TURN);
-  assert.deepStrictEqual(r.steps.map(s => s.tool), ['search_music', 'get_lyrics', 'list_platforms', 'history_stats']);
+  assert.deepStrictEqual(r.steps.map(s => s.tool), [
+    'search_music', 'get_lyrics', 'list_platforms', 'history_stats',
+    'source_health', 'parse_link', 'search_singer', 'list_subscriptions',
+  ]);
 });
 
 test('trimHistory：只留末尾 N 条，且首条必须是 user（孤立的工具结果开头会让模型误读）', () => {
@@ -211,4 +217,37 @@ test('planAssistantTurn 把 context 递给 chat，仍是单条 system + 原历�
   assert.strictEqual(got[0].role, 'system');
   assert.ok(got[0].content.includes('晚风 - 张三'));
   assert.strictEqual(got[1].role, 'user');
+});
+
+// ── P2 Task 8：协议层 —— steps 带 why、上限 4→8、提示按 risk 说清确认形态 ──
+
+test('steps 带 why：文本截到 120 字，缺省或非法就不带这个键（不给界面留空串分支）', () => {
+  const longWhy = '解'.repeat(300);
+  const p = parseAssistantReply(JSON.stringify({
+    reply: '好',
+    steps: [
+      { tool: 'add_to_queue', args: { song: { id: 1 } }, why: longWhy },
+      { tool: 'list_playlists', args: {} },
+      { tool: 'list_playlists', args: {}, why: 42 },
+    ],
+  }));
+  assert.strictEqual(p.steps.length, 3);
+  assert.strictEqual(p.steps[0].why.length, 120, '超长 why 没截到 120 字');
+  assert.ok(!('why' in p.steps[1]), '没给 why 就不该造一个空 why');
+  assert.ok(!('why' in p.steps[2]), '非字符串 why 必须当没给');
+});
+
+test('每回合上限从 4 抬到 8（整局预算在渲染层，不在这里）', () => {
+  assert.strictEqual(MAX_STEPS_PER_TURN, 8);
+  const many = Array.from({ length: 12 }, () => ({ tool: 'list_playlists', args: {} }));
+  assert.strictEqual(parseAssistantReply(JSON.stringify({ reply: 'x', steps: many })).steps.length, 8);
+});
+
+test('提示里按 risk 说清三种确认形态，且仍然只有一句协议指令', () => {
+  const prompt = buildSystemPrompt(TOOLS);
+  assert.strictEqual((prompt.match(/只输出一个 JSON 对象/g) || []).length, 1, '协议指令必须只有一句');
+  assert.match(prompt, /计划卡/);
+  assert.match(prompt, /单独弹确认/);
+  assert.match(prompt, /"why"/);
+  assert.ok(prompt.indexOf('删除、清空') > 0, 'destructive 的说法要在提示里');
 });

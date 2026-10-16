@@ -130,12 +130,24 @@ function main() {
   const reported = new Set(entries.map((v) => v.name));
   const stale = [...exempt.keys()].filter((p) => !reported.has(p));
 
+  // 数据源防护：npm audit 偶发返回空（网络抖动/代理/registry 异常），
+  // 此时 entries 为 0、清单里全部豁免都会被误判成 stale（「已无对应漏洞」）。
+  // 实测 2026-10-14：同一条命令连续两次，一次报 12 项 high/critical、一次报 0 项。
+  // 若清单非空而 audit 一个漏洞都没报，几乎不可能是「上游一夜之间全修好了」，
+  // 更可能是这次根本没拿到数据 —— 此时按「数据源异常」告警放行，而不是误判 stale。
+  const auditLooksEmpty = entries.length === 0 && exempt.size > 0;
+
   if (remaining.length) {
     console.error(`\n✗ 存在未豁免的 high/critical（${remaining.length} 项），发版被阻断：`);
     remaining.forEach((v) => console.error(`    ${v.name} ${v.severity}`));
     console.error('\n处理方式：能安全升级就加进 package.json 的 overrides；'
       + '确实不可达或上游锁死，写进 audit-allowlist.json 并附理由与核查日期。');
     return 1;
+  }
+  if (auditLooksEmpty) {
+    console.warn('\n⚠ 本次 npm audit 返回 0 项漏洞，但豁免清单非空 —— 判为数据源异常'
+      + '（audit 偶发拿不到数据），本次不按 stale 误判、放行的同时请人工复核网络/registry。');
+    return 0;
   }
   if (stale.length) {
     console.error(`\n✗ 豁免清单里有 ${stale.length} 项当前已无对应漏洞，请移除：`);
