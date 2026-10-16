@@ -16,6 +16,7 @@ import {
 import { failureTagHtml, isAuthFailure } from '../diagnose.js';
 import { isRangeClick, rangeKeys } from '../selectionRange.js';
 import { registerDeleteScope } from '../deleteScope.js';
+import { formatFileSize, formatDuration, maskUrl, dlProgressText } from '../dlFormat.js';
 import { netFailedTasks } from '../netRecovery.js';
 import { explainSkip } from '../policySkipNotice.js';
 
@@ -448,42 +449,8 @@ async function toggleQueueDetail(taskId) {
 }
 
 // ── 辅助格式化 ─────────────────────────────────────────
-function formatFileSize(bytes) {
-  if (bytes == null || bytes === 0) return '';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let i = 0;
-  let size = bytes;
-  while (size >= 1024 && i < units.length - 1) { size /= 1024; i++; }
-  return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
-}
 
-function formatDuration(ms) {
-  if (ms == null || ms === 0) return '';
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return sec + ' 秒';
-  const min = Math.floor(sec / 60);
-  const remain = sec % 60;
-  return min + ' 分 ' + (remain > 0 ? remain + ' 秒' : '');
-}
 
-function maskUrl(url) {
-  if (!url) return '';
-  try {
-    const u = new URL(url);
-    const host = u.hostname;
-    // 提取文件名部分
-    const parts = u.pathname.split('/');
-    const filename = parts[parts.length - 1];
-    if (filename.length > 20) {
-      return host + '/…' + filename.slice(-18);
-    }
-    return host + '/' + filename;
-  } catch (_e) {
-    // 非法 URL，截断显示
-    if (url.length > 40) return url.slice(0, 20) + '…' + url.slice(-16);
-    return url;
-  }
-}
 
 async function retryQueueItem(taskId) {
   try {
@@ -538,23 +505,7 @@ async function removeQueueItem(taskId) {
   }
 }
 
-// 下载中条目的速度/剩余/大小文案（download-progress 事件驱动，app.js 调用）
-function formatEta(sec) {
-  sec = Math.max(0, Math.round(sec));
-  const m = Math.floor(sec / 60) % 60, h = Math.floor(sec / 3600), s = sec % 60;
-  const pad = n => String(n).padStart(2, '0');
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-}
 
-function dlProgressText(info) {
-  if (!info) return '';
-  const parts = [];
-  if (typeof info.progress === 'number') parts.push(info.progress + '%');
-  if (info.speedBps > 0) parts.push(formatBytes(info.speedBps) + '/s');
-  if (info.etaSec != null) parts.push('剩余 ' + formatEta(info.etaSec));
-  if (info.totalBytes > 0) parts.push(`${formatBytes(info.receivedBytes)} / ${formatBytes(info.totalBytes)}`);
-  return parts.join(' · ');
-}
 
 async function reorderQueueItem(taskId, action) {
   try {
