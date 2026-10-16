@@ -21,6 +21,7 @@ import {
 } from './player/lyrics.js';
 import { getLyricOverride } from './lyricEditor.js';
 import { createResumeSeeker } from './player/resumeSeek.js';
+import { createProgressWriter } from './player/progressStore.js';
 
 const audio = document.getElementById('audioPlayer');
 
@@ -163,23 +164,16 @@ function _updateQualityBadge(song) {
 // ── 播放进度记忆 ─────────────────────────────────────
 const _playProgressKey = (song) => song.filePath || `${song.source}:${song.id}`;
 
-async function savePlayProgress(song, time) {
-  try {
-    const enabled = await api.getPref('playProgressMemory');
-    if (enabled === false) return;
-    const key = _playProgressKey(song);
-    const progressMap = await api.getPref('playProgressMap') || {};
-    progressMap[key] = { time, savedAt: Date.now() };
-    // 只保留最近 200 首的进度
-    const entries = Object.entries(progressMap);
-    if (entries.length > 200) {
-      entries.sort((a, b) => (a[1].savedAt || 0) - (b[1].savedAt || 0));
-      const trimmed = Object.fromEntries(entries.slice(-200));
-      await api.setPref('playProgressMap', trimmed);
-    } else {
-      await api.setPref('playProgressMap', progressMap);
-    }
-  } catch (_e) { /* ignore */ }
+// 三个写者（30 秒自动保存 / 暂停 / 播完写 0）会在同一份 playProgressMap 上做
+// 「读 → 改 → 整体写回」，不排队就会互相用陈旧快照覆盖。串行队列的实现抽在
+// player/progressStore.js —— 那里不碰 DOM，才能对着假 prefs 真跑交错。
+const _progressWriter = createProgressWriter({
+  getPref: (k) => api.getPref(k),
+  setPref: (k, v) => api.setPref(k, v),
+});
+
+function savePlayProgress(song, time) {
+  return _progressWriter.save(_playProgressKey(song), time);
 }
 
 async function restorePlayProgress(song) {
