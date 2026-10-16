@@ -52,7 +52,9 @@ test('tools: 白名单纪律——敏感/破坏性通道不得进工具面', () 
     'export-all-data', 'import-all-data', 'update-id3-tags',
     'restart-and-install', 'download-update', 'open-external', 'open-folder',
   ];
-  const channels = new Set(toolsFromContract().map(t => t.channel));
+  // 且所有（有通道的）工具通道必须真的是主进程 invoke 通道。
+  // audience:'app' 的渲染层能力没有 IPC 通道 —— 它们的 channel 是 null，不在本判据内。
+  const channels = new Set(toolsFromContract().map(t => t.channel).filter((c) => c !== null));
   for (const b of banned) assert.ok(!channels.has(b), `${b} 不应暴露为 MCP 工具`);
   // 且所有工具通道必须真的是主进程 invoke 通道
   for (const ch of channels) {

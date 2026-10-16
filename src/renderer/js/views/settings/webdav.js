@@ -3,6 +3,8 @@
  */
 
 import { t } from '../../i18n.js';
+import { errBrief } from '../../errBrief.js';
+import { credentialErrorText } from './util.js';
 
 export async function loadWebdavConfig() {
   try {
@@ -24,11 +26,6 @@ export async function loadWebdavConfig() {
   } catch (e) {
     logger.error('读取 WebDAV 配置失败:', e);
   }
-}
-
-export function credentialErrorText(code) {
-  if (code === 'SECRET_STORAGE_UNAVAILABLE') return t('toast.secretStorageUnavailable');
-  return code;
 }
 
 export async function saveWebdavConfig() {

@@ -24,8 +24,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { readSettingsView, isSettingsViewPath } = require('./helpers/settingsViewSource.js');
 const ROOT = path.join(__dirname, '..');
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
+const _readFile = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
+// 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+const read = (p) => (isSettingsViewPath(p) ? readSettingsView() : _readFile(p));
 const countOf = (s, sub) => s.split(sub).length - 1;
 
 const EQ_BAND_COUNT = 5;

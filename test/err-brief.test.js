@@ -21,8 +21,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { readSettingsView, isSettingsViewPath } = require('./helpers/settingsViewSource.js');
 const R = (...p) => path.join(__dirname, '..', 'src', 'renderer', ...p);
-const read = (...p) => fs.readFileSync(R(...p), 'utf8').replace(/\r\n/g, '\n');
+const _readFile = (...p) => fs.readFileSync(R(...p), 'utf8').replace(/\r\n/g, '\n');
+// 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+const read = (...p) => (isSettingsViewPath(p.join('/')) ? readSettingsView() : _readFile(...p));
 
 // errBrief.js 是纯字符串函数（不碰 document、不碰 api），node 下可直接动态导入
 const load = async () => import('../src/renderer/js/errBrief.js?tc=' + Math.random());
@@ -108,6 +111,20 @@ const WIRED_JS = ['abClip.js', 'app.js', 'artistGroups.js', 'converter-core.js',
 
 test('全部接线视图各自 import errBrief（views 走 ../、js 走 ./）', () => {
   for (const f of WIRED_VIEWS) {
+    if (f === 'settings.js') {
+      // 设置视图已拆成 views/settings/*.js：每个用到 errBrief 的子模块都要显式引入，
+      // 深度比 views/ 多一层 —— 走 ../../errBrief.js。
+      const dir = path.join(__dirname, '..', 'src', 'renderer', 'js', 'views', 'settings');
+      const modules = fs.readdirSync(dir).filter((n) => n.endsWith('.js'));
+      const users = modules.filter((n) => /\berrBrief\(/.test(fs.readFileSync(path.join(dir, n), 'utf8')));
+      assert.ok(users.length > 0, 'settings 子模块中应有用到 errBrief 的模块');
+      for (const n of users) {
+        const src = fs.readFileSync(path.join(dir, n), 'utf8').replace(/\r\n/g, '\n');
+        assert.ok(src.includes("import { errBrief } from '../../errBrief.js';"),
+          `views/settings/${n} 需从公共模块引入 errBrief`);
+      }
+      continue;
+    }
     assert.ok(read('js', 'views', f).includes("import { errBrief } from '../errBrief.js';"),
       `views/${f} 需从公共模块引入 errBrief`);
   }

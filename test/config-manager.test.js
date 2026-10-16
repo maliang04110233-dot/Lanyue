@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { ConfigManager, resetConfig } = require('../src/utils/config');
+const { ConfigManager } = require('../src/utils/config');
 
 // ── 基础读取 ────────────────────────────────────────────
 

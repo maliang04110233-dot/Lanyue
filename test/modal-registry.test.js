@@ -34,10 +34,13 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeDomStub, dispatchKey } from './helpers/dom-stub.js';
+import _settingsView from './helpers/settingsViewSource.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const R = (...p) => path.join(ROOT, 'src', 'renderer', ...p);
-const readFile = (...p) => fs.readFileSync(R(...p), 'utf8').replace(/\r\n/g, '\n');
+const _readFile = (...p) => fs.readFileSync(R(...p), 'utf8').replace(/\r\n/g, '\n');
+// 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+const readFile = (...p) => (_settingsView.isSettingsViewPath(p.join('/')) ? _settingsView.readSettingsView() : _readFile(...p));
 
 const req = createRequire(import.meta.url);
 const SHORTCUTS_PATH = R('js', 'shortcuts.js');

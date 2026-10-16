@@ -9,7 +9,6 @@
  */
 
 const path = require('path');
-const Module = require('module');
 
 // ── 桩平台构造器 ─────────────────────────────────────────
 

@@ -6,9 +6,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import _settingsView from './helpers/settingsViewSource.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SETTINGS_JS = readFileSync(path.join(ROOT, 'src/renderer/js/views/settings.js'), 'utf8');
+// 设置视图已拆成多文件：统一从聚合助手取整视图源码
+const SETTINGS_JS = _settingsView.readSettingsView();
 const HTML = readFileSync(path.join(ROOT, 'src/renderer/index.html'), 'utf8');
 const CSS = readFileSync(path.join(ROOT, 'src/renderer/styles/overlays.css'), 'utf8');
 const PALETTE_JS = readFileSync(path.join(ROOT, 'src/renderer/js/commandPalette.js'), 'utf8');
@@ -92,7 +94,8 @@ test('planSettingsSearch：行命中留节隐行；标题命中全显；other �
 });
 
 test('接线钉：设置面板搜索框/空态/桥接/CSS/双语键/命令面板入口', async () => {
-  assert.match(SETTINGS_JS, /import \{ planSettingsSearch \} from '\.\.\/settingsSearch\.js';/);
+  // 设置视图拆成 views/settings/*.js 后深度多一层：相对路径允许一个以上 ../…
+  assert.match(SETTINGS_JS, /import \{ planSettingsSearch \} from '(?:\.\.\/)+settingsSearch\.js';/);
   assert.match(SETTINGS_JS, /window\.runSettingsSearch = runSettingsSearch;/);
   assert.match(SETTINGS_JS, /window\.focusSettingsSearch = focusSettingsSearch;/);
   // 只加减 srch-hide 类，绝不碰行内 display

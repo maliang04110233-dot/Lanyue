@@ -51,6 +51,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const REPO = path.join(__dirname, '..');
+const { readSettingsView, isSettingsViewPath } = require('./helpers/settingsViewSource.js');
 const zh = JSON.parse(fs.readFileSync(path.join(REPO, 'src/renderer/js/lang/zh.json'), 'utf8'));
 const en = JSON.parse(fs.readFileSync(path.join(REPO, 'src/renderer/js/lang/en.json'), 'utf8'));
 
@@ -61,7 +62,11 @@ const en = JSON.parse(fs.readFileSync(path.join(REPO, 'src/renderer/js/lang/en.j
  */
 const FEEDBACK_FNS = ['showToast', 'askConfirm', 'showActionToast'];
 
-function read(rel) { return fs.readFileSync(path.join(REPO, rel), 'utf8'); }
+function read(rel) {
+  // 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+  if (isSettingsViewPath(rel)) return readSettingsView();
+  return fs.readFileSync(path.join(REPO, rel), 'utf8');
+}
 
 function stripComments(src) {
   return src
@@ -446,7 +451,8 @@ test('已收编视图文件的取词走 i18n.js 的 t，且文件内没有名为
   for (const rel of CONQUERED_VIEWS) {
     const src = read(rel);
     const code = stripComments(src);
-    assert.match(src, /import\s*\{[^}]*\bt\b[^}]*\}\s*from\s*'\.\.\/i18n\.js'/,
+    // 设置视图已拆成 views/settings/*.js（深度多一层）：相对路径允许 ../ 或 ../../…
+    assert.match(src, /import\s*\{[^}]*\bt\b[^}]*\}\s*from\s*'(?:\.\.\/)+i18n\.js'/,
       `${rel} 应静态 import { t } from '../i18n.js'（视图层不许自己攒词典）`);
     assert.ok(!/window\.t\s*\(/.test(code),       `${rel} 不许留 window.t 的旁路（同一事实两个家）`);
     const shadows = [];

@@ -11,8 +11,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { readSettingsView, isSettingsViewPath } = require('./helpers/settingsViewSource.js');
 const ROOT = path.join(__dirname, '..');
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
+const _readFile = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
+// 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+const read = (p) => (isSettingsViewPath(p) ? readSettingsView() : _readFile(p));
 const HTML = read('src/renderer/index.html');
 const SETTINGS = read('src/renderer/js/views/settings.js');
 const ZH = JSON.parse(read('src/renderer/js/lang/zh.json'));
@@ -40,7 +43,8 @@ test('四个新函数都定义了也都被挂上 window', () => {
 });
 
 test('设置页 MCP 段落不出现中文字面量（CONQUERED 欠账须为 0）', () => {
-  const seg = SETTINGS.slice(SETTINGS.indexOf('// ── MCP 本地服务'), SETTINGS.indexOf('// ── 设置项搜索'));
+  // 拆分后「MCP 段落」就是 views/settings/mcp.js 这个物理文件，直接整文件当段落
+  const seg = fs.readFileSync(path.join(ROOT, 'src/renderer/js/views/settings/mcp.js'), 'utf8').replace(/\r\n/g, '\n');
   assert.ok(seg.length > 200 && seg.length < 6000, `MCP 段落切片不靠谱（${seg.length} 字节），钉要重看`);
   // logger 的参数不是用户可见文案（全仓日志一律中文），注释也不算 —— 只抓界面串
   const bad = seg.split('\n')

@@ -15,7 +15,9 @@ const path = require('node:path');
 const { ALLOWED_PREF_KEYS } = require('../src/main/ipc/prefs');
 
 const RENDERER = path.join(__dirname, '../src/renderer');
-const SETTINGS = path.join(RENDERER, 'js/views/settings.js');
+// 设置视图已拆成多文件：GENERAL_PREFS 登记表住在 views/settings/general.js；
+// 统一从聚合助手取「整视图」源码，避免测试焊死在某一个物理文件上。
+const { readSettingsView } = require('./helpers/settingsViewSource.js');
 
 /** 主进程内部维护、不经 set-pref 的键（与 quality.test.js 同口径） */
 const MAIN_INTERNAL_KEYS = new Set(['userPlaylists', 'activeDownloadTemplate']);
@@ -36,7 +38,7 @@ function rendererWrittenPrefKeys() {
     const src = fs.readFileSync(file, 'utf8');
     for (const m of src.matchAll(/api\.setPref\(\s*'([A-Za-z0-9_]+)'/g)) keys.add(m[1]);
   }
-  const block = fs.readFileSync(SETTINGS, 'utf8').match(/const GENERAL_PREFS = \{[\s\S]*?\n\};/);
+  const block = readSettingsView().match(/const GENERAL_PREFS = \{[\s\S]*?\n\};/);
   assert.ok(block, '未找到设置页 GENERAL_PREFS 登记表（改名或挪走时请同步本测试）');
   for (const m of block[0].matchAll(/key:\s*'([A-Za-z0-9_]+)'/g)) keys.add(m[1]);
   return keys;

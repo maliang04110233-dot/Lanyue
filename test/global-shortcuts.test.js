@@ -21,8 +21,11 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const MODULE_REL = 'src/shared/accelerators.js';
+const { readSettingsView, isSettingsViewPath } = require('./helpers/settingsViewSource.js');
 
 function read(rel) {
+  // 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+  if (isSettingsViewPath(rel)) return readSettingsView();
   return fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 }
 

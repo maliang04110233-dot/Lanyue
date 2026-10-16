@@ -21,8 +21,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { readSettingsView, isSettingsViewPath } = require('./helpers/settingsViewSource.js');
 const ROOT = path.join(__dirname, '..');
-const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const _readFile = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+// 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+const read = (rel) => (isSettingsViewPath(rel) ? readSettingsView() : _readFile(rel));
 
 const { defaultRegistry, loadPlatformPlugins } = require('../src/api/pluginRegistry');
 const { createPlatformGateway } = require('../src/api/gateway');
@@ -470,9 +473,9 @@ test('守卫：recommendations.js 经 gateway 调用平台，不再直连或手�
 test('守卫：所有消费方均不直连平台模块（gateway 是唯一调用出口）', () => {
   // 允许直连的两类例外：
   //   1. src/api/platforms/* 自身
-  //   2. 平台单测（test/*.test.js 直接测平台实现，如 fivesing/qq/list-cookie-scope）
+  //   2. 平台单测（test/ 下的 *.test.js 直接测平台实现，如 platforms/kugou.test.js、fivesing.test.js）
   // ⚠️ 豁免只针对 test/ 目录：生产代码（src/）无论文件名怎么起都不在名单里。
-  const ALLOW = /^(src\/api\/platforms\/|test\/[a-z0-9-]+\.test\.js$)/;
+  const ALLOW = /^(src\/api\/platforms\/|test\/.*\.test\.js$)/;
   const offenders = [];
 
   const walk = (dir) => {

@@ -7,6 +7,8 @@
 import { accountPlatforms, hasLoginWindow, cookiePlaceholder, cookieHint } from '../../accountPlatforms.js';
 import { platformName } from '../../utils.js';
 import { t } from '../../i18n.js';
+import { errBrief } from '../../errBrief.js';
+import { credentialErrorText, parseCookieFields } from './util.js';
 
 /** 手动粘贴 Cookie 的分平台提示 */
 const ACCOUNT_COOKIE_HINTS = {

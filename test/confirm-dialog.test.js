@@ -21,10 +21,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import _settingsView from './helpers/settingsViewSource.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const R = (...p) => path.join(ROOT, 'src', 'renderer', ...p);
-const read = (...p) => fs.readFileSync(R(...p), 'utf8').replace(/\r\n/g, '\n');
+const _readFile = (...p) => fs.readFileSync(R(...p), 'utf8').replace(/\r\n/g, '\n');
+// 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+const read = (...p) => (_settingsView.isSettingsViewPath(p.join('/')) ? _settingsView.readSettingsView() : _readFile(...p));
 
 // confirmDialog 的模型层是纯函数（DOM 只活在 askConfirm 体内），node 可直接 import
 const load = async () => import(pathToFileURL(R('js', 'confirmDialog.js')).href + '?tc=' + Math.random());
@@ -151,9 +154,9 @@ test('18 处不可逆操作全部接线 askConfirm，且调用处必带 await（
     const src = read('js', ...f.split('/'));
     const calls = src.match(/await\s+askConfirm\(/g) || [];
     assert.equal(calls.length, n, `${f} 应有 ${n} 处 await askConfirm(`);
-    assert.ok(src.includes("import { askConfirm } from './confirmDialog.js';")
-      || src.includes("import { askConfirm } from '../confirmDialog.js';"),
-    `${f} 需 import askConfirm`);
+    // 设置视图拆成 views/settings/*.js 后深度多一层：相对路径允许 ./ 或一个以上 ../…
+    assert.ok(/import\s*\{\s*askConfirm\s*\}\s*from\s*'(?:\.\/|(?:\.\.\/)+)confirmDialog\.js'/.test(src),
+      `${f} 需 import askConfirm`);
     total += calls.length;
   }
   assert.equal(total, 18, '调用点总数必须等于 18——多了少了都要先改这张表再改代码');

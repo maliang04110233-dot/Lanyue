@@ -118,7 +118,7 @@ test('transitionWithHistory: 历史最多保留 10 条', () => {
   const song = { status: 'pending', id: 'test' };
   for (let i = 0; i < 15; i++) {
     const to = i % 2 === 0 ? 'downloading' : 'pending';
-    try { transitionWithHistory(song, to); } catch {}
+    try { transitionWithHistory(song, to); } catch { /* 交替转换里会撞非法边，忽略即可 */ }
   }
   const history = getTransitionHistory(song);
   assert.ok(history.length <= 10);

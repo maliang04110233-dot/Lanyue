@@ -4,7 +4,7 @@
  * 负责：通用偏好加载/保存、主题切换、全局快捷键、文件名模板预览
  */
 
-const GENERAL_PREFS = {
+export const GENERAL_PREFS = {
   quality:       { key: 'quality',       default: 'standard',   el: 'settingQuality' },
   concurrency:   { key: 'concurrency',   default: 3,             el: 'settingConcurrency' },
   perSourceConcurrency: { key: 'perSourceConcurrency', default: 2, el: 'settingPerSourceConcurrency' },

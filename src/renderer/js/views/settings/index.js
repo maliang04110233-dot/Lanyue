@@ -11,34 +11,31 @@
  *   - webdav.js     WebDAV 云同步
  */
 
+import { t } from '../../i18n.js';
+import { errBrief } from '../../errBrief.js';
+import { askConfirm } from '../../confirmDialog.js';
+import { planSettingsSearch } from '../../settingsSearch.js';
+
 // ── 子模块导入 ─────────────────────────────────────────
 import {
   _accountPlatforms,
-  _platformDom,
-  _cacheAccountDom,
   loadAccountPlatforms,
   loadAccountCardStatus,
   loadCookieStatus,
-  renderSourceHealth,
   loadSourceHealth,
   probeSourcesUI,
   saveCookie,
   clearCookie,
   verifyCookieUI,
-  showVerifyResult,
-  clearVerifyResult,
   analyzeCookieUI,
   openLoginWindowUI,
 } from './account.js';
 
 import {
-  qualityPlatformIds,
   loadQualityBySource,
-  renderQualityBySource,
   onQualityBySourceChange,
   resetQualityBySource,
   loadFallbackDisabled,
-  renderFallbackDisabled,
   onFallbackDisabledToggle,
   resetFallbackDisabled,
   loadQualityPolicy,
@@ -52,23 +49,18 @@ import {
 } from './quality.js';
 
 import {
-  updateFilenameTmplPreview,
+  GENERAL_PREFS,
   loadGeneralSettings,
   applyTheme,
-  syncThemeCards,
   selectTheme,
   setupGeneralSettingListeners,
 } from './general.js';
 
 import {
   loadDownloadTemplates,
-  renderDownloadTemplates,
   setActiveTemplate,
   openDlTemplateEditor,
   closeDlTemplateEditor,
-  updateTemplateVarHints,
-  ensureDlTemplatePreview,
-  updateDlPathPreview,
   saveDlTemplate,
   deleteDlTemplate,
 } from './templates.js';
@@ -81,7 +73,6 @@ import {
   copyMcpSnippet,
   clearMcpAudit,
   loadMcpAudit,
-  openMcpAuditLog,
 } from './mcp.js';
 
 import {
@@ -218,7 +209,6 @@ async function importConfig() {
 }
 
 // ── 设置项搜索 ───────────────────────────────────────
-import { planSettingsSearch } from '../settingsSearch.js';
 
 function _settingBlockNodes(el) {
   if (el.classList.contains('setting-row')) {
@@ -306,24 +296,6 @@ function focusSettingsSearch() {
   openSettings();
   const input = document.getElementById('settingsSearchInput');
   if (input) { input.focus(); input.select(); }
-}
-
-// ── Cookie 字段解析 ───────────────────────────────────
-function parseCookieFields(cookieStr) {
-  const fields = [];
-  cookieStr.split(';').forEach(part => {
-    const trimmed = part.trim();
-    if (!trimmed) return;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) fields.push({ key: trimmed, value: '' });
-    else fields.push({ key: trimmed.substring(0, eq).trim(), value: trimmed.substring(eq + 1).trim() });
-  });
-  return fields;
-}
-
-function credentialErrorText(code) {
-  if (code === 'SECRET_STORAGE_UNAVAILABLE') return t('toast.secretStorageUnavailable');
-  return code;
 }
 
 // ── DOM 就绪后绑定事件 ─────────────────────────────

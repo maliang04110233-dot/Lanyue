@@ -16,7 +16,10 @@ const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const read = (p) => fs.readFileSync(path.resolve(p), 'utf8');
+const { readSettingsView, isSettingsViewPath } = require('./helpers/settingsViewSource.js');
+const _readFile = (p) => fs.readFileSync(path.resolve(p), 'utf8');
+// 设置视图已拆成多文件：读到 settings 相关路径时返回整视图（兼容层 + 子模块）源码
+const read = (p) => (isSettingsViewPath(p) ? readSettingsView() : _readFile(p));
 
 // ── 1. 运行时：engine.getMaxAttempts() 真调用 ────────────────
 function engineWithPrefs(store) {

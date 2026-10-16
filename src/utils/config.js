@@ -13,7 +13,6 @@
  *   - 敏感字段（cookie/token）自动加密
  */
 
-const path = require('path');
 const fs = require('fs');
 const logger = require('./logger');
 

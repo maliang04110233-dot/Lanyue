@@ -12,9 +12,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const path = require('path');
 
-const { loadAllPlatformPlugins, createPlatformStub } = require('../helpers/platformStub.js');
+const { loadAllPlatformPlugins } = require('../helpers/platformStub.js');
 
 // ── 平台 ID 清单 ─────────────────────────────────────────
 const ALL_IDS = ['netease', 'qq', 'bilibili', 'kugou', 'kuwo', 'migu', 'fivesing', 'soda'];
@@ -119,7 +118,7 @@ test('能力推导：有实现则有能力声明', () => {
 
   for (const id of ALL_IDS) {
     const p = plugins[id];
-    for (const [cap, method] of Object.entries(CAPABILITY_METHODS)) {
+    for (const method of Object.values(CAPABILITY_METHODS)) {
       const hasImpl = typeof p[method] === 'function';
       // 如果有实现，应该能在能力推导中被检测到
       // 这里只验证方法存在性，不验证 caps 对象（由 registry 推导）

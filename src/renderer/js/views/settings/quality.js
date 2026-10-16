@@ -4,10 +4,11 @@
  * 负责：分平台音质、换源排除、质量策略规则
  */
 
-import { getPlatforms, platformIcon, platformName } from '../../utils.js';
+import { getPlatforms, platformIcon, platformName, fallbackPlatformIds } from '../../utils.js';
 import { QUALITY_OPTIONS, QUALITY_FIXED, getQualityBySource } from '../../quality.js';
 import { setState } from '../../state.js';
 import { t } from '../../i18n.js';
+import { errBrief } from '../../errBrief.js';
 
 // ── 分平台音质 ─────────────────────────────────────────
 

@@ -3,6 +3,8 @@
  */
 
 import { t } from '../../i18n.js';
+import { askConfirm } from '../../confirmDialog.js';
+import { errBrief } from '../../errBrief.js';
 
 let _mcpRunning = false;
 
@@ -115,10 +117,4 @@ export function toggleMcpService() {
 export function rotateMcpToken() {
   _applyMcpConfig({ rotateToken: true });
   showToast(t('toast.mcpTokenRotated'), 'warn', 5000);
-}
-
-export function openMcpAuditLog() {
-  if (typeof api.openMcpAuditLog === 'function') {
-    api.openMcpAuditLog();
-  }
 }
