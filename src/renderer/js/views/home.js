@@ -27,6 +27,7 @@ import { platIdsOf, normalizePlatTab, nextPlatTab, HOME_PLAT_LS_KEY } from '../h
 import { skeletonHtml } from '../skeleton.js';
 import { buildFallbackNotice } from '../fallbackNotice.js';
 import { PLAY_ALL_LIMIT, planSectionPlay, playAllToastText } from '../homePlayAll.js';
+import { noCoverSvgHtml, svgIcon, fmtDuration, coverThumbHtml } from '../homeFormat.js';
 
 // 首页榜单过滤词（会话级；小写化在 filterHomeSection 内统一处理）
 let _homeFilterStr = '';
@@ -672,62 +673,8 @@ document.addEventListener('contextmenu', (e) => {
 });
 
 /**
- * 36px 方形封面缩略图。
- *
- * onerror 换成一个**内联 SVG 音符轮廓**而不是 emoji：原先用 📀，
- * 在无 emoji 字体的环境（本机 Chromium 实测）会被渲染成一个黄褐色
- * 实心圆点，看起来像「加载失败」，而不像「没有封面」。
- * SVG 不依赖字体，颜色走 token，主题切换自动跟随。
- */
-function coverThumbHtml(url, cls) {
-  const c = cls || 'top-song-cover';
-  return `<span class="${c}">${
-    url
-      ? `<img src="${escAttr(url)}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')" onerror="this.remove()">`
-      : ''
-  }${noCoverSvgHtml()}</span>`;
-}
 
-/** 无封面时的占位图形（内联 SVG，不依赖 emoji 字体） */
-function noCoverSvgHtml() {
-  return `<svg class="cover-ph-svg" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <circle cx="16.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
-  </svg>`;
-}
 
-/**
- * 行内操作图标（内联 SVG，统一 16px 网格 + 1.7 描边）。
- *
- * 换掉字符图标 ▶ ⬇ ＋ ♡ 的原因：这四个符号来自**四个不同的 Unicode 区块**
- * （几何图形 / 杂项符号 / 全角标点 / 其他符号），在 Segoe UI 下光学校正完全
- * 不一致 —— 实测放大后 ▶ 实心偏重、⬇ 细如发丝、＋ 偏轻，看起来像拼凑的。
- * 而 ⬇ 更麻烦：U+2B07 在部分字体下会走 emoji 呈现，被渲染成彩色方块。
- * 同一套 SVG 后，四个图标的笔画粗细、视觉重量、对齐都一致，
- * 且颜色继承 currentColor —— 主题切换与 hover 反色都不需要额外规则。
- */
-const ROW_ICONS = {
-  play:  '<path d="M6 4.5l12 7.5-12 7.5z" fill="currentColor"/>',
-  down:  '<path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
-  plus:  '<path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
-  heart: '<path d="M12 20s-7-4.4-7-9.3A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.7c0 4.9-7 9.3-7 9.3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
-  heartOn: '<path d="M12 20s-7-4.4-7-9.3A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.7c0 4.9-7 9.3-7 9.3z" fill="currentColor" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
-};
-
-function svgIcon(name) {
-  return `<svg class="row-icon" viewBox="0 0 24 24" aria-hidden="true">${ROW_ICONS[name] || ''}</svg>`;
-}
-
-/** 毫秒 → m:ss；缺失/非法返回空串（不显示「0:00」这种噪音） */
-function fmtDuration(ms) {
-  const n = Number(ms);
-  if (!Number.isFinite(n) || n <= 0) return '';
-  const total = Math.round(n / 1000);
-  const mm = Math.floor(total / 60);
-  const ss = String(total % 60).padStart(2, '0');
-  return mm + ':' + ss;
-}
 
 /**
  * 完整榜单弹窗。
