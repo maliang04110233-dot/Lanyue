@@ -240,3 +240,15 @@ test('player.js 续播 attach 要带换歌序号守卫（慢响应的旧进度�
   const guards = PLAYER.match(/seq !== _loadSeq/g) || [];
   assert.equal(guards.length, 2, '两个分支的 attach 前都要比序号，实际 ' + guards.length);
 });
+
+// 序号只管得住"迟到的 attach"，管不住"已经挂上但还没触发的监听"：
+// 歌 A 有进度记忆、metadata 迟迟不来（在线慢流），用户切到没有进度记忆的歌 B
+// —— B 压根不会 attach，也就不会走到 attach 内部那句撤销，A 的监听照样挂在
+// 共用的 audio 元素上，B 自己的 loadedmetadata 一到就把它 seek 到 A 的位置。
+// 所以换 src 的那一刻必须主动撤销，不能指望下一首来收尾。
+test('player.js 两处换 src 都先撤销续播监听（A 的监听不得活到无进度的 B 身上）', () => {
+  const cancels = PLAYER.match(/_resumeSeeker\.cancel\(\)/g) || [];
+  assert.equal(cancels.length, 2, '两个分支各一处，实际 ' + cancels.length);
+  const srcSets = PLAYER.match(/_resumeSeeker\.cancel\(\);\s*\n\s*const seq = \+\+_loadSeq;\s*\n\s*audio\.src = localUrl;/g) || [];
+  assert.equal(srcSets.length, 2, '撤销要紧跟换 src，夹在中间才管得住这一整类迟到，实际 ' + srcSets.length);
+});

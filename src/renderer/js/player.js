@@ -262,6 +262,9 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
     if (artistEl) artistEl.textContent = song.artist || '未知艺术家';
     _applyTitleMarquee();
 
+    // 换 src 就是一次新的加载：上一首若还挂着未触发的续播监听，此刻必须摘掉。
+    // 不能指望下一首的 attach 来收尾 —— 没有进度记忆的新歌压根不会 attach。
+    _resumeSeeker.cancel();
     const seq = ++_loadSeq;
     audio.src = localUrl;
     // 首播延迟（2026-10-13）：**先发起播放**，进度恢复并行做。
@@ -333,6 +336,8 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
 
   // 如果有预获取的 URL（来自 proxyPlay），则播放音频
   if (localUrl) {
+    // 与本地分支同一处：换 src 前撤销上一首尚未触发的续播监听
+    _resumeSeeker.cancel();
     const seq = ++_loadSeq;
     audio.src = localUrl;
     // 与上面同一处修正：播放先发起，进度恢复并行（少两个 IPC 往返的首播延迟）
