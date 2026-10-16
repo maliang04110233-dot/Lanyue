@@ -553,9 +553,16 @@ export function togglePlay() {
     if (Array.isArray(playQueue) && playQueue.length) {
       const playIdx = getState('playIdx');
       const song = playIdx >= 0 && playIdx < playQueue.length ? playQueue[playIdx] : playQueue[0];
-      if (song) {
-        setState('playIdx', playQueue.indexOf(song));
-        loadAndPlay(song);
+      const idx = playQueue.indexOf(song);
+      if (idx >= 0) {
+        setState('playIdx', idx);
+        // 按有没有本地文件分流：loadAndPlay 只认 filePath / 预取 URL，在线歌两个都没有
+        // → 两个分支都不落地（不出声），可 addToRecentlyPlayed/recordPlay 在它顶部已经
+        // 跑完，于是这一按白记一次播放。取流链路（含命中预取）在 playSongByIdx 里。
+        // 队列里也可能全是本地歌（local.js 把整份 localFiltered 塞进 playQueue），
+        // 那些有 filePath，一律改走 playSongByIdx 反会被推进取流失败里。
+        if (song.filePath) loadAndPlay(song);
+        else playSongByIdx(idx, song);
         return;
       }
     }

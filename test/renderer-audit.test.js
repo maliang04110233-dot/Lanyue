@@ -185,6 +185,21 @@ test('player.js: 歌词加载必须带请求序号守卫（快速切歌时慢响
   assert.ok(guards.length >= 2, '本地 readLocalLrc 与网络 getLyrics 两条歌词路径都要有守卫');
 });
 
+test('player.js: 冷启动那支播放要按有没有本地路径分流（在线歌没有 filePath，直接 loadAndPlay 不出声却白记一次播放）', () => {
+  // togglePlay 的「无音频源但有队列」分支是给重启后按播放键用的。
+  // loadAndPlay 只认 filePath / 预取 URL：在线歌两个都没有 → 两个分支都不落地，
+  // 界面安静得像坏了；而 addToRecentlyPlayed/recordPlay 在函数顶部已经跑完，
+  // 于是「最近播放」和播放次数被一次没出声的点击污染。取流链路只在 playSongByIdx 里。
+  // 但队列里也可能全是本地歌（local.js 就把 localFiltered 整份塞进 playQueue），
+  // 那些有 filePath，一律改走 playSongByIdx 反而会把它们推进取流失败里 —— 判据按 filePath 分。
+  const src = stripComments(read('js', 'player.js'));
+  const m = src.match(/if \(audio\.paused && \(!audio\.src[\s\S]*?\n  \}/);
+  assert.ok(m, '没找到 togglePlay 的冷启动分支（结构变了要同步改这条钉子）');
+  assert.match(m[0], /playSongByIdx\(/, '没有本地路径的歌要交回取流链路，不然在线队列按播放键必然哑火');
+  const bare = m[0].split('\n').filter((l) => /loadAndPlay\(/.test(l) && !/filePath/.test(l));
+  assert.deepEqual(bare, [], '不带 filePath 判断的 loadAndPlay 直调又回来了 —— 在线歌会哑火');
+});
+
 test('search.js: playSong 必须支持队列覆盖参数（batchPlay 传入勾选列表，不能被整页覆盖）', () => {
   const src = read('js', 'views', 'search.js');
   assert.match(src, /async function playSong\(idx, queueOverride = null\)/,
