@@ -174,7 +174,7 @@ const RENDERS_LIST = /\brender(Song|Album|Singer)List\b/;
 /** 关注的函数及其哨兵（用于自检抽段是否被字符串/模板字面量干扰配平） */
 const REQID_TARGETS = {
   doSearch: 'handleLinkInput',
-  doSearchByType: '_searchCacheKey',
+  doSearchByType: 'searchCacheKey',
   handleLinkInput: 'shortLink',
   doNaturalSearch: 'nlSearchMusic',
   openAlbumDetail: 'getAlbumSongs',

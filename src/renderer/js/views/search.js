@@ -15,6 +15,8 @@ import { buildFallbackNotice } from '../fallbackNotice.js';
 import { dismissedKeySet, filterDismissedPairs, onDismissChanged } from '../dismissed.js';
 import { skeletonHtml, SKEL_ROWS } from '../skeleton.js';
 import { t } from '../i18n.js';
+import { searchCacheKey, searchCacheGet, searchCacheSet } from '../searchCache.js';
+import { sourceErrorText, isLowYield } from '../sourceError.js';
 
 // ── DOM 缓存（避免重复查询）──────────────────────────
 const _dom = {
@@ -436,33 +438,7 @@ async function searchArtistSongs(artistName) {
 }
 
 // ── 统一搜索入口 ─────────────────────────────────────
-// ── 搜索结果 LRU 缓存 ─────────────────────────────────
-const _searchCache = new Map();
-const SEARCH_CACHE_MAX = 20;
-const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
-
-function _searchCacheKey(type, page, keyword, source) {
-  return `${type}:${source || ''}:${keyword}:${page}`;
-}
-
-function _searchCacheGet(key) {
-  const entry = _searchCache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.ts > SEARCH_CACHE_TTL) {
-    _searchCache.delete(key);
-    return null;
-  }
-  return entry.data;
-}
-
-function _searchCacheSet(key, data) {
-  if (_searchCache.size >= SEARCH_CACHE_MAX) {
-    // 删除最旧的
-    const oldest = _searchCache.keys().next().value;
-    _searchCache.delete(oldest);
-  }
-  _searchCache.set(key, { data, ts: Date.now() });
-}
+// ── 搜索结果 LRU 缓存（已拆出到 ../searchCache.js）─────────
 
 let _typeSearchReqId = 0;
 /**
@@ -471,8 +447,8 @@ let _typeSearchReqId = 0;
  *   这样并发的两次搜索由「谁后发起」决定谁赢，而不是「谁的响应先回来」。
  */
 async function doSearchByType(type, page, keyword, source, reqId = ++_typeSearchReqId) {
-  const cacheKey = _searchCacheKey(type, page, keyword, source);
-  const cached = _searchCacheGet(cacheKey);
+  const cacheKey = searchCacheKey(type, page, keyword, source);
+  const cached = searchCacheGet(cacheKey);
   if (cached) {
     const stateKey = { song: 'songs', album: 'albums', singer: 'singers' };
     const renderMap = { song: renderSongList, album: renderAlbumList, singer: renderSingerList };
@@ -501,7 +477,7 @@ async function doSearchByType(type, page, keyword, source, reqId = ++_typeSearch
     const items = (result && result[type === 'song' ? 'songs' : type + 's']) || [];
     // 存入缓存
     if (!result?.error) {
-      _searchCacheSet(cacheKey, { items, total: result?.total || 0 });
+      searchCacheSet(cacheKey, { items, total: result?.total || 0 });
     }
     // 迟到的旧请求结果只进缓存，不再覆盖界面（新搜索已在途时序号已变）
     if (reqId !== _typeSearchReqId) return [];
@@ -1051,6 +1027,7 @@ function renderSongList(list, targetEl = null) {
       </div>
       <span class="song-duration">${fmtDuration(s.duration)}</span>
       <span class="source-badge badge-${badgeCls(s.source)}">${esc(srcLabel(s.source))}</span>
+      ${isLowYield(s.source) ? `<span class="source-hint" title="${esc(t('badge.lowYield'))}">⚠️ ${esc(t('badge.lowYield'))}</span>` : ''}
       ${dlBadgeHtml(s, _dlQueue)}
       <div class="song-actions">
         ${heartBtnHtml(s)}
@@ -1276,11 +1253,8 @@ async function playSong(idx, queueOverride = null) {
     const result = await api.getDownloadUrlSmart(s, quality);
     if (reqId !== _searchPlayRequestId) return; // 已点别的歌，丢弃过期结果
     if (!result || !result.url) {
-      if (result && result.code === 'VIP_REQUIRED') {
-        showToast('⚠️ 该歌曲为 VIP 专享，请登录后重试', 'warn', 5000);
-      } else {
-        showToast('⚠️ 暂无法获取音源，请稍后重试', 'warn', 5000);
-      }
+      const msg = sourceErrorText(t, result, s.source, 'toast.noSource');
+      showToast(msg, 'warn', 5000);
       return;
     }
     s._playedQuality = quality;
