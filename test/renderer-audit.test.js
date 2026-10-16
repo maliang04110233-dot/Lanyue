@@ -193,7 +193,7 @@ test('player.js: 冷启动那支播放要按有没有本地路径分流（在线
   // 但队列里也可能全是本地歌（local.js 就把 localFiltered 整份塞进 playQueue），
   // 那些有 filePath，一律改走 playSongByIdx 反而会把它们推进取流失败里 —— 判据按 filePath 分。
   const src = stripComments(read('js', 'player.js'));
-  const m = src.match(/if \(audio\.paused && \(!audio\.src[\s\S]*?\n  \}/);
+  const m = src.match(/if \(audio\.paused && \(!audio\.src[\s\S]*?\n[ ]{2}\}/);
   assert.ok(m, '没找到 togglePlay 的冷启动分支（结构变了要同步改这条钉子）');
   assert.match(m[0], /playSongByIdx\(/, '没有本地路径的歌要交回取流链路，不然在线队列按播放键必然哑火');
   const bare = m[0].split('\n').filter((l) => /loadAndPlay\(/.test(l) && !/filePath/.test(l));
