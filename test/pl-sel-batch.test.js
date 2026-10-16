@@ -6,8 +6,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { readPlaylistView } = require('./helpers/playlistViewSource.js');
 
-const PL_JS = fs.readFileSync(path.join(__dirname, '../src/renderer/js/views/playlist.js'), 'utf8');
+const PL_JS = readPlaylistView();
 const HTML = fs.readFileSync(path.join(__dirname, '../src/renderer/index.html'), 'utf8');
 const PALETTE = fs.readFileSync(path.join(__dirname, '../src/renderer/js/commandPalette.js'), 'utf8');
 
@@ -49,21 +50,21 @@ test('playlist.js 接线：_playFrom 抽取、整单入队去重、多选两动�
   const { planSelEnqueue } = await fresh();
   assert.ok(typeof planSelEnqueue === 'function');
   // playPlaylistSong 变薄壳，取流主体抽成 _playFrom（多选连播复用）
-  assert.ok(/async function playPlaylistSong\(idx\) \{\n {2}await _playFrom\(_currentDetailSongs, idx\);/.test(PL_JS), 'playPlaylistSong 应委托 _playFrom');
+  assert.ok(/async function playPlaylistSong\(idx\) \{\n {2}await _playFrom\(plState._currentDetailSongs, idx\);/.test(PL_JS), 'playPlaylistSong 应委托 _playFrom');
   assert.ok((PL_JS.match(/_playFrom\(/g) || []).length === 3, '定义1 + 单点1 + 多选连播1');
   // 判重规则收编进纯函数：playlist.js 里只剩单曲守卫一处内联 status 判定
   assert.ok((PL_JS.match(/status !== 'done'/g) || []).length === 1, '整单入队的内联判重应已移入 plSelBatch');
   assert.ok((PL_JS.match(/planSelEnqueue\(/g) || []).length === 2, '整单 + 多选各调一次');
   assert.ok((PL_JS.match(/enqueueSkipSuffix\(/g) || []).length === 2, '两条批量线共用文案后缀');
   // 勾选提取复用0178f20 的 splitBySelection（键=歌身份），不再自造第二套选态
-  assert.equal((PL_JS.match(/splitBySelection\(_currentDetailSongs, _plSelKeys\)/g) || []).length, 1);
-  assert.ok(/function _plSelPicked\(\) \{\n {2}return splitBySelection\(_currentDetailSongs, _plSelKeys\)\.removed;/.test(PL_JS));
+  assert.equal((PL_JS.match(/splitBySelection\(plState._currentDetailSongs, plState._plSelKeys\)/g) || []).length, 1);
+  assert.ok(/function _plSelPicked\(\) \{\n {2}return splitBySelection\(plState._currentDetailSongs, plState._plSelKeys\)\.removed;/.test(PL_JS));
   assert.ok((PL_JS.match(/_plSelPicked\(\)/g) || []).length === 3, '定义1 + 下载/播放各1');
   assert.ok(/async function plSelDownload\(\)/.test(PL_JS));
   assert.ok(/async function plSelPlay\(\) \{[\s\S]*?await _playFrom\(picked, 0\);/.test(PL_JS));
   // 按钮同步扩到 5 件套（计数徽标随勾选数走）
-  assert.ok(PL_JS.includes('⬇ 下载 ${_plSelKeys.size}'));
-  assert.ok(PL_JS.includes('▶ 播放 ${_plSelKeys.size}'));
+  assert.ok(PL_JS.includes('⬇ 下载 ${plState._plSelKeys.size}'));
+  assert.ok(PL_JS.includes('▶ 播放 ${plState._plSelKeys.size}'));
   // 桥接
   assert.ok(PL_JS.includes('window.plSelDownload = plSelDownload;'));
   assert.ok(PL_JS.includes('window.plSelPlay = plSelPlay;'));

@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readPlaylistView } from './helpers/playlistViewSource.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PL_JS = readFileSync(path.join(ROOT, 'src/renderer/js/views/playlist.js'), 'utf8');
+const PL_JS = readPlaylistView();
 const HTML = readFileSync(path.join(ROOT, 'src/renderer/index.html'), 'utf8');
 const PALETTE_JS = readFileSync(path.join(ROOT, 'src/renderer/js/commandPalette.js'), 'utf8');
 
@@ -41,10 +42,10 @@ test('dupPlaylistPayload：无 id 键（带 id 会覆盖原单）+ songs 换数�
 test('接线钉：视图函数/实时重拉/桥/HTML 按钮/palette 全部就位', () => {
   assert.match(PL_JS, /import \{ dupPlaylistName, dupPlaylistPayload \} from '\.\.\/plDuplicate\.js';/);
   assert.match(PL_JS, /async function duplicateCurrentPlaylist\(\) \{/);
-  assert.match(PL_JS, /const all = \(await api\.getUserPlaylists\(\)\) \|\| \[\];\n\s+const pl = all\.find\(p => p && p\.id === _currentPlaylistId\);/, '实时重拉防脏 state');
+  assert.match(PL_JS, /const all = \(await api\.getUserPlaylists\(\)\) \|\| \[\];\n\s+const pl = all\.find\(p => p && p\.id === plState._currentPlaylistId\);/, '实时重拉防脏 state');
   assert.match(PL_JS, /dupPlaylistName\(pl\.name, all\.map\(p => p && p\.name\)\.filter\(Boolean\)\)/);
   assert.match(PL_JS, /api\.saveUserPlaylist\(dupPlaylistPayload\(pl, newName\)\)/, '副本载荷直发既有通道');
-  assert.match(PL_JS, /let _plDupBusy = false;/, '防重入闩');
+  assert.match(PL_JS, /plState\._plDupBusy = false;/, '防重入闩');
   assert.match(PL_JS, /window\.duplicateCurrentPlaylist = duplicateCurrentPlaylist;/);
   assert.match(HTML, /onclick="duplicateCurrentPlaylist\(\)">📋 副本/);
   assert.match(PALETTE_JS, /\{ id: 'pl-dup'/);

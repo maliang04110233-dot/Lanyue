@@ -7,12 +7,9 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
+const { readPlaylistView } = require('./helpers/playlistViewSource.js');
 
-const PL_JS = fs.readFileSync(
-  path.join(__dirname, '../src/renderer/js/views/playlist.js'), 'utf8'
-);
+const PL_JS = readPlaylistView();
 
 global.window = global.window || {
   location: { hostname: 'localhost', protocol: 'file:' },
@@ -84,8 +81,8 @@ test('接线钉桩：playlist.js import 红心模块 + 详情行 ♥ 注入在 �
 });
 
 test('接线钉桩：收藏夹详情一次性订阅同步（守卫 _currentPlaylistId + 弹层可见）', () => {
-  assert.match(PL_JS, /let _plFavSyncBound = false;/);
-  assert.match(PL_JS, /subscribe\('userPlaylists', \(pls\) => \{\r?\n\s*if \(_currentPlaylistId !== FAVORITES_PLAYLIST_ID\) return;/);
+  assert.match(PL_JS, /plState\._plFavSyncBound = false;/);
+  assert.match(PL_JS, /subscribe\('userPlaylists', \(pls\) => \{\r?\n\s*if \(plState._currentPlaylistId !== FAVORITES_PLAYLIST_ID\) return;/);
   assert.match(PL_JS, /if \(pl\) renderPlaylistDetailSongs\(pl\.songs \|\| \[\]\);/);
   assert.match(PL_JS, /_bindFavDetailSync\(\);\r?\n\s*loadUserPlaylists\(\);/);
 });

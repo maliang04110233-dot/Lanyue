@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readPlaylistView } from './helpers/playlistViewSource.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PL_JS = readFileSync(path.join(ROOT, 'src/renderer/js/views/playlist.js'), 'utf8');
+const PL_JS = readPlaylistView();
 const HTML = readFileSync(path.join(ROOT, 'src/renderer/index.html'), 'utf8');
 const PALETTE_JS = readFileSync(path.join(ROOT, 'src/renderer/js/commandPalette.js'), 'utf8');
 
@@ -69,10 +70,10 @@ test('接线钉：详情过滤行按钮、统一视图管线、开弹层复位�
   // （连选是第四个读者：区间必须按屏幕上的行序算，另写一遍筛选迟早漂出"连到没显示的行"）
   assert.equal((PL_JS.match(/_plVisiblePairs\(/g) || []).length, 5); // 定义外四处调用
   assert.ok(!/const pairs = sortPlaylistPairs\(filterPlaylistSongs\(/.test(PL_JS), '仍有未走统一管线的 pairs 计算');
-  assert.match(PL_JS, /sortPlaylistPairs\(dlFiltered, _plSortMode\)/);
+  assert.match(PL_JS, /sortPlaylistPairs\(dlFiltered, plState._plSortMode\)/);
   // 打开弹层复位三件套之一
-  assert.match(PL_JS, /_plDlMode = 'all';\n\s*_syncPlSortBtn\(\);\n\s*_syncPlDlBtn\(\);/);
-  assert.match(PL_JS, /_plDlMode = nextPlDlMode\(_plDlMode\);/);
+  assert.match(PL_JS, /plState._plDlMode = 'all';\n\s*_syncPlSortBtn\(\);\n\s*_syncPlDlBtn\(\);/);
+  assert.match(PL_JS, /plState._plDlMode = nextPlDlMode\(plState._plDlMode\);/);
   assert.match(PL_JS, /window\.cyclePlDlFilter = cyclePlDlFilter;/);
 
   assert.match(HTML, /id="plDlFilterBtn"[^>]*onclick="cyclePlDlFilter\(\)"/);

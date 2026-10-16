@@ -6,9 +6,9 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PL_JS = fs.readFileSync(
-  path.join(__dirname, '../src/renderer/js/views/playlist.js'), 'utf8'
-);
+const { readPlaylistView } = require('./helpers/playlistViewSource.js');
+
+const PL_JS = readPlaylistView();
 const LOCAL_JS = fs.readFileSync(
   path.join(__dirname, '../src/renderer/js/views/local.js'), 'utf8'
 );
@@ -63,7 +63,7 @@ test('脏输入全 -1：cur 为 null / 列表非数组 / 空对象', async () =>
 test('两视图接线：详情走 data-pidx+清过滤重试，本地走 scrollToIndex+双闪；按钮与面板入口齐备；模块有 document 守卫', () => {
   assert.match(PL_JS, /import \{ indexOfPlaying, flashRow \} from '\.\.\/locatePlaying\.js';/);
   assert.match(PL_JS, /data-pidx="\$\{idx\}"/);
-  assert.match(PL_JS, /if \(!row && _plSongKw\) \{/);
+  assert.match(PL_JS, /if \(!row && plState._plSongKw\) \{/);
   assert.match(PL_JS, /window\.locatePlayingInDetail = locatePlayingInDetail;/);
   assert.match(LOCAL_JS, /_localVirtualScroller\.scrollToIndex\(idx\)/);
   assert.match(LOCAL_JS, /setTimeout\(flash, 200\)/);

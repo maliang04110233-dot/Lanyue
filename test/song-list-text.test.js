@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readPlaylistView } from './helpers/playlistViewSource.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PL_JS = readFileSync(path.join(ROOT, 'src/renderer/js/views/playlist.js'), 'utf8');
+const PL_JS = readPlaylistView();
 const LOCAL_JS = readFileSync(path.join(ROOT, 'src/renderer/js/views/local.js'), 'utf8');
 const HTML = readFileSync(path.join(ROOT, 'src/renderer/index.html'), 'utf8');
 const PALETTE_JS = readFileSync(path.join(ROOT, 'src/renderer/js/commandPalette.js'), 'utf8');
@@ -44,7 +45,7 @@ test('toTrackLines：顺序不动、空行剔除、脏入参回空数组', async
 
 test('接线钉：详情走 _plVisiblePairs 视图 + 本地走 localFiltered 视图 + 双按钮双面板命令', async () => {
   assert.match(PL_JS, /import \{ toTrackLines \} from '\.\.\/songListText\.js';/);
-  assert.match(PL_JS, /const lines = toTrackLines\(_plVisiblePairs\(_currentDetailSongs\)\.map\(p => p\.song\)\);/, '复制的是当前过滤视图（含状态过滤/排序后）');
+  assert.match(PL_JS, /const lines = toTrackLines\(_plVisiblePairs\(plState._currentDetailSongs\)\.map\(p => p\.song\)\);/, '复制的是当前过滤视图（含状态过滤/排序后）');
   assert.match(PL_JS, /const ok = await copyText\(lines\.join\('\\n'\)\);/);
   assert.match(PL_JS, /window\.copyPlaylistListText = copyPlaylistListText;/);
   assert.match(LOCAL_JS, /const lines = toTrackLines\(getState\('localFiltered'\) \|\| \[\]\);/, '本地复制当前过滤视图');

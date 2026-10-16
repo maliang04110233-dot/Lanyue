@@ -6,10 +6,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { readPlaylistView } = require('./helpers/playlistViewSource.js');
 
-const PL_JS = fs.readFileSync(
-  path.join(__dirname, '../src/renderer/js/views/playlist.js'), 'utf8'
-);
+const PL_JS = readPlaylistView();
 const HTML = fs.readFileSync(
   path.join(__dirname, '../src/renderer/index.html'), 'utf8'
 );
@@ -59,8 +58,8 @@ test('无键歌「宁重不丢」：两轮清理结果一致（折叠对无键�
 
 test('playlist.js 接线：去重走 mergeSongLists(pl.songs,[])，有 busy 守卫与 window 桥', () => {
   assert.match(PL_JS, /const merged = mergeSongLists\(pl\.songs \|\| \[\], \[\]\);/);
-  assert.match(PL_JS, /let _plDedupeBusy = false;/);
-  assert.match(PL_JS, /if \(!_currentPlaylistId \|\| _plDedupeBusy\) return;/);
+  assert.match(PL_JS, /plState\._plDedupeBusy = false;/);
+  assert.match(PL_JS, /if \(!plState._currentPlaylistId \|\| plState._plDedupeBusy\) return;/);
   assert.match(PL_JS, /if \(!removed\) \{ showToast\(t\('toast\.plNoDupSongs'\), 'info'\); return; \}/);
   // 键值对账：源码只留键，词典值必须还是「本歌单没有重复歌曲」（防止接错线）
   const zh = JSON.parse(fs.readFileSync(

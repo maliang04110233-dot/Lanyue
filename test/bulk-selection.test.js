@@ -22,10 +22,11 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const read = (...seg) => fs.readFileSync(path.join(ROOT, ...seg), 'utf8');
+const { readPlaylistView } = require('./helpers/playlistViewSource.js');
 
 const RANGE_SRC = read('src/renderer/js/selectionRange.js');
 const SCOPE_SRC = read('src/renderer/js/deleteScope.js');
-const PL = read('src/renderer/js/views/playlist.js');
+const PL = readPlaylistView();
 const APP = read('src/renderer/js/app.js');
 const DL = read('src/renderer/js/views/download.js');
 const LOCAL = read('src/renderer/js/views/local.js');
@@ -155,7 +156,7 @@ test('注册表：缺字段的注册直接忽略，不许把 null 推进挑选�
 const LISTS = [
   { name: '歌单详情', src: () => PL, file: 'src/renderer/js/views/playlist.js',
     call: 'onclick="event.stopPropagation();togglePlSongSel(${idx}, event)"',
-    fn: 'function togglePlSongSel(idx, e)', anchor: 'let _plSelAnchor = null;' },
+    fn: 'function togglePlSongSel(idx, e)', anchor: 'plState._plSelAnchor' },
   { name: '播放队列', src: () => APP, file: 'src/renderer/js/app.js',
     call: "'onclick=\"event.stopPropagation();togglePqSel(' + i + ', event)\"",
     fn: 'window.togglePqSel = (idx, e)', anchor: 'let _pqSelAnchor = null;' },
