@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Menu, Tray, nativeImage, Notification, globalShortcut, protocol } = require('electron');
+const { app, BrowserWindow, session, Notification, globalShortcut, protocol } = require('electron');
 const { handle: ipcHandle, on: ipcOn, assertContractCoverage } = require('./ipc/register');
 const { buildContractArg } = require('../shared/ipcContract');
 const { defaultDownloadDir } = require('../shared/downloadDefaults');
@@ -46,6 +46,7 @@ const subscriptions = require('./subscriptions');
 const clipboardWatch = require('./clipboardWatch');
 const { createLibraryWatcher } = require('./libraryWatcher');
 const { buildAppMenu } = require('./appMenu');
+const trayMod = require('./tray');
 
 // 修复 B15：使用 context.js 提供的统一 safeSend，避免代码漂移
 const safeSend = ctxSafeSend;
@@ -73,8 +74,6 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow;
-let tray = null;
-let isQuitting = false;
 
 // ── 下载队列引擎（Sprint C：已从本文件抽到 main/downloadQueue.js）──
 // 队列状态 / 持久化 / 并发调度 / 单曲处理（取流→落盘→ID3→歌词→历史→通知）
@@ -203,148 +202,20 @@ function createWindow() {
 
   // 窗口关闭时最小化到托盘（不是真的关闭）
   mainWindow.on('close', (event) => {
-    if (!isQuitting) {
+    if (!trayMod.isQuittingApp()) {
       event.preventDefault();
       mainWindow.hide();
-      if (tray) {
-        tray.displayBalloon({ title: '揽乐', content: '已最小化到托盘，点击恢复' });
+      const t = trayMod.getTray();
+      if (t) {
+        t.displayBalloon({ title: '揽乐', content: '已最小化到托盘，点击恢复' });
       }
     }
   });
 }
 
-// ─── 系统托盘 ──────────────────────────────────────────
-/** 可见则收起、不可见则唤出并抢焦点。托盘点击与「显示/隐藏窗口」全局键共用这一处。 */
-function toggleMainWindow() {
-  if (!mainWindow) return;
-  if (mainWindow.isVisible()) {
-    mainWindow.hide();
-  } else {
-    mainWindow.show();
-    mainWindow.focus();
-  }
-}
-
-function createTray() {
-  const iconPath = path.join(__dirname, '../../assets/icon.png');
-  let trayIcon;
-  try {
-    trayIcon = nativeImage.createFromPath(iconPath);
-    if (trayIcon.isEmpty()) {
-      // 如果图标加载失败，使用空白图标
-      trayIcon = nativeImage.createEmpty();
-    } else {
-      trayIcon = trayIcon.resize({ width: 16, height: 16 });
-    }
-  } catch (e) {
-    logger.warn('[tray] 图标加载失败:', e.message);
-    trayIcon = nativeImage.createEmpty();
-  }
-
-  tray = new Tray(trayIcon);
-  tray.setToolTip('揽乐');
-
-  updateTrayMenu();
-
-  tray.on('click', () => {
-    toggleMainWindow();
-  });
-
-  tray.on('balloon-click', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
-}
-
-function updateTrayMenu(playState = { isPlaying: false, title: '', artist: '' }) {
-  if (!tray) return;
-
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: playState.title ? `🎵 ${playState.title}` : '🎵 揽乐',
-      enabled: false,
-    },
-    {
-      label: playState.artist ? `   ${playState.artist}` : '',
-      enabled: false,
-    },
-    { type: 'separator' },
-    {
-      label: playState.isPlaying ? '⏸ 暂停' : '▶ 播放',
-      click: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('tray-toggle-play');
-        }
-      },
-    },
-    {
-      label: '⏮ 上一首',
-      click: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('tray-prev');
-        }
-      },
-    },
-    {
-      label: '⏭ 下一首',
-      click: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('tray-next');
-        }
-      },
-    },
-    { type: 'separator' },
-    {
-      label: '🖼 桌面歌词',
-      click: () => {
-        try { ipcWindow.createDesktopLyric(); } catch (e) { logger.warn('[tray] 打开桌面歌词失败:', e.message); }
-      },
-    },
-    {
-      label: '📐 迷你播放器',
-      click: () => {
-        try { ipcWindow.createMiniPlayer(); } catch (e) { logger.warn('[tray] 打开迷你播放器失败:', e.message); }
-      },
-    },
-    { type: 'separator' },
-    {
-      label: '📋 显示主窗口',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-        }
-      },
-    },
-    {
-      type: 'checkbox',
-      label: '⏸ 暂停下载队列',
-      checked: !!(downloadQueueEngine && downloadQueueEngine.isPaused()),
-      click: (mi) => {
-        if (!downloadQueueEngine) return;
-        downloadQueueEngine.setPaused(mi.checked);
-        // 同步渲染层按钮状态（queue-updated 不携带 paused，走独立事件）
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('queue-paused-changed', { paused: mi.checked });
-        }
-      },
-    },
-    {
-      label: '❌ 退出',
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      },
-    },
-  ]);
-
-  tray.setContextMenu(contextMenu);
-}
-
+// ─── 系统托盘已抽到 main/tray.js（createTray / updateTrayMenu / toggleMainWindow）───
 // 导出供其他模块调用
-module.exports = { updateTrayMenu };
+module.exports = { updateTrayMenu: trayMod.updateTrayMenu };
 
 // ── 全局快捷键（可自定义）─────────────────────────────
 // 动作清单、accelerator 白名单、默认值与「一键一动作」的去重规则全在
@@ -359,7 +230,7 @@ function sendToMainWindow(channel) {
 
 function runShortcutAction(binding) {
   if (binding.channel) sendToMainWindow(binding.channel);
-  else toggleMainWindow();
+  else trayMod.toggleMainWindow();
 }
 
 function registerGlobalShortcuts() {
@@ -445,7 +316,7 @@ app.whenReady().then(async () => {
     getPolicyFacts: getPolicyFactsForQueue,
     onQueueChanged: () => {
       // 队列变更时同步托盘菜单（下载进度/数量展示）
-      try { updateTrayMenu(); } catch (_e) { /* 托盘未就绪可忽略 */ }
+      try { trayMod.updateTrayMenu(); } catch (_e) { /* 托盘未就绪可忽略 */ }
     },
     notifier: {
       notifyDownloadDone: (song, savePath) => {
@@ -580,12 +451,16 @@ app.whenReady().then(async () => {
     callback({ responseHeaders: headers });
   });
 
+  trayMod.init({
+    getMainWindow: () => mainWindow,
+    getDownloadQueueEngine: () => downloadQueueEngine,
+  });
   createWindow();
-  createTray();
+  trayMod.createTray();
   // 任务栏进度/托盘提示的落地目标（context.safeSend 在队列事件时驱动刷新）
   taskbarProgress.init({
     getWindows: () => (mainWindow && !mainWindow.isDestroyed() ? [mainWindow] : []),
-    getTray: () => tray,
+    getTray: () => trayMod.getTray(),
   });
   registerGlobalShortcuts();
 });
@@ -680,7 +555,7 @@ function registerAllIpcHandlers() {
 
   // ── 系统托盘 IPC ───────────────────────────────────
   ipcOn('tray-update-play-state', (_, playState) => {
-    updateTrayMenu(playState);
+    trayMod.updateTrayMenu(playState);
   });
 
   // ── 全局快捷键开关（设置页实时切换）─────────────────
