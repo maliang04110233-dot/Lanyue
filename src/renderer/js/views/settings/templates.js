@@ -2,7 +2,7 @@
  * 设置视图 - 下载路径模板模块
  */
 
-import { t } from '../i18n.js';
+import { t } from '../../i18n.js';
 
 let _dlTemplates = [];
 let _dlActiveTemplate = null;

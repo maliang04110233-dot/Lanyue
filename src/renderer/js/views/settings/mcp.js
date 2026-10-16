@@ -2,7 +2,7 @@
  * 设置视图 - MCP 服务模块
  */
 
-import { t } from '../i18n.js';
+import { t } from '../../i18n.js';
 
 let _mcpRunning = false;
 

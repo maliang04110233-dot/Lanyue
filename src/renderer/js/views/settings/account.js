@@ -4,9 +4,9 @@
  * 负责：平台账号卡片渲染、Cookie 管理、源健康度展示
  */
 
-import { accountPlatforms, hasLoginWindow, cookiePlaceholder, cookieHint } from '../accountPlatforms.js';
-import { platformName } from '../utils.js';
-import { t } from '../i18n.js';
+import { accountPlatforms, hasLoginWindow, cookiePlaceholder, cookieHint } from '../../accountPlatforms.js';
+import { platformName } from '../../utils.js';
+import { t } from '../../i18n.js';
 
 /** 手动粘贴 Cookie 的分平台提示 */
 const ACCOUNT_COOKIE_HINTS = {

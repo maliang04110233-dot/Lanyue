@@ -2,7 +2,7 @@
  * 设置视图 - WebDAV 云同步模块
  */
 
-import { t } from '../i18n.js';
+import { t } from '../../i18n.js';
 
 export async function loadWebdavConfig() {
   try {

@@ -4,8 +4,10 @@
  * 负责：分平台音质、换源排除、质量策略规则
  */
 
-import { getPlatforms, getQualityBySource, setState, QualityOptions, QualityFixed, platformIcon, platformName } from '../utils.js';
-import { t } from '../i18n.js';
+import { getPlatforms, platformIcon, platformName } from '../../utils.js';
+import { QUALITY_OPTIONS, QUALITY_FIXED, getQualityBySource } from '../../quality.js';
+import { setState } from '../../state.js';
+import { t } from '../../i18n.js';
 
 // ── 分平台音质 ─────────────────────────────────────────
 
@@ -18,7 +20,7 @@ export function qualityPlatformIds() {
 
 function _qualitySelectOptions(selected) {
   let opts = '<option value="">' + esc('跟随默认') + '</option>';
-  for (const o of QualityOptions) {
+  for (const o of QUALITY_OPTIONS) {
     opts += '<option value="' + escAttr(o.value) + '"' +
       (selected === o.value ? ' selected' : '') + '>' + esc(o.label) + '</option>';
   }
@@ -38,7 +40,7 @@ export function renderQualityBySource() {
   if (!el) return;
   const map = getQualityBySource();
   el.innerHTML = qualityPlatformIds().map(id => {
-    const fixed = QualityFixed.has(id);
+    const fixed = QUALITY_FIXED.has(id);
     const cur = map[id] || '';
     const icon = platformIcon(id);
     return '<div class="quality-map-row' + (fixed ? ' quality-map-row--fixed' : '') + '">' +
