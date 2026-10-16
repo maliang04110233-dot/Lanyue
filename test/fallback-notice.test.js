@@ -69,7 +69,7 @@ test('nameOf 缺省时走全局 platformName，都没有则原样 id（node 环�
 
 test('接线钉：五处播放入口都改用 buildFallbackNotice，旧复制文案清零', async () => {
   const { readFileSync } = await import('node:fs');
-  for (const f of ['player.js', 'app.js', 'views/search.js', 'views/playlist.js', 'views/home.js']) {
+  for (const f of ['player.js', 'app.js', 'views/search.js', 'views/playlist/playback.js', 'views/home.js']) {
     const src = readFileSync(new URL(`../src/renderer/js/${f}`, import.meta.url), 'utf8');
     assert.ok(!src.includes('本源不可用，已切换到'), `${f} 仍残留手抄换源文案`);
     assert.ok(src.includes('buildFallbackNotice'), `${f} 未接共享文案`);

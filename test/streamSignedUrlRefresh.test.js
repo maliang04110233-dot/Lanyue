@@ -428,6 +428,7 @@ test('接线：渲染层每个 proxy-play 调用点都回传了实际取流的 (
     'src/renderer/js/views/home.js',
     'src/renderer/js/views/search.js',
     'src/renderer/js/views/playlist.js',
+    'src/renderer/js/views/playlist/playback.js',
     'src/renderer/js/app.js',
   ];
   let total = 0;

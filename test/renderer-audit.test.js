@@ -68,7 +68,7 @@ test('取流 referer 单源：utils.js 提供 playReferer，5 处调用点不得
     ['js', 'app.js'],
     ['js', 'player.js'],
     ['js', 'views', 'home.js'],
-    ['js', 'views', 'playlist.js'],
+    ['js', 'views', 'playlist', 'playback.js'],
     ['js', 'views', 'search.js'],
   ];
   for (const f of files) {

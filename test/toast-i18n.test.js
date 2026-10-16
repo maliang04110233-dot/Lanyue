@@ -729,7 +729,7 @@ const LEDGER = {
   'src/renderer/js/lyricNudge.js': 3,
   'src/renderer/js/m3uToPlaylist.js': 6,
   'src/renderer/js/playRetry.js': 6,
-  'src/renderer/js/player.js': 10,
+  'src/renderer/js/player.js': 9,
   'src/renderer/js/player/fade.js': 2,
   'src/renderer/js/player/lyrics.js': 2,
   'src/renderer/js/player/stats.js': 3,
@@ -744,7 +744,9 @@ const LEDGER = {
   'src/renderer/js/views/history.js': 24,
   // 15 → 13（2026-10-13）：播放流程的正常态 toast（「正在准备音源」「正在播放」）
   // 按产品决策「只有报错才提示」删除 —— 变少是进步，按台账家法把数字钉小。
-  'src/renderer/js/views/home.js': 13,
+  // 13 → 11（2026-10-16）：playRecommendSong 的音源失败 toast 改用 sourceErrorText，
+  // 中文文案收进词典（sourceError.js），本文件少 2 处硬编码。
+  'src/renderer/js/views/home.js': 11,
   'src/renderer/js/views/local-stats.js': 11,
   // 46 → 0（阶段5b-1 + 5b-2 + 5a）：本地曲库的反馈文案已全部收编进词典，
   // 按台账家法「归零即删项」，此处不留恒真记录。
@@ -752,7 +754,9 @@ const LEDGER = {
   // 36 → 37（2026-10-13 复审 P2-13）：AI 搜索的「部分关键词失败」提示还没进词典。
   // 按台账家法「新增欠账要改表」先把数字钉住；后续若收编进 t()，再改回 36 或删项。
   // 37 → 35（同日）：播放流程的两条正常态 toast 按「只有报错才提示」删除。
-  'src/renderer/js/views/search.js': 35,
+  // 35 → 33（2026-10-16）：playSong 的音源失败 toast 改用 sourceErrorText（sourceError.js），
+  // 本文件少 2 处硬编码中文；具体文案由错误码映射决定。
+  'src/renderer/js/views/search.js': 33,
 };
 
 test('欠账台账与实际逐字相等（新增欠账要改表，还清欠账也要改表）', () => {
@@ -802,9 +806,11 @@ const PASSTHROUGH = {
   'src/renderer/js/playError.js': 6,
   'src/renderer/js/queueCopy.js': 2,
   // 47 → 25：6a（详情行内 + 卡片列表 + 详情描述）与 6b（回收站 / 添加弹层 / 合并弹层）把界面文案接进词典。
-  // 剩下的 25 处是 **logger 诊断文案**（"歌单批量入队失败:"等）与尚未收编的弹窗/剪贴板报告文案，
+  // 25 → 22：阶段 4 把播放/下载域（playPlaylistSong / _playFrom / 整单入队…）抽到
+  //   views/playlist/playback.js，随迁的 3 处是「播放失败」「歌单批量入队失败」「歌单 N 首已加入…」诊断串。
+  // 剩下的 22 处是 **logger 诊断文案**与尚未收编的弹窗/剪贴板报告文案，
   // 按批推进；每收就一处的是数字不是词条。
-  'src/renderer/js/views/playlist.js': 25,
+  'src/renderer/js/views/playlist.js': 22,
 };
 
 function scanPassthrough() {
