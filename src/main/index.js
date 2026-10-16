@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Notification, protocol } = require('electron');
+const { app, BrowserWindow, Notification, protocol } = require('electron');
 const { handle: ipcHandle, on: ipcOn, assertContractCoverage } = require('./ipc/register');
 const { buildContractArg } = require('../shared/ipcContract');
 const { defaultDownloadDir } = require('../shared/downloadDefaults');
@@ -47,6 +47,7 @@ const { createLibraryWatcher } = require('./libraryWatcher');
 const { buildAppMenu } = require('./appMenu');
 const trayMod = require('./tray');
 const globalShortcuts = require('./globalShortcuts');
+const { installCorsHeaders } = require('./corsHeaders');
 
 // 修复 B15：使用 context.js 提供的统一 safeSend，避免代码漂移
 const safeSend = ctxSafeSend;
@@ -372,40 +373,9 @@ app.whenReady().then(async () => {
   // 安装自定义应用菜单（屏蔽开发者工具菜单项及其加速键）
   buildAppMenu({ getMainWindow: () => mainWindow });
 
-  // CORS 白名单：本地来源 + 各平台 manifest 声明的域名（派生）
-  // ⚠️ 这是本工程唯一的安全边界 —— 它决定哪些源能拿到非 null 的
-  //    Access-Control-Allow-Origin。改动后必须与历史枚举逐条相等，
-  //    由 test/platform-contract.test.js 的集合相等断言守住（不允许新增项）。
-  const LOCAL_ORIGINS = ['http://localhost', 'http://127.0.0.1'];
-  const { origins: platformOrigins, suffixes: platformSuffixes } =
-    require('../api').registry.getAllowedOrigins();
-  const ALLOWED_ORIGINS = new Set([...LOCAL_ORIGINS, ...platformOrigins]);
-  // 部分平台的 CDN 子域是动态的（douyinvod 按地域/节点变化、kugou 音频域有多个前缀），
-  // 精确匹配枚举不完，故额外做后缀匹配。后缀带前导点，
-  // `evil-douyinvod.com` 这类不会以 `.douyinvod.com` 结尾，不会被误放行。
-  const ALLOWED_ORIGIN_SUFFIXES = [...platformSuffixes];
-  const ses = session.defaultSession;
-  ses.webRequest.onHeadersReceived((details, callback) => {
-    // M5 修正：原实现拿 details.url 自身的 origin 判定并回填，等于给每个
-    // 响应写上"它自己"，对本应用（file:// 页 origin 为 null）完全无效，
-    // 还会覆盖上游正确的 ACAO。正确语义：目标是白名单平台源时，把
-    // 「发起方」反射回去 —— 打包后发起方是 file://（null），dev 是本地端口。
-    let targetOrigin = '';
-    try { targetOrigin = new URL(details.url).origin; } catch (_e) { /* noop */ }
-    const isAllowed = ALLOWED_ORIGINS.has(targetOrigin)
-      || ALLOWED_ORIGIN_SUFFIXES.some((sfx) => targetOrigin.endsWith(sfx));
-    const headers = { ...details.responseHeaders };
-    const hasACAO = Object.keys(headers).some(k => k.toLowerCase() === 'access-control-allow-origin');
-    if (isAllowed && !hasACAO) {
-      const initiator = details.initiator && /^https?:\/\//.test(details.initiator)
-        ? new URL(details.initiator).origin
-        : 'null';
-      headers['Access-Control-Allow-Origin'] = [initiator];
-      headers['Access-Control-Allow-Methods'] = ['GET', 'HEAD', 'OPTIONS'];
-      headers['Access-Control-Allow-Headers'] = ['Range', 'Referer'];
-    }
-    callback({ responseHeaders: headers });
-  });
+  // 安装 CORS 白名单（唯一安全边界，实现见 main/corsHeaders.js，
+  // 由 test/platform-contract.test.js 的集合相等断言守住）
+  installCorsHeaders();
 
   trayMod.init({
     getMainWindow: () => mainWindow,
