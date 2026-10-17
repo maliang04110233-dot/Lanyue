@@ -12,14 +12,12 @@ import { t } from '../i18n.js';
 import { errBrief } from '../errBrief.js';
 import { askConfirm } from '../confirmDialog.js';
 import { logger } from '../logger.js';
-import { HEART_ON, heartBtnHtml } from '../favorites.js';
 import { FAVORITES_PLAYLIST_ID, subscribe } from '../state.js';
 import { resolveQuality } from '../quality.js';
-import { dlBadgeHtml, dlEnsureHistoryLoaded, addDlChangeListener, dlStatusFor } from '../dlStatus.js';
+import { addDlChangeListener } from '../dlStatus.js';
 import { openSongRowMenu } from '../songMenu.js';
-import { moveInList, sortPlaylistPairs, nextPlSortMode, PL_SORT_MODES, sortPlaylists, nextPlCardSortMode, PL_CARD_MODES, filterPlaylists } from '../playlistSort.js';
+import { moveInList, nextPlSortMode, nextPlCardSortMode, PL_CARD_MODES } from '../playlistSort.js';
 import { normalizeCoverUrl, pickFirstSongCover } from '../playlistCover.js';
-import { filterPlaylistSongs } from '../playlistFilter.js';
 import { findCrossPlaylistDupes, dedupeScanText, planConsolidate } from '../plDedupeScan.js';
 import { enrichExportSongs, buildPathMap } from '../playlistExport.js';
 import { mergeSongLists } from '../playlistMerge.js';
@@ -27,15 +25,16 @@ import { indexOfPlaying, flashRow } from '../locatePlaying.js';
 import { sanitizeFileBase } from '../artistGroups.js';
 import { plSongKey, splitBySelection, keysOf } from '../plBulkRemove.js';
 import { planSelEnqueue, enqueueSkipSuffix } from '../plSelBatch.js';
-import { filterByDlMode, nextPlDlMode, plDlModeLabel } from '../plDlFilter.js';
+import { nextPlDlMode } from '../plDlFilter.js';
 import { dupPlaylistName, dupPlaylistPayload } from '../plDuplicate.js';
 import { toTrackLines } from '../songListText.js';
 import { copyText } from '../songShare.js';
 import { isRangeClick, rangeKeys } from '../selectionRange.js';
 import { registerDeleteScope } from '../deleteScope.js';
 import { plState } from './playlist/state.js';
-import { _plInvalidateRender, _plDeferRender, _plRenderIdle, _plRenderBusy } from './playlist/render.js';
+import { _plRenderIdle, _plRenderBusy } from './playlist/render.js';
 import { playPlaylistSong, _playFrom, addPlaylistSongToQueue, downloadPlaylistSong, playAllPlaylist, downloadAllPlaylist } from './playlist/playback.js';
+import { renderPlaylistList, openPlaylistDetail, closePlaylistDetail, _plVisiblePairs, renderPlaylistDetailSongs, _syncPlSortBtn, _syncPlDlBtn, _syncPlSelBtns } from './playlist/core.js';
 
 // ── 状态 ─────────────────────────────────────────────
 // 模块级状态已迁出到 ./playlist/state.js 的 plState 对象（阶段 4 第 A 步）。
@@ -55,163 +54,9 @@ async function loadUserPlaylists() {
   refreshPlTrash();
 }
 
-// ── 渲染歌单列表 ──────────────────────────────────────
-function renderPlaylistList(playlists) {
-  const container = document.getElementById('userPlaylistGrid');
-  if (!container) return;
-
-  const shown = sortPlaylists(filterPlaylists(playlists, plState._plCardKw), plState._plCardSortMode);
-  if (!shown.length) {
-    const kw = plState._plCardKw.trim();
-    container.innerHTML = kw
-      ? `<div class="empty-hint" style="grid-column:1/-1;text-align:center;padding:40px 0;">
-        <div style="font-size:40px;margin-bottom:12px">🔍</div>
-        <div>${t('pl.card.emptyFiltered', { kw: esc(kw) })}</div>
-        <div style="font-size:12px;margin-top:6px;color:var(--neon-dim);">${t('pl.card.searchHint')}</div>
-      </div>`
-      : `<div class="empty-hint" style="grid-column:1/-1;text-align:center;padding:40px 0;">
-        <div style="font-size:40px;margin-bottom:12px">🎼</div>
-        <div>${t('pl.card.empty')}</div>
-        <div style="font-size:12px;margin-top:6px;color:var(--neon-dim);">${t('pl.card.emptyHint')}</div>
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = shown.map(pl => `
-    <div class="playlist-card" data-id="${escAttr(pl.id)}" tabindex="0" role="button" onclick="openPlaylistDetail('${escQ(pl.id)}')">
-      <div class="playlist-card-cover">
-        ${pl.cover ? `<img src="${escAttr(pl.cover)}" alt="${esc(pl.name)}" onerror="this.style.display='none'">` : `<div class="playlist-card-placeholder">${pl.system ? HEART_ON : '📋'}</div>`}
-        <div class="playlist-card-overlay">
-          <span class="playlist-card-count">${t('pl.count', { n: pl.songs?.length || 0 })}</span>
-        </div>
-      </div>
-      <div class="playlist-card-info">
-        <div class="playlist-card-name" title="${esc(pl.name)}">${esc(pl.name)}</div>
-        ${pl.desc ? `<div class="playlist-card-desc">${esc(pl.desc)}</div>` : ''}
-      </div>
-      <div class="playlist-card-actions" onclick="event.stopPropagation()">
-        ${pl.system
-          ? ''
-          : `<button class="action-btn" onclick="editPlaylist('${escQ(pl.id)}')" title="${t('pl.card.edit')}">✏️</button>
-        <button class="action-btn" onclick="deletePlaylist('${escQ(pl.id)}')" title="${t('pl.card.delete')}">🗑️</button>`}
-      </div>
-    </div>
-  `).join('');
-}
-
-// ── 打开歌单详情 ──────────────────────────────────────
-async function openPlaylistDetail(playlistId) {
-  try {
-    plState._currentPlaylistId = playlistId;
-    plState._plSongKw = '';
-    plState._plSortMode = '';
-    plState._plDlMode = 'all';
-    _syncPlSortBtn();
-    _syncPlDlBtn();
-    _resetPlSel();
-    const filterInput = document.getElementById('playlistSongFilter');
-    if (filterInput) filterInput.value = '';
-    const playlists = getState('userPlaylists') || [];
-    const pl = playlists.find(p => p.id === playlistId);
-    if (!pl) return;
-    plState._currentDetailSongs = pl.songs || [];
-
-    document.getElementById('playlistDetailTitle').textContent = pl.name;
-    document.getElementById('playlistDetailDesc').textContent = pl.desc || t('pl.detail.noDesc');
-    // 语义运维面板（候选方向 3）通过它拿当前歌单 id：模块变量 HTML onclick 拿不到
-    window._plDetailId = pl.id;
-    renderPlaylistDetailSongs(pl.songs || []);
-
-    document.getElementById('playlistDetailModal').classList.remove('hidden');
-  } catch (e) {
-    logger.error('[openPlaylistDetail] error:', e);
-  }
-}
-
-function closePlaylistDetail() {
-  document.getElementById('playlistDetailModal').classList.add('hidden');
-  plState._currentPlaylistId = null;
-  plState._currentDetailSongs = [];
-  window._plDetailId = null;
-  _resetPlSel();
-}
-
-// ── 渲染歌单歌曲列表 ──────────────────────────────────
-// 视图管线唯一入口：关键词过滤 → 下载状态过滤 → 排序（渲染/全选/任何读视图序的地方都走它，
-// 三处管线各自为政迟早漂出「全选选到隐形歌」这类 bug）
-function _plVisiblePairs(songs) {
-  const queue = getState('queueSnapshot') || [];
-  const kwFiltered = filterPlaylistSongs(songs || [], plState._plSongKw);
-  const dlFiltered = filterByDlMode(kwFiltered, plState._plDlMode, (s) => dlStatusFor(s, queue));
-  return sortPlaylistPairs(dlFiltered, plState._plSortMode);
-}
-
-// 大库分片渲染引擎（作废 / 登记 / 排空 / 是否在跑）已抽到 ./playlist/render.js。
-// 原实现在这里；_plVisiblePairs 视图管线仍留本文件（它依赖若干纯函数模块导入）。
-
-function renderPlaylistDetailSongs(songs) {
-  const list = document.getElementById('playlistDetailSongs');
-  if (!list) return Promise.resolve();
-  plState._currentDetailSongs = songs || [];
-  _syncPlSelBtns(); // 计数/显隐跟渲染走，早退分支也不留脏按钮
-  dlEnsureHistoryLoaded(); // 跨会话"已下载"懒回填，完成后经监听器重渲染徽标
-
-  if (!songs || songs.length === 0) {
-    _plInvalidateRender(); // 作废进行中的分片追加
-    list.innerHTML = `<div class="empty-hint" style="text-align:center;padding:30px 0;">${t('pl.detail.empty')}</div>`;
-    return Promise.resolve();
-  }
-
-  const pairs = _plVisiblePairs(songs);
-  const reorderable = songs.length > 1 && !plState._plSortMode; // 排序时展示序≠存储序，禁用拖把手防误持久化
-  if (!pairs.length) {
-    _plInvalidateRender();
-    const kwPart = plState._plSongKw.trim() ? t('pl.detail.kwWrap', { kw: esc(plState._plSongKw.trim()) }) : '';
-    const dlPart = plState._plDlMode !== 'all' ? (kwPart ? t('pl.detail.filterDlWithKw') : t('pl.detail.filterDl')) : '';
-    list.innerHTML = `<div class="empty-hint" style="text-align:center;padding:30px 0;">${t('pl.detail.emptyFiltered', { kw: kwPart, dl: dlPart })}</div>`;
-    return Promise.resolve();
-  }
-  const rows = pairs.map(({ song, i: idx }) => `
-    <div class="song-row" data-pidx="${idx}" ondblclick="playPlaylistSong(${idx})">
-      ${plState._plSelMode ? `<input type="checkbox" class="pl-sel-chk" ${plState._plSelKeys.has(plSongKey(song)) ? 'checked' : ''} onclick="event.stopPropagation();togglePlSongSel(${idx}, event)" title="${t('pl.sel.hint')}" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;margin-right:6px;">` : ''}
-      ${reorderable ? `<span class="pl-drag-handle" draggable="true" title="${t('pl.drag.hint')}">⠿</span>` : ''}
-      <span class="song-num" style="color:var(--neon-dim);font-size:12px;width:22px;text-align:right;flex-shrink:0;">${idx + 1}</span>
-      <div class="song-info">
-        <div class="song-title" title="${esc(song.title)}">${esc(song.title) || t('pl.row.unknownTitle')}</div>
-        <div class="song-meta">${esc(song.artist) || t('pl.row.unknownArtist')}${song.album ? ' · ' + esc(song.album) : ''}</div>
-      </div>
-      ${dlBadgeHtml(song, getState('queueSnapshot') || [])}
-      <span class="song-duration">${song.duration ? fmtDuration(song.duration) : '--:--'}</span>
-      <div class="song-actions">
-        ${heartBtnHtml(song, 'action-btn')}
-        <button class="action-btn" onclick="playPlaylistSong(${idx})" title="${t('pl.row.play')}">▶</button>
-        <button class="action-btn" onclick="downloadPlaylistSong(${idx})" title="${t('pl.row.download')}">⬇</button>
-        <button class="action-btn" onclick="addPlaylistSongToQueue(${idx})" title="${t('pl.row.enqueue')}">➕</button>
-        <button class="action-btn" onclick="removeSongFromPlaylist('${escQ(String(song.id))}','${escQ(String(song.source || ''))}')" title="${t('pl.row.remove')}">✕</button>
-      </div>
-    </div>
-  `);
-  _plInvalidateRender();
-  const d = _plDeferRender();
-  const token = plState._plRenderToken;
-  let cursor = 0;
-  const appendSlice = () => {
-    // 被作废（新一轮渲染，或外部 ++plState._plRenderToken）时先结算 await 方再走人：
-    // 不结算就是永久 pending，比误报更难排查。
-    if (token !== plState._plRenderToken) return d.settle();
-    const end = Math.min(cursor + plState.PL_RENDER_CHUNK, rows.length);
-    let html = '';
-    for (let i = cursor; i < end; i++) html += rows[i];
-    if (cursor === 0) list.innerHTML = html;
-    else list.insertAdjacentHTML('beforeend', html);
-    cursor = end;
-    if (cursor < rows.length) requestAnimationFrame(appendSlice);
-    else d.settle();
-  };
-  appendSlice();
-  return d.promise;
-}
-
+// ── 渲染歌单列表 / 打开与关闭详情 / 渲染详情歌曲列表 ──
+// 已抽到 ./playlist/core.js（含视图管线 _plVisiblePairs 与按钮同步）。
+// loadUserPlaylists 留在本文件：它要回调本域 refreshPlTrash，避免反向依赖。
 // ── 行右键菜单（业务项在 ../songMenu.js 共享）──────────
 function playlistRowContext(e) {
   const list = document.getElementById('playlistDetailSongs');
@@ -354,35 +199,7 @@ async function removeSongFromPlaylist(songId, source) {
 }
 
 // ── 多选批量移除───────────────────────────────
-function _resetPlSel() {
-  plState._plSelMode = false;
-  plState._plSelKeys = new Set();
-  plState._plSelAnchor = null; // 换歌单/关弹层后锚点属于上一张单，留着会连出跨单的区间
-  _syncPlSelBtns();
-}
-
-function _syncPlSelBtns() {
-  const modeBtn = document.getElementById('plSelModeBtn');
-  const allBtn = document.getElementById('plSelAllBtn');
-  const rmBtn = document.getElementById('plSelRemoveBtn');
-  const dlBtn = document.getElementById('plSelDlBtn');
-  const playBtn = document.getElementById('plSelPlayBtn');
-  if (modeBtn) modeBtn.textContent = plState._plSelMode ? '⬚ 退出多选' : '☑ 多选';
-  if (allBtn) allBtn.classList.toggle('hidden', !plState._plSelMode);
-  if (rmBtn) {
-    rmBtn.classList.toggle('hidden', !plState._plSelMode);
-    rmBtn.textContent = `🗑 移除 ${plState._plSelKeys.size}`;
-  }
-  if (dlBtn) {
-    dlBtn.classList.toggle('hidden', !plState._plSelMode);
-    dlBtn.textContent = `⬇ 下载 ${plState._plSelKeys.size}`;
-  }
-  if (playBtn) {
-    playBtn.classList.toggle('hidden', !plState._plSelMode);
-    playBtn.textContent = `▶ 播放 ${plState._plSelKeys.size}`;
-  }
-}
-
+// 多选选择态的重置 / 工具条按钮同步已抽到 ./playlist/core.js（详情弹层的一部分）。
 function togglePlBulkMode() {
   plState._plSelMode = !plState._plSelMode;
   if (!plState._plSelMode) { plState._plSelKeys = new Set(); plState._plSelAnchor = null; }
@@ -857,13 +674,7 @@ function onPlaylistSongFilterInput(v) {
 }
 
 // ── 详情视图排序（只排展示 pairs，不动存储顺序；排序中拖把手隐藏）──
-function _syncPlSortBtn() {
-  const btn = document.getElementById('playlistSortBtn');
-  if (!btn) return;
-  const m = PL_SORT_MODES.find((x) => x.key === plState._plSortMode);
-  btn.textContent = m ? m.label : '↕ 默认序';
-}
-
+// 详情排序按钮的文案同步已抽到 ./playlist/core.js（详情弹层的一部分）。
 function cyclePlaylistSort() {
   plState._plSortMode = nextPlSortMode(plState._plSortMode);
   _syncPlSortBtn();
@@ -872,11 +683,7 @@ function cyclePlaylistSort() {
 
 // ── 详情下载状态过滤循环（plDlFilter.js 纯函数的接线层）──
 // 判定复用 dlStatusFor（与行内徽标同一来源），'done' 之外都算未下载
-function _syncPlDlBtn() {
-  const btn = document.getElementById('plDlFilterBtn');
-  if (btn) btn.textContent = plDlModeLabel(plState._plDlMode);
-}
-
+// 详情下载状态过滤按钮的文案同步已抽到 ./playlist/core.js（详情弹层的一部分）。
 function cyclePlDlFilter() {
   plState._plDlMode = nextPlDlMode(plState._plDlMode);
   _syncPlDlBtn();

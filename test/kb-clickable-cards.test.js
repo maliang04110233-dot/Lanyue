@@ -77,9 +77,10 @@ test('home.js: 4 类可点击模板（歌单卡/最近播放/榜单行/分区重
   ], 4);
 });
 
-test('playlist.js: 歌单卡与"加入歌单"弹层条目挂桥属性（弹层内也可键盘选定）', () => {
-  const src = read('js', 'views', 'playlist.js');
-  assertCardPinned('playlist.js', src, [
+test('playlist.js(+core.js): 歌单卡与"加入歌单"弹层条目挂桥属性（弹层内也可键盘选定）', () => {
+  // 阶段 4 拆分后：歌单卡随详情核心迁进 views/playlist/core.js，弹层条目留在兼容层。
+  const src = read('js', 'views', 'playlist.js') + read('js', 'views', 'playlist', 'core.js');
+  assertCardPinned('playlist.js+core.js', src, [
     '<div class="playlist-card"', '<div class="playlist-select-item"',
   ], 2);
 });
@@ -103,7 +104,7 @@ test('第二批（163 收尾）: 播放队列行 / 下载队列详情 / 下载�
 // ── 反向钉：不收的口子，防止无声扩大或走偏 ─────────────
 
 test('桥属性不得被挂到既有 input/checkbox 上（tabindex 归桥只认 div 卡片；复选框另有 aria-checked 课题）', () => {
-  const files = ['index.html', 'js/app.js', 'js/views/home.js', 'js/views/playlist.js', 'js/views/local.js', 'js/views/download.js', 'js/views/settings.js'];
+  const files = ['index.html', 'js/app.js', 'js/views/home.js', 'js/views/playlist.js', 'js/views/playlist/core.js', 'js/views/local.js', 'js/views/download.js', 'js/views/settings.js'];
   for (const f of files) {
     const parts = f.split('/');
     const src = read(...parts);

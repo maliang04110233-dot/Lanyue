@@ -61,9 +61,13 @@ test('filterByDlMode：done 才算已下载；queued/downloading/无状态都算
 });
 
 test('接线钉：详情过滤行按钮、统一视图管线、开弹层复位、桥与命令面板入口', async () => {
-  assert.match(PL_JS, /import \{ filterByDlMode, nextPlDlMode, plDlModeLabel \} from '\.\.\/plDlFilter\.js';/);
+  // 阶段 4 拆分后：plDlFilter 三件分居两处 —— nextPlDlMode 在兼容层（cyclePlDlFilter 用），
+  // filterByDlMode + plDlModeLabel 随视图管线/按钮同步迁进 core.js。聚合视图里两侧都要有。
+  assert.match(PL_JS, /import \{ nextPlDlMode \} from '\.\.\/plDlFilter\.js';/);
+  assert.match(PL_JS, /import \{ filterByDlMode, plDlModeLabel \} from '\.\.\/\.\.\/plDlFilter\.js';/);
   assert.match(PL_JS, /from '\.\.\/dlStatus\.js'/);
-  assert.match(PL_JS, /dlBadgeHtml, dlEnsureHistoryLoaded, addDlChangeListener, dlStatusFor/);
+  // 阶段 4 拆分后同理：addDlChangeListener 的监听挂在兼容层，徽标渲染三件迁进 core.js。
+  assert.match(PL_JS, /import \{ dlBadgeHtml, dlEnsureHistoryLoaded, dlStatusFor \} from '\.\.\/\.\.\/dlStatus\.js';/);
   // 渲染与全选共用一个管线（两旧字面量都退役）
   assert.match(PL_JS, /function _plVisiblePairs\(songs\) \{/);
   // 渲染/全选/复制曲单/Shift 连选四处读视图都走同一管线

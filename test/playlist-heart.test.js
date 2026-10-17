@@ -74,7 +74,7 @@ test('本地收藏曲在收藏详情的红心：键为 filePath:local，切换�
 });
 
 test('接线钉桩：playlist.js import 红心模块 + 详情行 ♥ 注入在 ▶ 之前', () => {
-  assert.match(PL_JS, /import \{ HEART_ON, heartBtnHtml \} from '\.\.\/favorites\.js';/);
+  assert.match(PL_JS, /import \{ HEART_ON, heartBtnHtml \} from '\.\.\/(\.\.\/)?favorites\.js';/);
   assert.match(PL_JS, /import \{ FAVORITES_PLAYLIST_ID, subscribe \} from '\.\.\/state\.js';/);
   assert.match(PL_JS,
     /\$\{heartBtnHtml\(song, 'action-btn'\)\}\s*<button class="action-btn" onclick="playPlaylistSong\(\$\{idx\}\)"/);

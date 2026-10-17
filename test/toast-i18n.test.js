@@ -806,11 +806,14 @@ const PASSTHROUGH = {
   'src/renderer/js/playError.js': 6,
   'src/renderer/js/queueCopy.js': 2,
   // 47 → 25：6a（详情行内 + 卡片列表 + 详情描述）与 6b（回收站 / 添加弹层 / 合并弹层）把界面文案接进词典。
-  // 25 → 22：阶段 4 把播放/下载域（playPlaylistSong / _playFrom / 整单入队…）抽到
-  //   views/playlist/playback.js，随迁的 3 处是「播放失败」「歌单批量入队失败」「歌单 N 首已加入…」诊断串。
-  // 剩下的 22 处是 **logger 诊断文案**与尚未收编的弹窗/剪贴板报告文案，
+  // 22 → 16：阶段 4 把播放/下载域（playPlaylistSong / _playFrom / 整单入队…）抽到
+  //   views/playlist/playback.js（随迁 3 处诊断串），随后又把详情弹层核心（卡片网格 /
+  //   打开关闭 / 渲染歌曲列表 / 按钮同步）抽到 views/playlist/core.js（随迁 6 处：
+  //   多选工具条 5 处 + 排序按钮 1 处 —— 「☑ 多选」这类不是反馈调用，进不了 LEDGER）。
+  // 剩下的 16 处是 **logger 诊断文案**与尚未收编的弹窗/剪贴板报告文案，
   // 按批推进；每收就一处的是数字不是词条。
-  'src/renderer/js/views/playlist.js': 22,
+  'src/renderer/js/views/playlist.js': 16,
+  'src/renderer/js/views/playlist/core.js': 6,
 };
 
 function scanPassthrough() {

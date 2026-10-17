@@ -10,9 +10,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PLAYLIST_JS = fs.readFileSync(
-  path.join(__dirname, '../src/renderer/js/views/playlist.js'), 'utf8'
-);
+const { readPlaylistView } = require('./helpers/playlistViewSource.js');
+const PLAYLIST_JS = readPlaylistView();
 const HTML = fs.readFileSync(
   path.join(__dirname, '../src/renderer/index.html'), 'utf8'
 );
