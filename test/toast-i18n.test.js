@@ -810,10 +810,13 @@ const PASSTHROUGH = {
   //   views/playlist/playback.js（随迁 3 处诊断串），随后又把详情弹层核心（卡片网格 /
   //   打开关闭 / 渲染歌曲列表 / 按钮同步）抽到 views/playlist/core.js（随迁 6 处：
   //   多选工具条 5 处 + 排序按钮 1 处 —— 「☑ 多选」这类不是反馈调用，进不了 LEDGER）。
-  // 剩下的 16 处是 **logger 诊断文案**与尚未收编的弹窗/剪贴板报告文案，
+  // 16 → 14：又把视角弹层核心之后的「行操作」域（行右键菜单 / 拖拽排序 / 单曲移除）
+  //   抽到 views/playlist/detail.js，随迁 2 处（「从歌单移除」菜单标签 + 「保存失败」）。
+  // 剩下的 14 处是 **logger 诊断文案**与尚未收编的弹窗/剪贴板报告文案，
   // 按批推进；每收就一处的是数字不是词条。
-  'src/renderer/js/views/playlist.js': 16,
+  'src/renderer/js/views/playlist.js': 14,
   'src/renderer/js/views/playlist/core.js': 6,
+  'src/renderer/js/views/playlist/detail.js': 2,
 };
 
 function scanPassthrough() {

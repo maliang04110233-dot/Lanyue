@@ -15,8 +15,7 @@ import { logger } from '../logger.js';
 import { FAVORITES_PLAYLIST_ID, subscribe } from '../state.js';
 import { resolveQuality } from '../quality.js';
 import { addDlChangeListener } from '../dlStatus.js';
-import { openSongRowMenu } from '../songMenu.js';
-import { moveInList, nextPlSortMode, nextPlCardSortMode, PL_CARD_MODES } from '../playlistSort.js';
+import { nextPlSortMode, nextPlCardSortMode, PL_CARD_MODES } from '../playlistSort.js';
 import { normalizeCoverUrl, pickFirstSongCover } from '../playlistCover.js';
 import { findCrossPlaylistDupes, dedupeScanText, planConsolidate } from '../plDedupeScan.js';
 import { enrichExportSongs, buildPathMap } from '../playlistExport.js';
@@ -35,6 +34,7 @@ import { plState } from './playlist/state.js';
 import { _plRenderIdle, _plRenderBusy } from './playlist/render.js';
 import { playPlaylistSong, _playFrom, addPlaylistSongToQueue, downloadPlaylistSong, playAllPlaylist, downloadAllPlaylist } from './playlist/playback.js';
 import { renderPlaylistList, openPlaylistDetail, closePlaylistDetail, _plVisiblePairs, renderPlaylistDetailSongs, _syncPlSortBtn, _syncPlDlBtn, _syncPlSelBtns } from './playlist/core.js';
+import { playlistRowContext, _plRowUnder, _plClearDragMarks, persistPlaylistOrder, removeSongFromPlaylist } from './playlist/detail.js';
 
 // ── 状态 ─────────────────────────────────────────────
 // 模块级状态已迁出到 ./playlist/state.js 的 plState 对象（阶段 4 第 A 步）。
@@ -57,44 +57,14 @@ async function loadUserPlaylists() {
 // ── 渲染歌单列表 / 打开与关闭详情 / 渲染详情歌曲列表 ──
 // 已抽到 ./playlist/core.js（含视图管线 _plVisiblePairs 与按钮同步）。
 // loadUserPlaylists 留在本文件：它要回调本域 refreshPlTrash，避免反向依赖。
-// ── 行右键菜单（业务项在 ../songMenu.js 共享）──────────
-function playlistRowContext(e) {
-  const list = document.getElementById('playlistDetailSongs');
-  const row = e.target && e.target.closest ? e.target.closest('.song-row') : null;
-  if (!list || !row || !list.contains(row)) return;
-  const idx = Number(row.getAttribute('data-pidx'));
-  const song = plState._currentDetailSongs[idx];
-  if (!song) return;
-  openSongRowMenu(e, song, {
-    play: () => playPlaylistSong(idx),
-    download: () => downloadPlaylistSong(idx),
-    downloadQuality: (q) => downloadPlaylistSong(idx, q),
-    addToQueue: () => addPlaylistSongToQueue(idx),
-    extra: [{
-      icon: '✕', label: '从歌单移除', danger: true,
-      onClick: () => removeSongFromPlaylist(String(song.id), String(song.source || '')),
-    }],
-  });
-}
+// 行右键菜单的 handler 已抽到 ./playlist/detail.js（监听仍按实例挂载）。
 document.addEventListener('contextmenu', playlistRowContext);
 
 // ── 拖拽排序（把手起拖 → 落到目标行占据该位置）──────────
 // 复用现有 save-user-playlist 通道做全量 songs 覆盖，不新增 IPC。
 plState._plDragFrom = -1;
 
-function _plRowUnder(e) {
-  const list = document.getElementById('playlistDetailSongs');
-  const row = e.target && e.target.closest ? e.target.closest('.song-row[data-pidx]') : null;
-  if (!list || !row || !list.contains(row)) return null;
-  const n = Number(row.getAttribute('data-pidx'));
-  return Number.isFinite(n) ? { idx: n, row } : null;
-}
-
-function _plClearDragMarks() {
-  document.querySelectorAll('.song-row.pl-dragging, .song-row.pl-drag-over')
-    .forEach(el => el.classList.remove('pl-dragging', 'pl-drag-over'));
-}
-
+// 行定位（_plRowUnder）与清拖痕（_plClearDragMarks）已抽到 ./playlist/detail.js。
 document.addEventListener('dragstart', (e) => {
   if (!(e.target && e.target.closest && e.target.closest('.pl-drag-handle'))) return;
   // 分片还在跑 ⇒ 列表正在往下长。此时起拖，用户能瞄到的只有"已经画出来的那几片"，
@@ -141,26 +111,7 @@ document.addEventListener('dragend', () => {
   _plClearDragMarks();
 });
 
-async function persistPlaylistOrder(from, to) {
-  if (!plState._currentPlaylistId) return;
-  const next = moveInList(plState._currentDetailSongs, from, to);
-  if (!next) return;
-  const playlists = getState('userPlaylists') || [];
-  const pl = playlists.find(p => p.id === plState._currentPlaylistId);
-  if (!pl) return;
-  renderPlaylistDetailSongs(next); // 先落视觉，失败再回滚
-  try {
-    const r = await api.saveUserPlaylist({ id: pl.id, name: pl.name, songs: next });
-    if (!r || !r.success) throw new Error((r && r.error) || '保存失败');
-    pl.songs = next;
-    setState('userPlaylists', playlists);
-    renderPlaylistList(playlists);
-  } catch (err) {
-    showToast(t('toast.plSortSaveFailed', { msg: errBrief(err) }), 'error');
-    renderPlaylistDetailSongs(pl.songs || []);
-  }
-}
-
+// 拖拽落点后的持久化已抽到 ./playlist/detail.js。
 // ── 播放歌单中的歌曲 / 添加队列 / 下载（单曲·整单）──
 // 已抽到 ./playlist/playback.js：playPlaylistSong / _playFrom / addPlaylistSongToQueue /
 // downloadPlaylistSong / playAllPlaylist / downloadAllPlaylist 由该模块导出。
@@ -175,29 +126,7 @@ addDlChangeListener(() => {
   }, 300);
 });
 
-// ── 从歌单移除歌曲 ─────────────────────────────────────
-async function removeSongFromPlaylist(songId, source) {
-  if (!plState._currentPlaylistId) return;
-  try {
-    const result = await api.removeFromUserPlaylist(plState._currentPlaylistId, String(songId), String(source || ''));
-    if (result.success) {
-      const playlists = getState('userPlaylists') || [];
-      const pl = playlists.find(p => p.id === plState._currentPlaylistId);
-      if (pl) {
-        pl.songs = pl.songs.filter(s => !(
-          String(s.id) === String(songId) &&
-          String(s.source || '') === String(source || '')
-        ));
-        setState('userPlaylists', playlists);
-        renderPlaylistDetailSongs(pl.songs);
-        renderPlaylistList(playlists);
-      }
-    }
-  } catch (e) {
-    showToast(t('toast.plRemoveFailed', { msg: errBrief(e) }), 'error');
-  }
-}
-
+// 单曲移除已抽到 ./playlist/detail.js（与行右键菜单 / 拖拽排序同域）。
 // ── 多选批量移除───────────────────────────────
 // 多选选择态的重置 / 工具条按钮同步已抽到 ./playlist/core.js（详情弹层的一部分）。
 function togglePlBulkMode() {
