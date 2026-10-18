@@ -251,3 +251,9 @@ test('提示里按 risk 说清三种确认形态，且仍然只有一句协议�
   assert.match(prompt, /"why"/);
   assert.ok(prompt.indexOf('删除、清空') > 0, 'destructive 的说法要在提示里');
 });
+
+test('提示里说清「播放控制这一类只能在应用里做」，且它不构成对状态的指令', () => {
+  const prompt = buildSystemPrompt(toolsFromContract());
+  assert.match(prompt, /播放|音量/, '新面要在提示里有名字');
+  assert.strictEqual((prompt.match(/只输出一个 JSON 对象/g) || []).length, 1);
+});

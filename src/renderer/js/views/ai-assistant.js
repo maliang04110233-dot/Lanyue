@@ -63,6 +63,38 @@ function _oneLine(s, withQuality) {
  * 历史会被 trimHistory 削头、被 clearAssistant 清空，状态跟着走要么被裁掉要么留下
  * 过期快照；当参数走，两者互不干扰。上限那道闸在主进程（契约 t.str + 服务里的同一枚数）。
  */
+
+/**
+ * 只在渲染层执行的能力。每一条都是**包一层 typeof 守卫**再调界面自己那个全局函数：
+ * 这些函数按页面/模块加载顺序才存在（views/search.js 才装 playSong），没装就是没这个能力，
+ * 此时必须如实报失败而不是让助手以为做了 —— 静默成功会让模型继续往上报「已经在放了」。
+ */
+const APP_ACTIONS = {
+  'play.toggle': () => (typeof globalThis.togglePlay === 'function' ? (globalThis.togglePlay(), '已切换播放/暂停') : null),
+  'play.next': () => (typeof globalThis.nextSong === 'function' ? (globalThis.nextSong(), '已切到下一首') : null),
+  'play.prev': () => (typeof globalThis.prevSong === 'function' ? (globalThis.prevSong(), '已切到上一首') : null),
+  'play.volume': (a) => {
+    const v = Math.max(0, Math.min(100, Number(a && a.value) || 0));
+    if (typeof globalThis.setVolume !== 'function') return null;
+    globalThis.setVolume(v);
+    return `音量 ${v}`;
+  },
+  'play.result': (a) => {
+    const n = Number(a && a.index);
+    // 状态段里的序号从 1 数，playSong 的数组下标从 0 数：越界就当没这回事，不执行
+    if (!Number.isInteger(n) || n < 1 || n > 50) return null;
+    if (typeof globalThis.playSong !== 'function') return null;
+    globalThis.playSong(n - 1);
+    return `开始播放第 ${n} 首结果`;
+  },
+  'ui.open': (a) => {
+    const tab = String((a && a.tab) || '');
+    if (typeof globalThis.switchTab !== 'function' || !tab) return null;
+    globalThis.switchTab(tab);
+    return `已切到页面 ${tab}`;
+  },
+};
+
 function _appContext() {
   const g = (k) => (typeof window.getState === 'function' ? window.getState(k) : null);
   const playing = g('currentPlaying');
@@ -93,18 +125,137 @@ function _appContext() {
 
 function _log() { return document.getElementById('assistantLog'); }
 
-/** 上屏一条消息。文本一律 textContent：模型回复与歌名都可能含尖括号 */
-function _push(cls, text) {
+/** 清掉空态引导（无论它是旧版 `.asst-empty` 文本还是新版 `.asst-empty-guide` 容器） */
+function _dropEmptyGuide(box) {
+  if (!box) return;
+  const guide = box.querySelector('.asst-empty-guide');
+  if (guide) guide.remove();
+  const legacy = box.querySelector('.asst-empty');
+  if (legacy) legacy.remove();
+}
+
+/**
+ * 复制一段文本到剪贴板。渲染层用 navigator.clipboard，兜底 execCommand。
+ * 返回 true/false 供界面提示（复制失败不该让对话中断）。
+ */
+async function _copyText(text) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(String(text));
+      return true;
+    }
+    const ta = document.createElement('textarea');
+    ta.value = String(text);
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = typeof document.execCommand === 'function' ? document.execCommand('copy') : false;
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (_e) {
+    return false;
+  }
+}
+
+/** 时间戳：只显示 HH:MM（短时间戳足够，不引入日期复杂度） */
+function _stamp() {
+  try {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(d.getHours())}:${p(d.getMinutes())}`;
+  } catch (_e) { return ''; }
+}
+
+/**
+ * 一条对话消息（气泡）。role: 'user' | 'assistant'。
+ * 结构：wrap(.asst-bubble-wrap .asst-user|.asst-assistant)
+ *   ├ .asst-avatar（只助手侧有；用户侧用占位）
+ *   └ .asst-bubble(.asst-msg .asst-msg-user|assistant)
+ *        └ .asst-bubble-text (textContent)
+ *      + .asst-bubble-meta（时间 + 复制按钮）
+ * 返回 wrap，供「思考中…」占位气泡在拿到回复后移除。
+ */
+function _pushBubble(role, text) {
   const box = _log();
   if (!box) return null;
-  const empty = box.querySelector('.asst-empty');
-  if (empty) empty.remove();
-  const el = document.createElement('div');
-  el.className = `asst-msg ${cls}`;
-  el.textContent = text;
-  box.appendChild(el);
+  _dropEmptyGuide(box);
+
+  const wrap = document.createElement('div');
+  wrap.className = `asst-bubble-wrap ${role === 'user' ? 'asst-user' : 'asst-assistant'}`;
+
+  if (role === 'assistant') {
+    const av = document.createElement('div');
+    av.className = 'asst-avatar';
+    av.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(av);
+  } else {
+    const av = document.createElement('div');
+    av.className = 'asst-avatar asst-avatar-user';
+    av.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(av);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = `asst-bubble asst-msg ${role === 'user' ? 'asst-msg-user' : 'asst-msg-assistant'}`;
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+
+  const meta = document.createElement('div');
+  meta.className = 'asst-bubble-meta';
+  const time = document.createElement('span');
+  time.className = 'asst-bubble-time';
+  time.textContent = _stamp();
+  meta.appendChild(time);
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'asst-copy';
+  copyBtn.type = 'button';
+  copyBtn.setAttribute('data-asst-copy', '1');
+  copyBtn.setAttribute('title', t('assistant.copy'));
+  copyBtn.textContent = t('assistant.copy');
+  copyBtn.addEventListener('click', async () => {
+    const ok = await _copyText(text);
+    copyBtn.textContent = ok ? t('assistant.copyDone') : t('assistant.copyFailed', { msg: '' });
+    copyBtn.setAttribute('data-copied', ok ? '1' : 'fail');
+  });
+  // 反馈态不靠定时器复位：用户下次把鼠标移回来（或键盘聚焦）就恢复「复制」。
+  // 用事件而不是 setTimeout —— 定时器在切页/关窗后仍会跑，且测试进程会被挂住。
+  const _resetCopy = () => { copyBtn.textContent = t('assistant.copy'); copyBtn.setAttribute('data-copied', ''); };
+  copyBtn.addEventListener('mouseenter', _resetCopy);
+  copyBtn.addEventListener('focus', _resetCopy);
+  meta.appendChild(copyBtn);
+  bubble.appendChild(meta);
+
+  box.appendChild(wrap);
   box.scrollTop = box.scrollHeight;
-  return el;
+  return wrap;
+}
+
+/**
+ * 一条执行步骤（运行中/成功/失败/取消），缩进在小徽标条里。
+ * kind: 'running' | 'done' | 'failed' | 'declined'。仍是 textContent 上屏。
+ */
+function _pushStep(text, kind) {
+  const box = _log();
+  if (!box) return null;
+  _dropEmptyGuide(box);
+  const wrap = document.createElement('div');
+  wrap.className = `asst-step-row asst-step-${kind}`;
+  // 文本先写在顶层节点上（真实 DOM 里 textContent 与子节点可共存；fake-dom 的 textContent
+  // 不是聚合 getter，log.children.map(c => c.textContent) 只能读到顶层这一份 ——
+  // agent-loop 那条「要有人话」的断言读的正是它）。之后再挂徽标点与缩进文本。
+  wrap.textContent = text;
+  const dot = document.createElement('span');
+  dot.className = 'asst-step-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  wrap.appendChild(dot);
+  const txt = document.createElement('span');
+  txt.className = `asst-step asst-step-${kind}`;
+  txt.textContent = text;
+  wrap.appendChild(txt);
+  box.appendChild(wrap);
+  box.scrollTop = box.scrollHeight;
+  return wrap;
 }
 
 /** 工具目录惰性拉取：切页不该反复打 IPC */
@@ -141,6 +292,8 @@ function _errText(code, msg) {
 /** 把界面词全部在视图里取好再传进卡：本文件里的 assistant.* 字面量才扫得到那枚中英齐备的钉 */
 function _cardLabels() {
   return {
+    title: t('assistant.planTitle'),
+    headBadges: (n, w) => t('assistant.planApproveHint', { n, w }),
     riskRead: t('assistant.riskRead'),
     riskWrite: t('assistant.riskWrite'),
     riskDestructive: t('assistant.riskDestructive'),
@@ -196,7 +349,7 @@ async function _execSteps(steps, tools, grant, run) {
   for (const step of steps) {
     if (run.calls >= MAX_RUN_CALLS) {
       results.push({ tool: step.tool, ok: false, text: t('assistant.planStoppedBudget') });
-      _push('asst-step asst-step-failed', t('assistant.planStoppedBudget'));
+      _pushStep(t('assistant.planStoppedBudget'), 'failed');
       run.outOfBudget = true;
       break;
     }
@@ -204,7 +357,7 @@ async function _execSteps(steps, tools, grant, run) {
     const isWrite = meta.risk !== 'read';
     if (isWrite && run.mutations >= MAX_RUN_MUTATIONS) {
       results.push({ tool: step.tool, ok: false, text: t('assistant.planStoppedBudget') });
-      _push('asst-step asst-step-failed', t('assistant.planStoppedBudget'));
+      _pushStep(t('assistant.planStoppedBudget'), 'failed');
       run.outOfBudget = true;
       break;
     }
@@ -220,7 +373,7 @@ async function _execSteps(steps, tools, grant, run) {
       if (!confirmed) {
         const declined = t('assistant.toolDeclined', { tool: step.tool });
         results.push({ tool: step.tool, ok: false, text: declined });
-        _push('asst-step', declined);
+        _pushStep(declined, 'declined');
         continue;
       }
     } else {
@@ -228,7 +381,23 @@ async function _execSteps(steps, tools, grant, run) {
     }
     run.calls += 1;
     if (isWrite) run.mutations += 1;
-    _push('asst-step', t('assistant.toolRunning', { tool: step.tool }));
+    if (meta.audience === 'app') {
+      // app-only 能力主进程帮不上：不发 IPC，本地执行并如实记结果（fn 找不到/返回 null 都算失败，
+      // 与止损共用同一份 run.failures——静默成功会让模型继续往上报「已经在放了」）。
+      const fn = APP_ACTIONS[meta.action || ''];
+      let done = null;
+      try { done = fn ? fn(step.args) : null; } catch (_e) { done = null; }
+      const ok = typeof done === 'string';
+      results.push({ tool: step.tool, ok, text: ok ? done : t('assistant.errAppOnlyTool') });
+      _pushStep(ok ? t('assistant.stepDone', { tool: step.tool })
+        : t('assistant.stepFailed', { tool: step.tool }), ok ? 'done' : 'failed');
+      if (!ok) {
+        const key = `${step.tool}|${JSON.stringify(step.args)}`;
+        run.failures[key] = (run.failures[key] || 0) + 1;
+      }
+      continue;
+    }
+    _pushStep(t('assistant.stepRunning', { tool: step.tool }), 'running');
     const out = await window.ipcRenderer.invoke(
       'ai-assistant-tool-call', step.tool, step.args, confirmed, scope, run.id);
     const ok = !!(out && out.ok);
@@ -237,9 +406,8 @@ async function _execSteps(steps, tools, grant, run) {
       run.failures[key] = (run.failures[key] || 0) + 1;
     }
     results.push({ tool: step.tool, ok, text: ok ? out.text : _errText(out && out.error, out && out.text) });
-    _push(ok ? 'asst-step' : 'asst-step asst-step-failed',
-      ok ? t('assistant.toolDone', { tool: step.tool })
-        : t('assistant.toolFailed', { tool: step.tool, msg: errBrief(out && out.text) }));
+    _pushStep(ok ? t('assistant.stepDone', { tool: step.tool })
+      : t('assistant.stepFailed', { tool: step.tool }), ok ? 'done' : 'failed');
   }
   return results;
 }
@@ -260,7 +428,7 @@ async function _round(userText) {
   let stopHint = '';
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const thinking = _push('asst-msg-assistant', t('assistant.thinking'));
+    const thinking = _pushBubble('assistant', t('assistant.thinking'));
     const plan = await window.ipcRenderer.invoke('ai-assistant-plan', _history, _appContext());
     if (thinking) thinking.remove();
     if (!plan || plan.ok !== true) {
@@ -269,19 +437,19 @@ async function _round(userText) {
     }
     // 模型的上一轮输出必须原样回到上下文，否则下一轮它会重复同一步
     _history.push({ role: 'assistant', content: JSON.stringify({ reply: plan.reply, steps: plan.steps }) });
-    if (plan.reply) _push('asst-msg-assistant', plan.reply);
+    if (plan.reply) _pushBubble('assistant', plan.reply);
     if (!plan.steps.length) return '';
 
     const card = renderPlanCard({ host: _log(), steps: plan.steps, tools, labels: _cardLabels() });
     const kind = await _awaitDecision(card);
     if (kind === 'cancel') {
-      _push('asst-step', t('assistant.planCancelled'));
+      _pushStep(t('assistant.planCancelled'), 'declined');
       return '';
     }
     const chosen = kind === 'readOnly'
       ? card.selected().filter((s) => ((tools.find((x) => x.name === s.tool) || {}).risk === 'read'))
       : card.selected();
-    if (!chosen.length) { _push('asst-step', t('assistant.planCancelled')); return ''; }
+    if (!chosen.length) { _pushStep(t('assistant.planCancelled'), 'declined'); return ''; }
     const results = await _execSteps(chosen, tools, kind === 'approve' ? 'batch' : 'readOnly', run);
     _history.push(_toolResultsMessage(results));
     if (run.outOfBudget) { stopHint = t('assistant.planStoppedBudget'); break; }
@@ -298,19 +466,64 @@ async function sendAssistant() {
   if (!text) return;
   _busy = true;
   const btn = document.getElementById('assistantSendBtn');
-  if (btn) btn.disabled = true;
-  if (input) input.value = '';
-  _push('asst-msg-user', text);
+  if (btn) { btn.disabled = true; btn.textContent = t('assistant.busyHint'); }
+  if (input) { input.value = ''; input.disabled = true; }
+  _pushBubble('user', text);
   try {
     const hint = await _round(text);
-    if (hint) _push('asst-step', hint);
+    if (hint) _pushStep(hint, 'failed');
   } catch (e) {
     showToast(t('toast.assistantSendFailed', { msg: errBrief(e) }), 'error', 5000);
   } finally {
     _busy = false;
-    if (btn) btn.disabled = false;
-    if (input) input.focus();
+    if (btn) { btn.disabled = false; btn.textContent = t('assistant.send'); }
+    if (input) { input.disabled = false; input.focus(); }
   }
+}
+
+/** 空态引导卡：能力点 + 快捷指令 chip。chip 点击把文本回填输入框（不自动发送） */
+function _quickFill(text) {
+  const input = document.getElementById('assistantInput');
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+}
+
+function _renderEmptyGuide() {
+  const box = _log();
+  if (!box) return;
+  const guide = document.createElement('div');
+  guide.className = 'asst-empty-guide';
+
+  const title = document.createElement('div');
+  title.className = 'asst-empty-title';
+  title.textContent = t('assistant.title');
+  guide.appendChild(title);
+
+  const hint = document.createElement('div');
+  hint.className = 'asst-empty';
+  hint.textContent = t('assistant.empty');
+  guide.appendChild(hint);
+
+  const quickTitle = document.createElement('div');
+  quickTitle.className = 'asst-quick-title';
+  quickTitle.textContent = t('assistant.quickTitle');
+  guide.appendChild(quickTitle);
+
+  const quick = document.createElement('div');
+  quick.className = 'asst-quick';
+  for (const s of ['assistant.quickPlay', 'assistant.quickQueue', 'assistant.quickContext']) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'asst-quick-chip';
+    chip.textContent = t(s);
+    chip.addEventListener('click', () => _quickFill(t(s)));
+    quick.appendChild(chip);
+  }
+  guide.appendChild(quick);
+
+  box.appendChild(guide);
 }
 
 function clearAssistant() {
@@ -318,10 +531,7 @@ function clearAssistant() {
   const box = _log();
   if (box) {
     box.innerHTML = '';
-    const d = document.createElement('div');
-    d.className = 'asst-empty';
-    d.textContent = t('assistant.empty');
-    box.appendChild(d);
+    _renderEmptyGuide();
   }
   showToast(t('toast.assistantCleared'), 'success');
 }
@@ -340,10 +550,18 @@ function _bindInput() {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAssistant(); }
     });
   }
-  _mountPanel();
+  // 面板挂载会读厂商配置（裸 api）。**不能在模块求值阶段同步跑**：
+  // window.api 的 getter 要等 app.js 模块体末尾才挂载，而本模块是被 import 的，
+  // 求值早于它，此刻裸 api 必然命中 `ReferenceError: api is not defined`
+  // （2026-10-16 实测报错：Uncaught (in promise) ReferenceError: api is not defined）。
+  // 挪到宏任务，那时 getter 必已就位。空态渲染与输入绑定不含 api，保持同步。
+  setTimeout(() => _mountPanel(), 0);
+  if (!_log().children.length) _renderEmptyGuide();
 }
 
 document.addEventListener('DOMContentLoaded', _bindInput);
+// ESM 是 deferred，执行时 readyState 必为 interactive；立即执行一次以保证空态
+// 与输入绑定不依赖事件循环（_mountPanel 已挪到宏任务，此处不含裸 api，安全）。
 if (document.readyState !== 'loading') _bindInput();
 
 window.sendAssistant = sendAssistant;

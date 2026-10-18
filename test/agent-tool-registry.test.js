@@ -10,6 +10,7 @@ const assert = require('node:assert');
 const {
   AGENT_TOOLS, RISK_LEVELS, AUDIENCES, toolsFromContract, toolsForSource, visibleToAgent,
 } = require('../src/main/mcp/tools');
+const { CHANNELS } = require('../src/shared/ipcContract');
 
 test('每条工具都带合法 risk/audience，且 mutating 由 risk 派生', () => {
   for (const def of toolsFromContract()) {
@@ -28,15 +29,14 @@ test('工具名唯一、通道也唯一（两条工具指向同一通道就是�
 
 test('改造不许悄悄改面：今天恰 21 条、其中 3 条非只读（P1 基线，P2 落地后由 39 条那枚接管）', () => {
   const defs = toolsFromContract();
-  // P2 Task 11 会把面扩到 38：这里钉的是「扩面只准发生在那一次」，此后由 38 条那枚守
-  assert.ok(defs.length === 21 || defs.length === 38, `工具面数量飘了：${defs.length}`);
+  // P2 落地后 38、P3 加 6 条 app 工具后 44：这里钉的是「扩面只准发生在那两次」
+  assert.ok([21, 38, 44].includes(defs.length), `工具面数量飘了：${defs.length}`);
 });
 
-test('P2 面：38 条工具，destructive 恰 7 条，且都进不了外部 Agent 的面', () => {
+test('P2 面：destructive 恰 7 条，且都进不了外部 Agent 的面', () => {
   const defs = toolsFromContract();
-  // 38 = 18 只读 + 13 写 + 7 destructive（计划文档里写的 39 是算术笔误：
-  // 它自己点名的 13+7 两份清单 + 既有 18 只读，加出来就是 38）
-  assert.strictEqual(defs.length, 38);
+  // P3 加 6 条 app 工具后总数 44（38 + 6 app）；destructive 仍是 7 条
+  assert.strictEqual(defs.length, 44);
   const destructive = defs.filter((d) => d.risk === 'destructive').map((d) => d.name).sort();
   assert.deepStrictEqual(destructive, [
     'clear_all_downloads', 'clear_finished_downloads', 'clear_history', 'delete_download_template',
@@ -48,12 +48,39 @@ test('P2 面：38 条工具，destructive 恰 7 条，且都进不了外部 Agen
   }
 });
 
+test('P3：6 条只在渲染层执行的能力，主进程调不动、外部 Agent 看不见', () => {
+  const appOnly = toolsFromContract().filter((d) => d.audience === 'app');
+  assert.deepStrictEqual(appOnly.map((d) => d.name).sort(), [
+    'open_app_page', 'play_next', 'play_prev', 'play_search_result', 'play_toggle', 'set_play_volume',
+  ]);
+  for (const d of appOnly) {
+    assert.strictEqual(d.channel, null, `${d.name} 不该有通道`);
+    assert.ok(d.action, `${d.name} 要有渲染层的 action 键`);
+    assert.ok(!toolsForSource('agent').some((x) => x.name === d.name));
+  }
+});
+
+test('app 工具的参数规格也走契约那套原语（同一份词汇，不另立形状）', () => {
+  const vol = toolsFromContract().find((d) => d.name === 'set_play_volume');
+  assert.strictEqual(vol.inputSchema.properties.value.maximum, 100);
+  const page = toolsFromContract().find((d) => d.name === 'open_app_page');
+  assert.deepStrictEqual(page.inputSchema.properties.tab.enum,
+    ['home', 'search', 'download', 'local', 'aggregate', 'playlist', 'subscription', 'assistant']);
+});
+
+test('没有通道的条目不许被拿去查 CHANNELS（否则派生会抛「不是 main invoke」）', () => {
+  const d = toolsFromContract().find((x) => x.audience === 'app');
+  assert.ok(d, '本计划该有至少一条 app 工具');
+  assert.ok(!(d.name in CHANNELS), 'app 工具不是 IPC 通道');
+});
+
 test('P2 的写面点名（少了哪条、多了哪条都算红）', () => {
   const writes = toolsFromContract().filter((d) => d.risk === 'write').map((d) => d.name).sort();
   assert.deepStrictEqual(writes, [
-    'add_playlist_to_downloads', 'add_to_playlist', 'add_to_queue', 'cancel_download', 'remove_from_playlist',
+    'add_playlist_to_downloads', 'add_to_playlist', 'add_to_queue', 'cancel_download', 'open_app_page',
+    'play_next', 'play_prev', 'play_search_result', 'play_toggle', 'remove_from_playlist',
     'remove_queue_item', 'reorder_queue_item', 'retry_download', 'save_download_template',
-    'set_download_queue_paused', 'subscribe_add', 'subscribe_mark_seen', 'toggle_favorite',
+    'set_download_queue_paused', 'set_play_volume', 'subscribe_add', 'subscribe_mark_seen', 'toggle_favorite',
   ]);
 });
 

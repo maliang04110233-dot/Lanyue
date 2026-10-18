@@ -580,6 +580,17 @@
   color: var(--badge-fg, var(--text-dim));
   border: 1px solid var(--badge-border, var(--border));
 }
+/* 「音源可能不全」提示徽标（见 sourceError.js 的 isLowYield）：挂在已知低命中平台的
+   结果行尾，提醒用户别抱太高预期。这是平台策略层面的提示，不代表这一首一定失败 ——
+   具体原因仍由播放那一刻的 sourceErrorText 给出。 */
+.source-hint {
+  font-size: 10px; line-height: 1.6; padding: 2px 6px; border-radius: var(--r-xs);
+  flex-shrink: 0; font-weight: 500; letter-spacing: .2px;
+  color: var(--c-warn);
+  background: color-mix(in srgb, var(--c-warn) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-warn) 26%, transparent);
+  white-space: nowrap;
+}
 /* 失败原因徽标（队列行 + 历史行同一份渲染，见 diagnose.js 的 failureTagHtml）：
    字色由内联 style 给（语义色跟着码表走），这里只管外形。
    ⚠️ 老写法把底色边框拼成 `var(--neon-orange)22` —— CSS 变量不能这么串字面量，
@@ -1815,6 +1826,231 @@
   font-family: inherit;
 }
 .asst-input:focus { outline: none; border-color: var(--neon-cyan); }
+
+/* ── 助手计划卡（轨道五 P2）────────────────────────────
+   「AI 要做什么」落成一张可逐条勾选的卡片：整份计划一次批准、
+   危险步骤由徽标色标出。配色全部走主题变量（--bg-card/--c-* 等），换主题自动跟随。 */
+.asst-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--bg-input);
+  border: 1px solid var(--neon-blue-dim);
+  border-radius: var(--r-md);
+}
+.asst-plan-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.asst-plan-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: var(--fs-md);
+  color: var(--text);
+}
+.asst-plan-row:hover { background: var(--bg-hover); border-color: var(--border); }
+.asst-plan-check { flex-shrink: 0; accent-color: var(--neon-cyan); }
+/* 风险三档徽标：read/write/destructive 对应 只读/会改数据/会删除 */
+.asst-risk {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-med);
+  line-height: 1.4;
+}
+.asst-risk-read { background: var(--neon-cyan-dim); color: var(--neon-cyan); }
+.asst-risk-write { background: var(--gold-dim); color: var(--gold); }
+.asst-risk-destructive { background: var(--red-dim); color: var(--red); }
+.asst-plan-tool { font-weight: var(--fw-med); font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-sm); }
+.asst-plan-why {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.asst-plan-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+.asst-plan-summary { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--neon-dim); }
+.asst-plan-btn {
+  padding: 6px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--neon-blue-dim);
+  background: var(--bg-card);
+  color: var(--neon-text);
+  font-size: var(--fs-md);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.asst-plan-btn:hover:not(:disabled) { border-color: var(--neon-cyan); }
+.asst-plan-btn:disabled { opacity: .45; cursor: default; }
+
+/* ── 助手页 UI 重构（2026-10-16）────────────────────────
+   气泡化 + 空态引导 + 步骤徽标 + 计划卡视觉强化。
+   颜色/圆角/间距全部走主题变量，换主题自动跟随（css-token-integrity 会扫）。 */
+
+/* 气泡：用户右、助手左；头像固定 28px */
+.asst-bubble-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  max-width: 92%;
+}
+.asst-bubble-wrap.asst-user { align-self: flex-end; flex-direction: row-reverse; }
+.asst-bubble-wrap.asst-assistant { align-self: flex-start; }
+.asst-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--neon-cyan-dim), var(--neon-blue-dim));
+  border: 1px solid var(--accent-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+}
+.asst-avatar-user { background: var(--stroke-1); border-color: var(--stroke-2); }
+.asst-bubble {
+  max-width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-input);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-lg);
+}
+.asst-bubble-wrap.asst-user .asst-bubble {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+.asst-bubble-wrap.asst-assistant .asst-bubble {
+  background: var(--bg-card);
+  border-color: var(--stroke-1);
+}
+.asst-bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--stroke-1);
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+}
+.asst-copy {
+  background: transparent;
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-xs);
+  color: var(--fg-2);
+  font-size: var(--fs-xs);
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.asst-copy:hover:not(:disabled) { border-color: var(--accent-line); color: var(--fg-1); }
+.asst-copy:disabled { opacity: .6; cursor: default; }
+
+/* 步骤徽标条：运行中/成功/失败/取消 三色点 + 缩进文本 */
+.asst-step-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 2px 0 2px calc(var(--sp-8) + var(--sp-1));
+}
+.asst-step-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--fg-3);
+}
+.asst-step-running .asst-step-dot { background: var(--neon-cyan); }
+.asst-step-done .asst-step-dot { background: var(--neon-blue); }
+.asst-step-failed .asst-step-dot { background: var(--red); }
+.asst-step-declined .asst-step-dot { background: var(--fg-3); }
+.asst-step { font-size: var(--fs-sm); color: var(--fg-3); }
+.asst-step-running { color: var(--neon-cyan); }
+.asst-step-done { color: var(--fg-2); }
+.asst-step-failed { color: var(--red); }
+.asst-step-declined { color: var(--fg-3); }
+
+/* 空态引导卡：标题 + 说明 + 快捷指令 chip */
+.asst-empty-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  padding: var(--sp-5) var(--sp-4);
+  max-width: 420px;
+}
+.asst-empty-title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semi);
+  color: var(--neon-text);
+}
+.asst-empty-guide .asst-empty {
+  color: var(--fg-2);
+  font-size: var(--fs-md);
+  line-height: 1.7;
+}
+.asst-quick-title {
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.asst-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.asst-quick-chip {
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-full);
+  color: var(--fg-1);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.asst-quick-chip:hover { border-color: var(--accent-line); background: var(--accent-soft); }
+
+.asst-plan-approve {
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+  border-color: var(--accent-line);
+  color: var(--bg-deep);
+  font-weight: var(--fw-semi);
+  box-shadow: var(--shadow-sm);
+}
+.asst-plan-readonly {
+  background: var(--bg-card);
+  border-color: var(--accent-line);
+  color: var(--neon-cyan);
+  font-weight: var(--fw-med);
+}
+.asst-plan-cancel { color: var(--fg-3); }
+
+/* 输入行 busy 态：输入框禁用时同步降透明（渲染层为 Chromium，支持 :has） */
+.asst-input:disabled { opacity: .6; }
+.asst-input-row:has(.asst-input:disabled) .btn-primary { opacity: .6; }
 
 /* ── AI 智能歌单面板（轨道三，长在歌单页顶部）──────────── */
 .spl-panel {

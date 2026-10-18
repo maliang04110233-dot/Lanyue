@@ -8,7 +8,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { boot, send, SONG } = require('./helpers/assistant-boot');
+const { boot, SONG } = require('./helpers/assistant-boot');
 
 const TOOLS = [
   { name: 'search_music', description: '搜歌', mutating: false, risk: 'read', audience: 'both' },
@@ -139,4 +139,59 @@ test('止损：同一步连续失败两次就不再试它，把错误摊给用�
   await drive(h, 'approve');
   await p;
   assert.strictEqual(n, 2, `同一步只该被试到第 2 次就止损，实得 ${n}`);
+});
+
+test('app 工具不发 IPC：播放控制走渲染层自己的全局函数', async () => {
+  const seen = { ipc: [], play: 0, vol: null };
+  const h = await boot({}, {
+    tools: [{ name: 'play_toggle', description: '播放/暂停', mutating: true, risk: 'write', audience: 'app', action: 'play.toggle' },
+      { name: 'set_play_volume', description: '设音量', mutating: true, risk: 'write', audience: 'app', action: 'play.volume' }],
+    plan: (msgs, ctx, round) => round === 1
+      ? '{"reply":"好","steps":[{"tool":"play_toggle","args":{}},{"tool":"set_play_volume","args":{"value":30}}]}'
+      : '{"reply":"好了","steps":[]}',
+    tool: (st, c, args) => { seen.ipc.push(args); return { ok: true, text: '{}' }; },
+    extraGlobalsHook: (g) => { g.togglePlay = () => { seen.play += 1; }; g.setVolume = (v) => { seen.vol = v; }; },
+  });
+  const p = h.sendAssistant('暂停一下，音量调到 30');
+  await h.tick(3);
+  assert.ok(await decide(h.dom, 'approve'), '计划卡上找不到 approve 按钮');
+  await p;
+  assert.deepStrictEqual(seen.ipc, [], 'app 工具一条 IPC 都不该发（主进程帮不上）');
+  assert.strictEqual(seen.play, 1);
+  assert.strictEqual(seen.vol, 30);
+});
+
+test('渲染层没有那个函数时如实报错，不许静默当成功', async () => {
+  const h = await boot({}, {
+    tools: [{ name: 'play_next', description: '下一首', mutating: true, risk: 'write', audience: 'app', action: 'play.next' }],
+    plan: (msgs, ctx, round) => round === 1
+      ? '{"reply":"好","steps":[{"tool":"play_next","args":{}}]}'
+      : '{"reply":"好了","steps":[]}',
+    tool: () => ({ ok: true, text: '{}' }),
+    // 不装 window.nextSong —— 真应用里它也可能在别的页面尚未注册，那种时候必须报失败
+  });
+  const p = h.sendAssistant('下一首');
+  await h.tick(3);
+  assert.ok(await decide(h.dom, 'approve'), '计划卡上找不到 approve 按钮');
+  await p;
+  const texts = h.dom.element('assistantLog').children.map((c) => c.textContent);
+  assert.ok(texts.some((x) => /play_next/.test(x) && !/完成/.test(x)), '该有一条失败上屏而不是假绿');
+});
+
+test('app 工具的观察结果里带上界内值：音量被钳到 0-100、序号越界不执行', async () => {
+  const got = [];
+  const h = await boot({}, {
+    tools: [{ name: 'set_play_volume', description: '音量', mutating: true, risk: 'write', audience: 'app', action: 'play.volume' },
+      { name: 'play_search_result', description: '播第 index 首', mutating: true, risk: 'write', audience: 'app', action: 'play.result' }],
+    plan: (msgs, ctx, round) => round === 1
+      ? '{"reply":"好","steps":[{"tool":"set_play_volume","args":{"value":900}},{"tool":"play_search_result","args":{"index":0}}]}'
+      : '{"reply":"好了","steps":[]}',
+    tool: () => ({ ok: true, text: '{}' }),
+    extraGlobalsHook: (g) => { g.setVolume = (v) => got.push(['vol', v]); g.playSong = (i) => got.push(['play', i]); },
+  });
+  const p = h.sendAssistant('音量 900，播第 0 首');
+  await h.tick(3);
+  assert.ok(await decide(h.dom, 'approve'), '计划卡上找不到 approve 按钮');
+  await p;
+  assert.deepStrictEqual(got, [['vol', 100]], '音量要钳到上限；序号 0（从 1 数）不该执行');
 });

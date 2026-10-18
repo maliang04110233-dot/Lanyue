@@ -13,16 +13,17 @@ const assert = require('node:assert');
 const { AGENT_TOOLS, MUTATING_TOOL_NAMES, toolsFromContract } = require('../src/main/mcp/tools');
 const { createMcpHandler } = require('../src/main/mcp/mcpCore');
 
-// P2 后「会让外部世界发生变化」的动作 = 13 条 write + 7 条 destructive，增删都要先想清楚
+// 「会让外部世界发生变化」的动作（write + destructive 全点名；P3 起 write 里含 6 条 app-only）
 const EXPECTED = [
   'add_playlist_to_downloads', 'add_to_playlist', 'add_to_queue', 'cancel_download',
   'clear_all_downloads', 'clear_finished_downloads', 'clear_history', 'delete_download_template',
-  'delete_user_playlist', 'remove_from_playlist', 'remove_history', 'remove_queue_item',
+  'delete_user_playlist', 'open_app_page', 'play_next', 'play_prev', 'play_search_result',
+  'play_toggle', 'remove_from_playlist', 'remove_history', 'remove_queue_item',
   'reorder_queue_item', 'retry_download', 'save_download_template', 'set_download_queue_paused',
-  'subscribe_add', 'subscribe_mark_seen', 'toggle_favorite', 'unsubscribe',
+  'set_play_volume', 'subscribe_add', 'subscribe_mark_seen', 'toggle_favorite', 'unsubscribe',
 ];
 
-test('非只读恰好 20 条：risk 分层与 MUTATING_TOOL_NAMES 必须是同一份事实', () => {
+test('非只读恰好 26 条：risk 分层与 MUTATING_TOOL_NAMES 必须是同一份事实', () => {
   assert.deepStrictEqual([...MUTATING_TOOL_NAMES].sort(), EXPECTED.slice().sort());
   const flagged = AGENT_TOOLS.filter(t => t.risk !== 'read').map(t => t.name).sort();
   assert.deepStrictEqual(flagged, EXPECTED.slice().sort(), 'risk 与集合必须是同一份事实');

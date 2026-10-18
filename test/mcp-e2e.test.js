@@ -124,9 +124,10 @@ test('e2e: initialize → tools/list 拿到白名单全量工具，且不外泄�
     const tools = l.body.result.tools;
     // 这个 boot 直接喂 toolsFromContract() 的全量面（不过滤 destructive —— 它测的是
     // 协议层参数钳制与审计落盘，不是外部可见性；可见性由 agent-tool-registry 的
-    // toolsForSource('agent') 钉着）。P2 后全量面 = 38 条。
+    // toolsForSource('agent') 钉着）。本 boot 喂的是全量面（P3 后 44 条），
+    // 外部 Agent 实际看到的只有其中 31 条。
     assert.strictEqual(tools.length, AGENT_TOOLS.length, '工具数量与显式白名单不一致');
-    assert.strictEqual(tools.length, 38, '白名单条目数变了 —— 先确认没有越红线扩面，再同步这条钉');
+    assert.strictEqual(tools.length, 44, '白名单条目数变了 —— 先确认没有越红线扩面，再同步这条钉');
     assert.ok(tools.every(t => !('channel' in t)), 'channel 属内部字段，绝不能出现在 tools/list');
     assert.ok(tools.every(t => t.inputSchema && t.inputSchema.type === 'object'));
   } finally { await h.stop(); }

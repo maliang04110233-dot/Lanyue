@@ -34,15 +34,15 @@ const SONG = (id, title) => ({
 /** 默认工具目录：与助手真实面同形（name/description/mutating），供「上下文」用例用 */
 const DEFAULT_TOOLS = [{ name: 'search_music', description: '搜歌', mutating: false, risk: 'read', audience: 'both' }];
 
-async function boot(state = {}, { tools, plan, tool, confirm } = {}) {
+async function boot(state = {}, { tools, plan, tool, confirm, extraGlobalsHook } = {}) {
   const calls = { plan: [], tool: [] };
   // 视图静态 import confirmDialog，全局桩拦不到它 —— 打开解析钩子的重定向，
   // 让 confirm 桩经 __TEST_CONFIRM__ 生效（只在本 boot 生效，不动别的视图测试）。
   globalThis.__STUB_CONFIRM_DIALOG__ = true;
   globalThis.__TEST_CONFIRM_CALLS__ = [];
   globalThis.__TEST_CONFIRM__ = confirm || true;
+  if (extraGlobalsHook) extraGlobalsHook(globalThis);
   let settled = false;
-  let pendingRound = null;
 
   const dom = installBrowserGlobals({
     ids: IDS,
@@ -87,7 +87,6 @@ async function boot(state = {}, { tools, plan, tool, confirm } = {}) {
   const sendTracked = async () => {
     settled = false;
     const p = origSend();
-    pendingRound = p;
     p.then(() => { settled = true; }, () => { settled = true; });
     return p;
   };

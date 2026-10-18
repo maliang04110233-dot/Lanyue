@@ -40,7 +40,8 @@ function _handle() {
 
 function register() {
   handle('ai-assistant-tools', () => ({
-    tools: toolsFromContract().map(({ name, description, mutating }) => ({ name, description, mutating })),
+    tools: toolsFromContract().map(({ name, description, mutating, risk, audience, action }) =>
+      ({ name, description, mutating, risk, audience, ...(action ? { action } : {}) })),
   }));
 
   handle('ai-assistant-plan', async (_, messages, context) => {
@@ -80,7 +81,10 @@ function register() {
         name,
         arguments: args && typeof args === 'object' ? args : {},
         // 审批形态/风险档/轮次随桥一路记进审计（mcpCore 只在 source==='assistant' 时采信）：
-        // 渲染层能在审计页回看「这一步是谁批准的、什么形态、几档风险、哪一轮」。
+        // 渲染层能在审计页回看「这一步是什么形态、几档风险、哪一轮」。
+        // 审计报告里原本还想要一枚 `approved`（谁批准的）—— 没落：本进程能观察到的
+        // 批准人只有「本机用户」一种（用户没批准的步骤根本不会走到这里），写成常量是假字段。
+        // 同一条要求里的「主进程按 run 限流」也未落，当前只有渲染层那枚 MAX_RUN_CALLS。
         auditContext: { scope: scope || 'single', risk: tool.risk, runId: runId || '' },
       },
     });

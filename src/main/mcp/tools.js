@@ -14,7 +14,7 @@
  * 新通道要暴露给 Agent = 在这里加一行 + 想清楚它能否被陌生程序驱动。
  */
 
-const { CHANNELS } = require('../../shared/ipcContract');
+const { CHANNELS, t } = require('../../shared/ipcContract');
 
 const RISK_LEVELS = ['read', 'write', 'destructive'];
 const AUDIENCES = ['both', 'app'];
@@ -118,6 +118,27 @@ const AGENT_TOOLS = [
     description: '跨源聚合用户的曲库。默认只看本地红心单；要把具体歌单一起纳进来得传 opts.playlists:[{source,id}]。opts 还支持 sources（平台 id 数组，不给则取红心里出现过的 source）与 markDuplicates（默认 true）。返回按曲目合并的清单，单个来源失败按空列表降级并在 failed 里回报。',
     paramDocs: { opts: '聚合选项对象：{playlists?:[{source,id}], sources?:[string], markDuplicates?:boolean}' },
   },
+  // ── 只在渲染层执行（audience:'app'）──────────────────
+  // 播放/切歌/音量/开页这些能力根本不在主进程里：状态与 audio 元素都长在渲染层，
+  // 为它们造一条 IPC 只是把一次函数调用换成三层往返，还多一处可绕过的口子。
+  // 因此它们**不进外部 Agent 的面**（toolsForSource 已按 audience 排除），
+  // 执行者是助手视图自己的一份 action 表 —— 见 views/ai-assistant.js 的 APP_ACTIONS。
+  { name: 'play_toggle', action: 'play.toggle', audience: 'app', risk: 'write',
+    description: '继续或暂停当前播放。' },
+  { name: 'play_next', action: 'play.next', audience: 'app', risk: 'write',
+    description: '切到下一首。' },
+  { name: 'play_prev', action: 'play.prev', audience: 'app', risk: 'write',
+    description: '切到上一首。' },
+  { name: 'set_play_volume', action: 'play.volume', audience: 'app', risk: 'write',
+    description: '把播放音量设成 value（0-100）。', required: ['value'],
+    argSpecs: [['value', t.int(50, 100)]], paramDocs: { value: '音量百分比' } },
+  { name: 'play_search_result', action: 'play.result', audience: 'app', risk: 'write',
+    description: '播放「本次搜索」列表里的第 index 首（从 1 数，索引来自状态段）。', required: ['index'],
+    argSpecs: [['index', t.int(1, 50)]], paramDocs: { index: '序号，从 1 开始' } },
+  { name: 'open_app_page', action: 'ui.open', audience: 'app', risk: 'write',
+    description: '把应用切到某个页面，方便用户看到结果。', required: ['tab'],
+    argSpecs: [['tab', t.enum(['home', 'search', 'download', 'local', 'aggregate', 'playlist', 'subscription', 'assistant'], 'home')]],
+    paramDocs: { tab: '页面 id' } },
   // ── 加法动作（可信 Agent 才开到这一层）─────────────
   {
     name: 'add_to_queue', channel: 'add-to-queue',
@@ -213,23 +234,34 @@ function toolsFromContract(list = AGENT_TOOLS, channels = CHANNELS) {
     if (!AUDIENCES.includes(audience)) {
       throw new Error(`[mcp] 工具 ${tool.name} 的 audience 非法: ${String(audience)}（只能是 ${AUDIENCES.join('/')}）`);
     }
-    const entry = channels[tool.channel];
-    if (!entry || !(entry.invoke || []).includes('main')) {
-      throw new Error(`[mcp] 工具 ${tool.name} 的通道不是 main invoke: ${tool.channel}`);
-    }
     const properties = {};
-    for (const [name, spec] of entry.args || []) {
-      const prop = specToJsonSchema(spec);
-      if (tool.paramDocs && tool.paramDocs[name]) prop.description = tool.paramDocs[name];
-      properties[name] = prop;
+    if (audience === 'app') {
+      // 渲染层能力没有 IPC 通道可派生：参数规格就地声明（argSpecs），但用的还是契约那套 t.* 原语，
+      // 于是「参数怎么钳制」这条链上的词汇仍是唯一一份；CHANNELS 里查不到它们，也不该去查。
+      for (const [name, spec] of tool.argSpecs || []) {
+        const prop = specToJsonSchema(spec);
+        if (tool.paramDocs && tool.paramDocs[name]) prop.description = tool.paramDocs[name];
+        properties[name] = prop;
+      }
+    } else {
+      const entry = channels[tool.channel];
+      if (!entry || !(entry.invoke || []).includes('main')) {
+        throw new Error(`[mcp] 工具 ${tool.name} 的通道不是 main invoke: ${tool.channel}`);
+      }
+      for (const [name, spec] of entry.args || []) {
+        const prop = specToJsonSchema(spec);
+        if (tool.paramDocs && tool.paramDocs[name]) prop.description = tool.paramDocs[name];
+        properties[name] = prop;
+      }
     }
     const tdef = {
       name: tool.name,
       description: tool.description,
       inputSchema: { type: 'object', properties },
-      channel: tool.channel,
+      channel: audience === 'app' ? null : tool.channel,
       risk: tool.risk,
       audience,
+      ...(tool.action ? { action: tool.action } : {}),
       // 派生而不是手写：一份判据只许有一个出处
       mutating: tool.risk !== 'read',
     };

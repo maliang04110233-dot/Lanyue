@@ -70,18 +70,18 @@ async function flushAudit() {
 
 assistant.register();
 
-test('目录：38 个工具、非只读 20 条、其中 destructive 7 条（P2 扩面后）', async () => {
+test('目录：44 个工具、非只读 26 条、其中 destructive 7 条（P2+P3 扩面后）', async () => {
   const r = await handlerOf('ai-assistant-tools')();
-  assert.strictEqual(r.tools.length, 38);
+  assert.strictEqual(r.tools.length, 44);
   for (const t of r.tools) {
     assert.ok('mutating' in t, `${t.name} 的目录项没有 mutating 字段，下面那枚断言会空转`);
   }
   const destructiveCount = require('../src/main/mcp/tools').toolsFromContract().filter((d) => d.risk === 'destructive').length;
   assert.strictEqual(destructiveCount, 7, 'destructive 应是 7 条');
-  assert.strictEqual(r.tools.filter(t => t.mutating === true).length, 20,
-    '非只读 = 13 条 write（3 既有 + 10 新增）+ 7 条 destructive，一条不多一条不少');
+  assert.strictEqual(r.tools.filter(t => t.mutating === true).length, 26,
+    '非只读 = 19 条 write（13 既有两侧 + 6 新增 app-only）+ 7 条 destructive，一条不多一条不少');
   assert.strictEqual(r.tools.filter(t => t.mutating === false).length, 18,
-    '只读面仍是 18 条；P2 只加写/破坏性，不该动只读');
+    '只读面仍是 18 条；P2/P3 只加写/破坏性，不该动只读');
 });
 
 test('闸门：写操作不带确认直接拒，带确认才落到 handler，且被拒的不进审计', async () => {
@@ -141,6 +141,18 @@ test('指名 destructive 也不给外部 Agent 跑：byName 里没有它，回�
   const r = await h({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'clear_all_downloads', arguments: {} } });
   assert.strictEqual(r.error.code, -32602);
   assert.strictEqual(executed, 0, '被拒的破坏性操作一次都不该落到 handler');
+});
+
+test('主进程对 app-only 工具回 APP_ONLY，一次桥都不碰', async () => {
+  const r = await handlerOf('ai-assistant-tool-call')('play_toggle', {}, false, 'single', 'run-x');
+  assert.deepStrictEqual(r, { ok: false, error: 'APP_ONLY' });
+});
+
+test('目录把 action 与 risk 一起递给界面（渲染层据此接线并决定确认形态）', async () => {
+  const r = await handlerOf('ai-assistant-tools')();
+  const d = r.tools.find((x) => x.name === 'play_toggle');
+  assert.strictEqual(d.audience, 'app');
+  assert.strictEqual(d.action, 'play.toggle');
 });
 
 test('参数钳制与外部 Agent 同一条码：超长 keyword 被截到 200', async () => {

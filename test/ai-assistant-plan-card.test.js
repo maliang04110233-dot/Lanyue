@@ -86,3 +86,22 @@ test('三个动作按钮都在，且各自标了 dataset.asstDecide 供界面接
   assert.deepStrictEqual(seen.sort(), ['approve', 'cancel', 'readOnly']);
   assert.ok(buttons(card), 'buttons 找不到');
 });
+
+test('卡头徽标的「会改数据」步数是实数，不是写死的 0', async () => {
+  const dom = installBrowserGlobals({ ids: ['asstHost'] });
+  const mod = await loadView(CARD, dom);
+  const seen = [];
+  const labels = {
+    ...LABELS, title: '执行计划',
+    headBadges: (n, w) => { seen.push([n, w]); return `批准 ${n} 步并执行，其中 ${w} 步会改数据`; },
+  };
+  const card = mod.renderPlanCard({
+    host: dom.element('asstHost'),
+    steps: [{ tool: 'search_music', args: {} }, { tool: 'add_to_queue', args: {} }, { tool: 'clear_all_queue', args: {} }],
+    tools: TOOLS, labels,
+  });
+  assert.deepStrictEqual(seen, [[3, 2]], 'headBadges 必须收到 (总步数, 会改数据的步数)');
+  const badge = el(card.el, (n) => n.className === 'asst-plan-head-badges');
+  assert.ok(badge, '卡头徽标没上屏');
+  assert.strictEqual(badge.textContent, '批准 3 步并执行，其中 2 步会改数据');
+});
