@@ -120,3 +120,21 @@ test('事实钉：配置开关与 RECORDED_STATE 仍一致（采购证书后此�
   );
   assert.ok(UPDATER_SRC.includes('update-error'), '失败事件通道仍在，守卫的前提成立');
 });
+
+test('事实钉：「GitHub 仓库」快捷链接指向本仓，不是 github.com 首页', () => {
+  // 与 build/config.cjs 的 publish 块同源：改仓库名时这条会红，
+  // 而不是让按钮继续打开设毫无意义的 GitHub 首页。
+  const block = /publish:\s*\{([^}]*)\}/.exec(CONFIG);
+  assert.ok(block, 'build/config.cjs 里找不到 publish 块');
+  const owner = /owner:\s*'([^']+)'/.exec(block[1]);
+  const repo = /repo:\s*'([^']+)'/.exec(block[1]);
+  assert.ok(owner && repo, 'publish 块里读不到 owner/repo');
+  const href = 'https://github.com/' + owner[1] + '/' + repo[1];
+  assert.ok(HTML.includes("api.openExternal('" + href + "')"),
+    '快捷链接未指向 ' + href + '（指到 github.com 首页等于没连上仓库）');
+});
+
+test('否定对照：只写 github.com 首页确实过不了上面那条判据', () => {
+  const fake = '<button onclick="api.openExternal(\'https://github.com\')">GitHub 仓库</button>';
+  assert.equal(fake.includes("api.openExternal('https://github.com/maliang04110233-dot/Lanyue')"), false);
+});
