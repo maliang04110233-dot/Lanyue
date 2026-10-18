@@ -82,14 +82,16 @@
 根本修不了。因此审计门禁改为 `scripts/audit-gate.cjs`：读 `scripts/audit-allowlist.json`
 的显式豁免，**剩余的 high/critical 仍然阻断**。
 
-豁免分三类，每条都带理由与核查日期（缺任一字段门禁直接失败 —— 豁免必须是可复核的
-判断，不是黑名单）：
+豁免分四组，每条都带理由与核查日期（缺任一字段门禁直接失败 —— 豁免必须是可复核的
+判断，不是黑名单）。分组即攻击面层级，从严到宽：**不在产物 → 在产物但无代码路径
+加载 → 被 require 但 HTTP 监听分支不可达 → 可达且攻击面在运行路径**：
 
 | 分组 | 包 | 依据 |
 | --- | --- | --- |
 | `unreachable_excluded` | `jade` `constantinople` `uglify-js` `transformers` `clean-css` | 运行时插桩与源码静态引用（`scripts/check-dead-deps.cjs` 的判据）均未命中，且 `build/config.cjs` 已把它们排除出 asar —— 不在发布产物里 |
 | `unreachable_but_packaged` | `useragent` | 同上判据未命中；差别是会打进产物，故单列以示区分 |
-| `upstream_locked` | `NeteaseCloudMusicApi` `express` `body-parser` `path-to-regexp` `node-forge` `basic-ftp` `get-uri` `pac-proxy-agent` | **可达**（运行时插桩确认该 SDK 确实起了 express 服务，不是死代码），但 `NeteaseCloudMusicApi@4.32.0` 已是最新，修复需跨大版本升级其内置依赖，会破坏它的 HTTP 服务行为 |
+| `upstream_locked_server_never_launched` | `express` `body-parser` `path-to-regexp` | 打进 asar 且被加载（SDK main.js 末尾无条件 `require('./server')`），但全仓唯一的 `createServer+listen` 在 `mcpServer.js`，本项目消费面只有 SDK 的 10 个纯数据方法 —— HTTP 监听分支从未执行，攻击面收敛到「供应链投毒」而非「HTTP 请求解析」。**该组理由由 `npm run check:attack-surface` 每次机器复核**（ADR-20261017-01 方案 A，2026-10-17 落地），四条判据不再满足时 CI 必红 |
+| `upstream_locked` | `NeteaseCloudMusicApi` `node-forge` `basic-ftp` `get-uri` `pac-proxy-agent` | **可达**，但根因是 `NeteaseCloudMusicApi@4.32.0`（registry 最后一版；上游 2024-01-24 因网易法务函删库停更）内置的老依赖树，无可行修复路径。node-forge 1.4.0 即最新；basic-ftp 链仅在 SDK 的 PAC 代理分支实例化，本项目未走该配置分支。处置路线见 `documents/adr/ADR-20261017-01` |
 
 配套约束：
 
@@ -99,7 +101,11 @@
   否则它会变成掩盖新问题的集合。
 - `unreachable_*` 的依据是可达性判据，与 `check:dead-deps` 配套：任何人把这些包加回
   运行路径，那条检查会红。
-- 复核触发点：`NeteaseCloudMusicApi` 发布新版本时重新评估 `upstream_locked` 组。
+- `upstream_locked_server_never_launched` 的依据是攻击面判据，与 `check:attack-surface`
+  配套（已串进 verify 链与 CI）：根包被直接消费、消费面扩散、listen 门被打破或打包
+  前提被破坏 —— 任一判据失败，CI 必红，豁免理由当轮重评。
+- 复核触发点：`NeteaseCloudMusicApi` 发布新版本（或换装 enhanced fork，ADR 方案 C）
+  时重新评估 `upstream_locked` 与 `upstream_locked_server_never_launched` 两组。
 
 残余风险：`upstream_locked` 那批是**真实可达**的依赖，其漏洞并未消除，只是当前无
 可行的修复路径。已确认的实际缓解面：出网请求统一过 `utils/urlGuard.js` 的
@@ -132,16 +138,20 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 
 ### 6. 两个调用方，一张白名单（外部 Agent 与应用内 AI 助手）
 
-应用内助手（侧栏「AI 助手」）不是第二套权限：它能看到、能调用的就是外部 Agent 那
-**21 个工具**（P1 起 17 → 21，多出的四条全是只读，见第五节），且执行走**同一条进程内桥**
+应用内助手（侧栏「AI 助手」）不是第二套权限：两侧读的是**同一张登记表**
+（`src/main/mcp/tools.js`；总量 P1 起 17 → 21 → P2 的 38 → P3 的 44，多出的四条只读、17 条写/破坏性与 6 条 app-only 播放控制，见第五节），
+按 caller 身份只切一个口子：外部 Agent 看到 **31 条**（唯一判据 `visibleToAgent`：`audience === 'both'` 且非 `destructive`），
+助手拿到全量 **44 条**。且执行走**同一条进程内桥**
 （`src/main/mcp/agentBridge.js`），因此参数钳制、契约拒绝语义与审计落点两边一致 ——
 助手侧比 Agent 松就是实锤的漂移，钉在 `test/ai-assistant-e2e.test.js`。
 
-差异只有两处，且两处都是收紧不是放宽。第一处：**改动曲库或队列的三个写操作**
-（`add_to_queue` / `add_to_playlist` / `toggle_favorite`）在应用内必须逐条经用户确认，
+差异有三处。第一处是**助手侧更宽**：那 7 条 `destructive` 与 6 条 `audience:'app'` 只出现在助手侧，
+Agent 侧连工具名都看不到；换来的代价是应用内那两道更严的闸（见第二处与下方 P3 那段）。
+第二处：**任何非只读步骤**（`risk !== 'read'`，19 条可逆写 + 7 条破坏性）在应用内必须经用户确认，
 判据是主进程 handler 上的 `confirmed === true` 参数（`src/main/ipc/ai-assistant.js`），
-不是「界面已经问过了」这种口头承诺；被拒的调用不进桥，因此不出现在审计里。
-第二处：**工具返回值的脱敏闸只装在助手 → 厂商那一条路上**（见第五节），
+不是「界面已经问过了」这种口头承诺；破坏性还另需 `scope === 'single'`，批量令牌换不到删除（判据 `src/main/ipc/assistantGate.js`）。
+被拒的调用不进桥，因此不出现在审计里。
+第三处：**工具返回值的脱敏闸只装在助手 → 厂商那一条路上**（见第五节），
 所以同一个工具在两侧返回的形状不同 —— 助手侧看不到本机路径，Agent 侧看得到。
 助手的审计与 Agent 的写在同一个文件，靠 `source` 字段区分（`agent` / `assistant`）。
 
@@ -152,10 +162,14 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 钉在 `test/ai-assistant-service.test.js`。执行侧没有新权限：状态里没有的工具不会因为
 状态里写了歌名就多出一条通道，写操作照旧逐条确认。
 
+**P3 起助手也能操作播放器**（播放/暂停/切歌/音量/切页面，共 6 条 `audience:'app'` 的能力）——
+这些只在渲染层执行、不进外部 Agent 的面，也不经任何新增 IPC：状态与 audio 元素都长在渲染层，
+为它们造一条 IPC 只是把一次函数调用换成三层往返，还多一处可绕过的口子。
+
 ### 7. AI 智能歌单（轨道三）：只读生成，写库仍是那一下点击
 
 「说一句主题 → 从你已有的歌里挑 → 存成普通歌单」走一条**新的 invoke 通道**
-`smart-playlist-generate`（`src/main/ipc/smart-playlist.js`），它**不在** MCP 的 21 个工具白名单里，
+`smart-playlist-generate`（`src/main/ipc/smart-playlist.js`），它**不在** MCP 那张登记表里，
 也不产生审计条目 —— 因为它什么都不改。边界由三处共同保证：
 
 - 主进程侧只读 `prefs` 里的 `userPlaylists`（不用 `ensureFavorites()`，那个在缺单时会建单落盘），
@@ -252,12 +266,25 @@ Agent 通过 MCP 做的每一次 `tools/call` 都写一条审计：`userData/mcp
 
 ---
 
+### 三种确认形态：P2 起，写操作分三档
+
+AI 助手（轨道五）从 P2 起把「改动你的东西」分成三档，判据在主进程（`src/main/ipc/assistantGate.js`），界面只负责把正确的 `scope`/`confirmed` 组合发过去：
+
+1. **只读**：直接跑，不问。
+2. **可逆写**（入队、加歌单、订阅、取消/重试下载）：整份计划一次性批准（计划卡上勾选/取消，点「批准并执行」）。
+3. **破坏性**（删除、清空队列与历史、移除订阅）：即使在整份批准里也**单独弹一次模态确认**——批量令牌换不到删除，这是主进程闸的硬判据，界面绕不开。
+
+**给改这块代码的人**：新增长一个工具时，先想清楚它属于哪一档——`risk` 字段是唯一的判据来源，写错一档就是给用户凭空加了一次或减了一次确认负担。
+
+---
+
 ## 六、用户自查清单
 
 1. 只从官方渠道获取安装包（项目主页 Releases），不要用第三方镜像的安装包
 2. 若启用了 MCP，记住它是一个**本机 HTTP 服务**；不用时在设置里关掉
 3. 分享日志或诊断包前扫一眼：虽然已脱敏，但你的歌名/路径仍属于个人信息
 4. 升级前看 `CHANGELOG.md` 的「安全」小节
+5. AI 助手执行删除/清空类动作时，即使在批量批准里也会**单独再弹一次确认**——如果哪次没弹就删了，请立刻报告
 
 **一句话给改这块代码的人**：应用状态摘要与工具返回值是**两条**出网路，两条各有一道闸——
 前者在拼状态段时只取 `title/artist/source/id/quality`，后者在 `src/shared/outboundScrub.js`

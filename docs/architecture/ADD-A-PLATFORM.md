@@ -95,6 +95,32 @@ module.exports = {
 
 ---
 
+## 歌曲条目规范（songShape · 必读）
+
+搜索返回的歌曲条目要经过 `src/api/songShape.js` 的 `asSong()` 收敛：
+
+```js
+const { asSong } = require('../songShape');
+
+async function mySearch(keyword, page = 1) {
+  // ... 拿到平台原始条目以后：
+  return list.map((s) => asSong({ title: ..., source: 'myid', /* ... */ }));
+}
+```
+
+`asSong` 只做**形状/类型收敛**（durations NaN→0、核心字段统一为字符串等），
+字段取值逻辑仍由平台自己写。三条硬约定：
+
+| 字段 | 约定 |
+|---|---|
+| `duration` | **毫秒整数**。平台源是秒的（qq `interval` / kugou `Duration` / kuwo `DURATION`）在平台文件里 `* 1000`；接口不返回的报 `0` |
+| `artist` | 已连接好的字符串；连接符**按平台现状保留**（勿统一）：netease/qq `' / '`、migu/soda `'、'`、kuwo `', '` |
+| 扩展字段 | 透传保留（netease `fee/albumMid`、qq `pay/numId` 是下游依赖），平台特有的随意加 |
+
+丢单守卫（空 id / 空 title）留在平台里——各平台丢单条件不同，收拢会改变丢单集合。
+
+---
+
 ## 步骤 2 · 跑测试
 
 ```bash

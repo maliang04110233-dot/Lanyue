@@ -1,19 +1,25 @@
 {
-  "_comment": "npm audit 豁免清单。每条都必须写清「为什么豁免」，否则 scripts/audit-gate.cjs 拒绝放行 —— 豁免必须是可复核的判断，不是黑名单。分级判据见 SECURITY.md。",
+  "_comment": "npm audit 豁免清单。每条都必须写清「为什么豁免」，否则 scripts/audit-gate.cjs 拒绝放行 —— 豁免必须是可复核的判断，不是黑名单。分组依据与机器判据见 SECURITY.md 与 scripts/audit-gate.cjs 头注。四个分组的可达性/攻击面层级：unreachable_excluded（不在产物）< unreachable_but_packaged（在产物但无代码路径加载）< upstream_locked_server_never_launched（在产物、被加载，但 HTTP 监听分支不可达）< upstream_locked（可达且攻击面在运行路径）。",
   "unreachable_excluded": {
     "_why": "运行时插桩 + 源码静态引用（scripts/check-dead-deps.cjs 的判据）均未命中，且 build/config.cjs 已把它们排除出 asar —— 这些代码根本不在发布产物里，漏洞不可达。",
-    "_verified": "2026-10-13",
+    "_verified": "2026-10-17",
     "packages": ["jade", "constantinople", "uglify-js", "transformers", "clean-css"]
   },
   "unreachable_but_packaged": {
     "_why": "运行时插桩与静态引用均未命中：会被打进 asar，但没有任何代码路径加载它。与上一类的差别是「产物里存在」，故单列以示区分。",
-    "_verified": "2026-10-13",
+    "_verified": "2026-10-17",
     "packages": ["useragent"]
   },
+  "upstream_locked_server_never_launched": {
+    "_why": "打进 asar 且被 NeteaseCloudMusicApi/main.js 末尾的无条件 Object.assign(module.exports, require('./server')) 拉入运行时（2026-10-17 运行时插桩实测 4 条命中），但全仓 src/ 唯一的 http.createServer + listen 在 src/main/mcp/mcpServer.js（与 express 无关）；本项目消费面只有 netease.js 的 10 个纯数据方法，server.js 的 HTTP 监听分支从未执行。攻击面因此收敛到「供应链投毒」而非「HTTP 请求解析层」。机器判据：npm run check:attack-surface 每次复核 listen/createServer 使用点必须不含 SDK 消费链。",
+    "_verified": "2026-10-17",
+    "_revisit": "换装 @neteasecloudmusicapienhanced/api 时整组移除（ADR-20261017-01 方案 C）",
+    "packages": ["express", "body-parser", "path-to-regexp"]
+  },
   "upstream_locked": {
-    "_why": "可达，但根因是 NeteaseCloudMusicApi@4.32.0（已是最新）内置的老依赖树。修复需跨大版本升级 express(4->5) / path-to-regexp(0.1->8) / body-parser(1->2)，会破坏该 SDK 内部的 HTTP 服务行为 —— 已实机验证该 SDK 确实起了 express 服务（运行时插桩命中），不是死代码。node-forge 自身 1.4.0 即最新。风险与缓解见 SECURITY.md。",
-    "_verified": "2026-10-13",
+    "_why": "可达，但根因是 NeteaseCloudMusicApi@4.32.0（已是最新，registry 最后一版 time.modified 2026-05-18；上游 2024-01-24 因网易法务函删库停更）内置的老依赖树。修复需跨大版本升级或换 fork，会破坏该 SDK 的兼容行为。node-forge 自身 1.4.0 即最新无修复版；basic-ftp/get-uri/pac-proxy-agent 链仅在 SDK util/request.js 的 PAC 代理分支实例化，本项目未走该配置分支。风险与缓解见 SECURITY.md；处置路线见 documents/adr/ADR-20261017-01。",
+    "_verified": "2026-10-17",
     "_revisit": "NeteaseCloudMusicApi 发布新版本时重新评估",
-    "packages": ["NeteaseCloudMusicApi", "express", "body-parser", "path-to-regexp", "node-forge", "basic-ftp", "get-uri", "pac-proxy-agent"]
+    "packages": ["NeteaseCloudMusicApi", "node-forge", "basic-ftp", "get-uri", "pac-proxy-agent"]
   }
 }

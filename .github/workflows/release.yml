@@ -110,6 +110,9 @@ jobs:
         run: npm run audit:deps
       - name: Dead deps check
         run: npm run check:dead-deps
+      # 「server 从未启动」豁免理由的机器复核（ADR-20261017-01 方案 A，2026-10-17）
+      - name: Attack surface check
+        run: npm run check:attack-surface
       - name: Unit tests
         # 并发 2 + 重试 3 次，并把失败用例名以 annotation 形式暴露。
         #

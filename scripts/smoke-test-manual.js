@@ -3,7 +3,12 @@
 /**
  * Windows 解包产物真机冒烟：
  * 1) 首实例可拉起并持续存活；2) 第二实例被单实例锁快速拒绝；
- * 3) stdout/stderr 与本机 main.log 没有常见致命错误。
+ * 3) stdout/stderr 无常见致命错误；
+ * 4) 本机 main.log 本次启动增量：无致命错误 + 全局快捷键注册成功（已注册 N/M 且 N≥1）
+ *    + 托盘无失败记录（无 [tray] 告警）。
+ *    —— 第 4 组判据消费的是主进程既有日志（src/main/globalShortcuts.js:51、
+ *    src/main/tray.js:52），不要求新增日志行为；增量窗口从首个实例 spawn 之前
+ *    的字节偏移算起，多字节 UTF-8 切割与日志轮转均有退路。
  *
  * 用法：node scripts/smoke-test-manual.js [exe路径]
  * 默认：release/win-unpacked/Lanyue.exe
@@ -17,6 +22,8 @@ const {
   processStayedAlive,
   secondInstanceWasRejected,
   startupLogLooksHealthy,
+  shortcutsRegisteredInLog,
+  trayFailureAbsent,
 } = require('./release-smoke-checks.cjs');
 
 if (process.platform !== 'win32') {
@@ -37,6 +44,11 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`);
 };
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const finish = () => {
+  const failed = results.filter((r) => !r.ok);
+  console.log(`\n${results.length - failed.length}/${results.length} 通过`);
+  process.exitCode = failed.length ? 1 : 0;
+};
 const capture = () => {
   const state = { spawnError: null, exitCode: null, exitSignal: null, stdout: '', stderr: '', timedOut: false };
   const child = spawn(exePath, [], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false });
@@ -56,6 +68,18 @@ async function stop(child) {
 
 async function main() {
   console.log('exe:', exePath, `(${fs.statSync(exePath).size} B)`);
+
+  // 在拉起首个实例之前记录本机 main.log 的当前字节大小，作为「本次启动」
+  // 的增量切片起点——后续 tray/shortcuts/致命错误断言只看这个偏移之后的
+  // 新增内容，避免历史日志误伤。多字节 UTF-8 切割处理见下方 readIncremental。
+  const logCandidatesPre = [
+    path.join(process.env.APPDATA || '', 'music-downloader', 'logs', 'main.log'),
+    path.join(process.env.APPDATA || '', 'Lanyue', 'logs', 'main.log'),
+    path.join(os.homedir(), 'AppData', 'Roaming', 'music-downloader', 'logs', 'main.log'),
+  ].filter(Boolean);
+  const logPathPre = logCandidatesPre.find((p) => fs.existsSync(p));
+  const spawnOffset = logPathPre ? fs.statSync(logPathPre).size : null;
+
   const first = capture();
   await delay(6000);
   first.state.timedOut = first.state.exitCode == null && !first.state.spawnError;
@@ -90,18 +114,41 @@ async function main() {
     path.join(os.homedir(), 'AppData', 'Roaming', 'music-downloader', 'logs', 'main.log'),
   ].filter(Boolean);
   const logPath = logCandidates.find((p) => fs.existsSync(p));
-  if (logPath) {
-    const text = fs.readFileSync(logPath, 'utf8').slice(-20000);
-    check('本机 main.log 尾部无常见致命错误', startupLogLooksHealthy(text), path.relative(os.homedir(), logPath));
-  } else {
+  if (!logPath) {
     console.log('SKIP  未定位到本机 main.log（进程输出检查仍已执行）');
+    await stop(second && second.child);
+    await stop(first.child);
+    finish();
+    return;
   }
+  if (logPath !== logPathPre) {
+    console.log('WARN  使用的 main.log 路径在启动前后发生了变化，增量切片退化为尾部片段');
+  }
+
+  // 增量读取：fs.statSync 偏移是字节，多字节 UTF-8 字符可能被切在中间。
+  // 安全做法：从偏移处切片后，若首字节不是合法 UTF-8 序列起点，
+  // 再往前多回退 4 字节内的对齐窗口，然后跳到下一行行首。
+  const buf = fs.readFileSync(logPath);
+  const sliceStart = spawnOffset != null ? Math.min(spawnOffset, buf.length) : Math.max(0, buf.length - 20000);
+  let incremental = buf.slice(sliceStart).toString('utf8');
+  if (buf.length > sliceStart && buf[sliceStart] >= 0x80) {
+    // 切点落在多字节序列中间 → 丢弃第一行
+    incremental = incremental.replace(/^[^\n]*\n?/, '');
+  }
+  if (spawnOffset != null && sliceStart > 0) {
+    // 尾部截断保护：若因 log 轮转/截断导致偏移超过当前文件长度，退化为尾部
+    if (sliceStart >= buf.length) incremental = buf.slice(Math.max(0, buf.length - 20000)).toString('utf8');
+  }
+
+  check('本机 main.log 增量无常见致命错误', startupLogLooksHealthy(incremental), path.relative(os.homedir(), logPath));
+  check('全局快捷键注册成功（已注册 N/M 且 N≥1）', shortcutsRegisteredInLog(incremental),
+    shortcutsRegisteredInLog(incremental) ? '' : '增量日志未出现「[shortcuts] 全局快捷键已注册 N/M」或 N=0');
+  check('托盘启动无失败记录（日志无 [tray] 告警）', trayFailureAbsent(incremental),
+    trayFailureAbsent(incremental) ? '' : '增量日志包含 [tray] 失败记录');
 
   await stop(second && second.child);
   await stop(first.child);
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} 通过`);
-  process.exitCode = failed.length ? 1 : 0;
+  finish();
 }
 
 main().catch((e) => {

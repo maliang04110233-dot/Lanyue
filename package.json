@@ -1,6 +1,6 @@
 {
   "name": "music-downloader",
-  "version": "1.0.36",
+  "version": "1.0.37",
   "description": "多平台音乐下载器 - 支持网易云/QQ音乐/B站/酷狗/酷我/咪咕/汽水/5sing",
   "main": "dist/main/index.js",
   "scripts": {
@@ -22,8 +22,9 @@
     "check:icons": "node scripts/check-icons.cjs",
     "gen:icons": "node scripts/gen-icon.js",
     "audit:deps": "node scripts/audit-gate.cjs",
-    "verify": "npm run lint && npm test && npm run check:dead-deps && npm run check:icons && npm run build && npm run smoke:asar",
-    "verify:release": "npm run verify && npm run smoke:release"
+    "verify": "npm run lint && npm test && npm run check:dead-deps && npm run check:attack-surface && npm run check:icons && npm run build && npm run smoke:asar",
+    "verify:release": "npm run verify && npm run smoke:release",
+    "check:attack-surface": "node scripts/audit-attack-surface.cjs"
   },
   "keywords": [
     "music",

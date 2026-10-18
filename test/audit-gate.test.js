@@ -63,10 +63,28 @@ test('仓库里的 audit-allowlist.json 自身合规（分组、理由、日期�
   assert.ok(r.exempt.size > 0);
 });
 
-test('豁免分组只用这三种（新增分组必须先想清楚依据属于哪一类）', () => {
+test('豁免分组的四个可选值（新增分组必须先想清楚依据属于哪一类；改名/合组同步改此钉）', () => {
   const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'audit-allowlist.json'), 'utf8'));
   const groups = Object.keys(raw).filter((k) => !k.startsWith('_')).sort();
-  assert.deepStrictEqual(groups, ['unreachable_but_packaged', 'unreachable_excluded', 'upstream_locked']);
+  assert.deepStrictEqual(groups, [
+    'unreachable_but_packaged',
+    'unreachable_excluded',
+    'upstream_locked',
+    'upstream_locked_server_never_launched',
+  ]);
+});
+
+test('攻击面日志四组缺一不可：upstream_locked_server_never_launched 只放「打进 asar + 被 require + listen 分支不可达」的包', () => {
+  const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'audit-allowlist.json'), 'utf8'));
+  const g = raw.upstream_locked_server_never_launched;
+  // 缺 machines 判据 —— 该组的存在前提是对 scripts/audit-attack-surface.cjs
+  // 的机器复核承诺；_why 不提这一点的分组会退化为「信任上次结论的僵尸标签」。
+  assert.ok(/audit-attack-surface|机器判据/.test(g._why),
+    '该组 _why 必须指明机器判据挂钩（scripts/audit-attack-surface.cjs）');
+  // SDK 自身不可归入该组 —— 它的 HTTP 服务部分确实存在（server.js 被要求加载），
+  // 真正锁死它的点是「消费面只有纯数据方法」；SDK 归 upstream_locked。
+  assert.ok(!g.packages.includes('NeteaseCloudMusicApi'),
+    'SDK 根包不属于 server_never_launched 组（server.js 是被无条件加载的）');
 });
 
 test('npm audit 输出带 BOM 时仍能解析（Windows 上真实发生过的坑）', () => {

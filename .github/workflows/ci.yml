@@ -85,6 +85,10 @@ jobs:
       - name: Dead deps check
         run: npm run check:dead-deps
 
+      # 「server 从未启动」豁免理由的机器复核（ADR-20261017-01 方案 A，2026-10-17）
+      - name: Attack surface check
+        run: npm run check:attack-surface
+
       # 测试不触网，但大量用例直接碰文件系统与平台分支（符号链接复核 / 目录沙箱 /
       # 路径拼接 / 媒体探测），故 runner 与打包、与用户真实环境保持一致：windows-latest
       # （2026-10-13 改：放在 ubuntu 上时 CI 连续红，而同一份代码在 Windows 上全绿）

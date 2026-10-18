@@ -21,7 +21,12 @@
  * 2. `unreachable_*` 两组的依据是 scripts/check-dead-deps.cjs 的可达性判据
  *    （运行时插桩 ∪ 源码静态引用）。任何人把这些包加回运行路径，本脚本不报警，
  *    但 check:dead-deps 会红 —— 两条闸是配套的。
- * 3. 本脚本不吞掉 npm audit 的原始输出：豁免了什么、剩了什么，都打印出来。
+ * 3. `upstream_locked_server_never_launched` 组（express/body-parser/
+ *    path-to-regexp）的「HTTP 监听分支从未执行」这一句理由，由
+ *    scripts/audit-attack-surface.cjs 的四条判据**每次机器复核**：分组包若
+ *    被直接消费、被打包排除、消费面扩散或出现新的 createServer/listen，
+ *    那条检查必红 —— 豁免理由不再停留在上次的分析结论上。
+ * 4. 本脚本不吞掉 npm audit 的原始输出：豁免了什么、剩了什么，都打印出来。
  *
  * 用法：node scripts/audit-gate.cjs
  * 退出码：0 = 通过；1 = 有未豁免的 high/critical，或豁免清单本身不合规

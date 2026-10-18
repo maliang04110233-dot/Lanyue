@@ -49,7 +49,10 @@ test('verify 不含 audit:deps（registry 不实现 audit 端点时会硬失败�
 
 test('verify 覆盖了真正需要本地跑通的全套检查', () => {
   // 移出 audit 不该顺手把别的东西也弄丢了。这里逐条钉住。
-  for (const step of ['lint', 'test', 'check:dead-deps', 'check:icons', 'build', 'smoke:asar']) {
+  // 2026-10-17 起补 check:attack-surface（scripts/audit-attack-surface.cjs）：
+  // 它和 check:dead-deps 一样是离线纯静态扫描，命名刻意避开 "audit" 字样，
+  // 但闸的是 audit-allowlist.json 里「server 从未启动」豁免理由的机器复核。
+  for (const step of ['lint', 'test', 'check:dead-deps', 'check:attack-surface', 'check:icons', 'build', 'smoke:asar']) {
     assert.match(
       scripts.verify, new RegExp(`\\b${step}\\b`),
       `verify 少了 ${step} —— 移出 audit 时不该顺带砍掉它`,
