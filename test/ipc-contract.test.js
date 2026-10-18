@@ -115,7 +115,7 @@ test('僵尸通道已清除：flush 走 main 直调，扫描进度无人订阅�
   const read = (p) => fsp.readFileSync(require('node:path').join(__dirname, '..', 'src', 'main', p), 'utf8');
   assert.doesNotMatch(read('ipc/prefs.js'), /handle\('flush-prefs'/);
   assert.doesNotMatch(read('ipc/history.js'), /handle\('flush-history'/);
-  assert.doesNotMatch(read('ipc/library.js'), /library-scan-progress/,
+  assert.doesNotMatch(read('ipc/library/scan.js'), /library-scan-progress/,
     '无人订阅的进度推送应连发送点一起删，而不是只删契约');
 });
 

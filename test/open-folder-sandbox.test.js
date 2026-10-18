@@ -6,7 +6,7 @@
  * 渲染层可以拿任意绝对路径（契约参数只限 t.str(1024)）做两件事：
  *   1. 存在性探测：返回值 { ok:true } / { ok:false } 泄漏盘面信息；
  *   2. 把资源管理器拉到任意目录（社工素材也能落在受害者眼前）。
- * 同一仓库 src/main/ipc/library.js 的 15 处路径通道都过了
+ * 同一仓库 src/main/ipc/library/*.js 的 15 处路径通道都过了
  * isValidPath + isInAllowedDir 两道，open-folder 是唯一漏网的那条。
  *
  * 为什么必须是"行为测试"而不是扫源码：这个通道的判据是 approvedDirs 的

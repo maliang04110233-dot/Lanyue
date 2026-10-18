@@ -303,16 +303,17 @@ test('UI：renderSourceSelect 存在并消费传入清单（不内联平台 id�
   );
 });
 
-test('UI：app.js 在 applyTranslations() **之前**拉取平台清单（顺序陷阱）', () => {
-  // ⚠️ 必须先剥注释。app.js 与本文件的注释里都**提到了** applyTranslations()，
-  //    直接 indexOf 会命中注释自身 —— 这个坑在本次实现中已踩过一次（补丁脚本断言）。
-  const src = read('src/renderer/js/app.js')
+test('UI：启动通路在 applyTranslations() **之前**拉取平台清单（顺序陷阱）', () => {
+  // ⚠️ 必须先剥注释。注释里都**提到了** applyTranslations()，
+  //    直接 indexOf 会命中注释自身 —— 这个坑实现时踩过一次（补丁脚本断言）。
+  // 启动偏好/平台清单块自 app.js init() 提出，落在 boot-restore.js
+  const src = read('src/renderer/js/boot-restore.js')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^[ \t]*\/\/.*$/gm, '');
   const iPlatforms = src.indexOf('renderSourceSelect(');
   const iI18n = src.indexOf('applyTranslations()');
-  assert.ok(iPlatforms > 0, 'app.js 应调用 renderSourceSelect');
-  assert.ok(iI18n > 0, 'app.js 应调用 applyTranslations');
+  assert.ok(iPlatforms > 0, 'boot-restore.js 应调用 renderSourceSelect');
+  assert.ok(iI18n > 0, 'boot-restore.js 应调用 applyTranslations');
   assert.ok(
     iPlatforms < iI18n,
     '顺序错误：renderSourceSelect 必须在 applyTranslations 之前，'

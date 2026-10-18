@@ -97,7 +97,7 @@ test('登记簿：没有 check 时该字段为 null（调用方是旧路径/本�
 });
 
 test('守卫钉：proxy-play 必须把 check 传进 registerStream（否则复用形同虚设）', () => {
-  const src = read('src/main/ipc/download.js');
+  const src = read('src/main/ipc/download/stream.js');
   assert.match(src, /registerStream\(url, referer, refreshFn, check\)/,
     'proxy-play 已经在同一个 handler 里校验过 URL，不传下去就等于白校验一次');
 });

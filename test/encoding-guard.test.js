@@ -64,10 +64,11 @@ const SIGNATURE = new RegExp(`[${SIGNATURE_CHARS.join('')}]|${SIGNATURE_WORDS}`)
 
 /** 合法命中：讲到 U+FFFD 本身的注释行。精确到行，过期即红。 */
 const ALLOWED = new Set([
-  // 2026-10-13：library.js 删掉了 2 行 require（沙箱收紧后 app 不再使用），
-  // 本条行号随之从 481 移到 488。守卫按行号登记，所以改动该文件必须同步这里 ——
-  // 这正是「过期即红」要的效果：白名单不允许变成万能豁免。
-  'src/main/ipc/library.js:488',
+  // 2026-10-13：library.js 删掉了 2 行 require，行号从 481 移到 488。
+  // 2026-10-17：library.js 按域拆分（转码/歌词等抽进 library/ 子目录），
+  // LRC 解码落在 lyrics.js，行号从 488 移到 97。守卫按行号登记，改动该
+  // 文件必须同步这里 —— 这正是「过期即红」要的效果：白名单不允许变成万能豁免。
+  'src/main/ipc/library/lyrics.js:97',
 ]);
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'release', '.backup', '.preview', 'spark-output']);

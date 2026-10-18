@@ -6,6 +6,7 @@
  */
 
 const request = require('../request');
+const { asSong } = require('../songShape');
 const logger = require('../../utils/logger');
 const { AppError } = require('../../shared/errors');
 
@@ -219,13 +220,14 @@ async function bilibiliSearch(keyword, page = 1, cookie = '') {
   });
 
   const videos = result?.data?.result || [];
-  return videos.slice(0, 20).map(v => ({
+  return videos.slice(0, 20).map((v) => asSong({
     id: v.bvid || String(v.aid),
     aid: v.aid,
     title: (v.title || '').replace(/<[^>]+>/g, ''),
     artist: v.author || v.uploader || '',
     album: '哔哩哔哩',
     cover: v.pic ? ('https:' + v.pic) : '',
+    // parseDuration 解析的是 "mm:ss"（秒），折算成约定的毫秒
     duration: parseDuration(v.duration) * 1000,
     source: 'bilibili',
   }));

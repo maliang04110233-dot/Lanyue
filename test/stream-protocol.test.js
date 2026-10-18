@@ -310,7 +310,7 @@ test('主进程把 scheme 声明为特权（否则 audio 元素不会发 Range �
 });
 
 test('preload 之外，渲染层拿到的就是 scheme URL（不再等 file://）', () => {
-  const DL = read('src/main/ipc/download.js');
+  const DL = read('src/main/ipc/download/stream.js');
   const DLs = strip(DL);
   // D-35 起登记是三参：(url, referer, refreshFn)。第三参是同源重取回调，
   // 缺了它签名链接过期就只能如实失败。期望值必须跟着接线走 ——

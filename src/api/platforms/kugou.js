@@ -9,6 +9,7 @@
 
 const request = require('../request');
 const logger = require('../../utils/logger');
+const { asSong } = require('../songShape');
 const { decodeKrc } = require('../../utils/krcCodec');
 
 // 编码/解码三种音质的 hash 到 id
@@ -48,13 +49,14 @@ async function kugouSearch(keyword, page = 1) {
   const url = `https://songsearch.kugou.com/song_search_v2?keyword=${encodeURIComponent(keyword)}&page=${Number(page) || 1}&pagesize=30&platform=WebFilter`;
   const result = await request(url, { timeout: 10000 });
   const songs = result?.data?.lists || [];
-  return songs.map(s => ({
+  return songs.map((s) => asSong({
     title: s.SongName || '',
     artist: s.SingerName || '',
     album: s.AlbumName || '',
     cover: s.FileHash
       ? `https://imgessl.kugou.com/stdmusic/${s.FileHash.slice(0, 2)}/${s.FileHash}.jpg`
       : '',
+    // 源单位是秒（Duration），这里折算成约定的毫秒
     duration: (s.Duration || 0) * 1000,
     source: 'kugou',
     // 将三种音质的 hash 编码到 id 中，方便 getUrl 按需取用

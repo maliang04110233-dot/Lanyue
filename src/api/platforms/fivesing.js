@@ -35,6 +35,7 @@
  */
 
 const request = require('../request');
+const { asSong } = require('../songShape');
 const { testAudioLink } = require('../request');
 const logger = require('../../utils/logger');
 
@@ -115,15 +116,15 @@ function mapSong(s) {
   const title = stripHtml(s.songName);
   if (!title) return null;
   const singer = stripHtml(s.singer);
-  return {
+  return asSong({
     id: encodeId(songId, type),
     title,
     artist: /^null$/i.test(singer) ? '' : singer,
     album: '',
     cover: '',
-    duration: 0, // 搜索接口不返回时长
+    duration: 0, // 搜索接口不返回时长（约定恒为毫秒，见 ../songShape.js）
     source: 'fivesing',
-  };
+  });
 }
 
 /**

@@ -203,7 +203,8 @@ test('接线：菜单项 / 面板入口 / 主进程透传 / 零新通道 全齐'
   assert.match(palette, /id: 'pl-abclip'/, '命令面板缺入口');
   assert.match(palette, /_call\('exportAbClip'\)/, '命令面板未指向同一个全局函数');
 
-  const lib = read('src/main/ipc/library.js');
+  // 转码域拆到 library/convert.js（library.js 只剩组装根）
+  const lib = read('src/main/ipc/library/convert.js');
   assert.match(lib, /start: clip \? clip\.start : null/, '主进程未透传起点');
   assert.match(lib, /const clip = \(start != null \|\| end != null\)/, '主进程未做区间合法性判定');
   assert.match(lib, /片段区间无效/, '非法区间必须明确失败，不能静默出全曲');

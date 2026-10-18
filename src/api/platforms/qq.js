@@ -11,6 +11,7 @@
 const qqMusic = require('qq-music-api');
 const qqGetSign = require('qq-music-api/util/sign');
 const request = require('../request');
+const { asSong } = require('../songShape');
 const { AppError } = require('../../shared/errors');
 const {
   extractQQUin,
@@ -116,7 +117,7 @@ async function qqGetSingerSongs(singerMid, limit = 20) {
     // 返回结构: { list: [...], singer, desc, total, num, singermid }
     // list 项字段: mid, id, name, album={mid,name}, singer=[{mid,name}], interval
     const list = result?.list || [];
-    return list.map(s => ({
+    return list.map((s) => asSong({
       id: String(s.mid || s.id || ''),
       numId: String(s.id || ''),
       mid: s.mid || '',
@@ -211,7 +212,7 @@ async function qqSearch(keyword, page = 1) {
       t: 0, // 0=单曲
     });
     const songs = result?.list || [];
-    return songs.map(s => ({
+    return songs.map((s) => asSong({
       id: String(s.songmid || ''),
       numId: String(s.songid || ''),
       title: s.songname || '',
@@ -219,6 +220,7 @@ async function qqSearch(keyword, page = 1) {
       album: s.albumname || '',
       albumMid: s.albummid || '',
       cover: s.albummid ? `https://y.qq.com/music/photo_new/T002R300x300M000${s.albummid}.jpg` : '',
+      // 源单位是秒（interval），折算成约定的毫秒
       duration: s.interval ? s.interval * 1000 : 0,
       source: 'qq',
       pay: s.pay,

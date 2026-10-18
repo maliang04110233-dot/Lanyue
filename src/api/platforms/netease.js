@@ -8,6 +8,7 @@
 
 const ncm = require('NeteaseCloudMusicApi');
 const logger = require('../../utils/logger');
+const { asSong } = require('../songShape');
 const { AppError } = require('../../shared/errors');
 
 /**
@@ -26,7 +27,7 @@ async function neteaseSearch(keyword, page = 1, cookie = '') {
     ...(cookie ? { cookie } : {}),
   });
   const songs = res?.body?.result?.songs || [];
-  return songs.map(s => ({
+  return songs.map((s) => asSong({
     id: String(s.id),
     title: s.name,
     artist: (s.artists || []).map(a => a.name).join(' / '),

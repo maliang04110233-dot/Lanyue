@@ -58,7 +58,8 @@ test('P2-9：findDownloadedAsync 与同步版语义一致（命中 / 文件已�
 });
 
 test('P2-9（守卫钉）：入队/订阅路径一律不许用同步判活', () => {
-  for (const rel of ['src/main/ipc/download.js', 'src/main/subscriptions.js']) {
+  // 下载 IPC 已按域拆分：判活调用点在 queue.js，取流域单独守卫
+  for (const rel of ['src/main/ipc/download.js', 'src/main/ipc/download/stream.js', 'src/main/ipc/download/queue.js', 'src/main/subscriptions.js']) {
     const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
     assert.ok(!/history\.findDownloaded\(/.test(src),
       `${rel} 仍在用同步判活 findDownloaded（应改用 findDownloadedAsync）—— `

@@ -10,6 +10,7 @@
  */
 
 const request = require('../request');
+const { asSong } = require('../songShape');
 const { testAudioLink } = require('../request');
 const logger = require('../../utils/logger');
 const { USER_AGENT } = require('../../utils/userAgent');
@@ -48,12 +49,13 @@ async function kuwoSearch(keyword, page = 1) {
   });
   const list = res?.abslist || [];
   return list
-    .map((s) => ({
+    .map((s) => asSong({
       id: normalizeId(s.MUSICRID || s.musicrid),
       title: String(s.SONGNAME || s.songName || '').replace(/<[^>]+>/g, '').trim(),
       artist: String(s.ARTIST || s.artist || '').replace(/&amp;/g, ', ').trim(),
       album: String(s.ALBUM || s.album || '').replace(/&amp;/g, ', ').trim(),
       cover: coverUrl(s),
+      // 源单位是秒（DURATION），折算成约定的毫秒
       duration: (parseInt(s.DURATION || s.duration, 10) || 0) * 1000,
       source: 'kuwo',
     }))

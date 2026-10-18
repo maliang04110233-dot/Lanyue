@@ -32,6 +32,7 @@
 const https = require('https');
 const http = require('http');
 const request = require('../request');
+const { asSong } = require('../songShape');
 const { testAudioLink } = require('../request');
 const logger = require('../../utils/logger');
 
@@ -74,7 +75,7 @@ function mapSong(s) {
   if (!id) return null;
   const title = String(s?.name || '').trim();
   if (!title) return null;
-  return {
+  return asSong({
     id,
     title,
     artist: Array.isArray(s.singers)
@@ -86,9 +87,9 @@ function mapSong(s) {
     cover: Array.isArray(s.imgItems)
       ? String((s.imgItems[0] && s.imgItems[0].img) || '').trim()
       : '',
-    duration: 0, // 搜索接口不返回时长
+    duration: 0, // 搜索接口不返回时长（约定恒为毫秒，见 ../songShape.js）
     source: 'migu',
-  };
+  });
 }
 
 /**

@@ -51,7 +51,7 @@ const RAWSRC = read('src/main/streamProtocol.js');
 // handle 主流程区块的边界：注意锚点必须是带 STREAM_SCHEME 的那次注册，
 // 用 'protocol.handle(' 会命中头部注释，取到的前段反而含 refreshUpstreamOn403。
 const HANDLE_MARK = 'protocol.handle(STREAM_SCHEME';
-const DL = read('src/main/ipc/download.js');
+const DL = read('src/main/ipc/download/stream.js');
 
 // ── 假上游 ──────────────────────────────────────────────────
 // 起一个可控的 HTTP 服务：/stale 永远 403（模拟过期签名），

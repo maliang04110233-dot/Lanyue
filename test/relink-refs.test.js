@@ -209,8 +209,9 @@ test('relinkFileRefs：一次改名的全部落库回写 + .lrc sidecar 跟着�
 });
 
 test('接线：rename-file 成功后必走 relink，且没有为它开新通道', () => {
-  const lib = read('src/main/ipc/library.js');
-  const renameBlock = lib.slice(lib.indexOf("handle('rename-file'"), lib.indexOf("handle('convert-audio'"));
+  // 文件操作域拆到 library/files.js；.lrc sidecar 约定在 library/lyrics.js
+  const lib = read('src/main/ipc/library/files.js');
+  const renameBlock = lib.slice(lib.indexOf("handle('rename-file'"), lib.indexOf('module.exports'));
   assert.ok(renameBlock.includes('relinkFileRefs('), 'rename-file 没接回写');
   assert.ok(renameBlock.indexOf('fsp.rename') < renameBlock.indexOf('relinkFileRefs('), '回写必须在文件真的改成功之后');
   assert.match(lib, /success:\s*true,\s*relink/, '回写结果要随返回值上去，前端才能如实说');
@@ -223,10 +224,10 @@ test('接线：rename-file 成功后必走 relink，且没有为它开新通道'
     '回写不需要新参数、更不需要新通道（契约形状变了就是走偏了）',
   );
 
-  // .lrc 命名约定收成一处：library.js 自己那两处内联表达式必须换用 sidecarPathFor
-  assert.ok(!lib.includes("replace(/\\.[^.]+$/, '.lrc')"), 'library.js 还在内联拼 .lrc 路径（第 4 份约定必然漂移）');
-  assert.ok(/const \{ sidecarPathFor \} = require\('\.\.\/\.\.\/utils\/relinkRefs'\)/.test(lib), '没引 sidecarPathFor');
-  assert.equal((lib.match(/sidecarPathFor\(/g) || []).length, 2, '读写两侧都走同一个约定函数');
+  const lyrics = read('src/main/ipc/library/lyrics.js');
+  assert.ok(!lyrics.includes("replace(/\\.[^.]+$/, '.lrc')"), 'library 还在内联拼 .lrc 路径（第 4 份约定必然漂移）');
+  assert.ok(/const \{ sidecarPathFor \} = require\('\.\.\/\.\.\/\.\.\/utils\/relinkRefs'\)/.test(lyrics), '没引 sidecarPathFor');
+  assert.equal((lyrics.match(/sidecarPathFor\(/g) || []).length, 2, '读写两侧都走同一个约定函数');
 });
 
 test('接线：批量重命名后刷新内存歌单，并把回写失败如实说出口', () => {

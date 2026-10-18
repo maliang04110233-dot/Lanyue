@@ -43,6 +43,7 @@
  */
 
 const request = require('../request');
+const { asSong } = require('../songShape');
 const { testAudioLink } = require('../request');
 const logger = require('../../utils/logger');
 
@@ -123,7 +124,7 @@ function mapTrack(tk) {
   if (!id) return null;
   const title = String(tk?.name || '').trim();
   if (!title) return null;
-  return {
+  return asSong({
     id,
     title,
     artist: Array.isArray(tk.artists)
@@ -131,9 +132,9 @@ function mapTrack(tk) {
       : '',
     album: String((tk.album && tk.album.name) || '').trim(),
     cover: pickCover(tk.album && tk.album.url_cover),
-    duration: Number(tk.duration) || 0, // ⚠️ 毫秒（与分享页的秒不同）
+    duration: Number(tk.duration) || 0, // ⚠️ 毫秒（与分享页的秒不同），见 ../songShape.js
     source: 'soda',
-  };
+  });
 }
 
 /**

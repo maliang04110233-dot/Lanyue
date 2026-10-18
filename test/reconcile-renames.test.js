@@ -142,8 +142,9 @@ test('reconcileScannedRefs：真 sqlite + 真 prefs 走一遍，徽标/歌单/�
 });
 
 test('接线：扫描成功后对账并如实上报，前端不另开通道', () => {
-  const lib = read('src/main/ipc/library.js');
-  assert.match(lib, /require\('\.\.\/\.\.\/utils\/fileRelink'\)/, '没引对账函数');
+  // 扫描域拆到 library/scan.js（library.js 只剩组装根）
+  const lib = read('src/main/ipc/library/scan.js');
+  assert.match(lib, /require\('\.\.\/\.\.\/\.\.\/utils\/fileRelink'\)/, '没引对账函数');
   assert.equal((lib.match(/reconcileScannedRefs\(/g) || []).length, 2, '增量与全量两条扫描出口都得对账，漏一条就是半残功能');
   assert.equal((lib.match(/relinked/g) || []).length >= 2, true, '对账结果要随 scan-local-library 的返回值上去');
 
