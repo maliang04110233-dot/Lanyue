@@ -26,6 +26,7 @@ import { filterHomeSection } from '../homeFilter.js';
 import { platIdsOf, normalizePlatTab, nextPlatTab, HOME_PLAT_LS_KEY } from '../homePlatTabs.js';
 import { skeletonHtml } from '../skeleton.js';
 import { buildFallbackNotice } from '../fallbackNotice.js';
+import { sourceErrorText } from '../sourceError.js';
 import { PLAY_ALL_LIMIT, planSectionPlay, playAllToastText } from '../homePlayAll.js';
 import { noCoverSvgHtml, svgIcon, fmtDuration, coverThumbHtml } from '../homeFormat.js';
 
@@ -760,11 +761,8 @@ async function playRecommendSong(song) {
   try {
     const result = await api.getDownloadUrlSmart(song, quality);
     if (!result || !result.url) {
-      if (result && result.code === 'VIP_REQUIRED') {
-        showToast('⚠️ 该歌曲为 VIP 专享，请在「设置」中填入已登录的 Cookie 后重试', 'warn', 5000);
-      } else {
-        showToast('⚠️ 暂无法获取音源，请稍后重试或下载后收听', 'warn', 5000);
-      }
+      const msg = sourceErrorText(window.t, result, song.source, 'toast.noSource');
+      showToast(msg, 'warn', 5000);
       return;
     }
     song._playedQuality = quality;

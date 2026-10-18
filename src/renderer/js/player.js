@@ -9,6 +9,7 @@ import { logger } from './logger.js';
 import { resolveQuality, playedQualityLabel } from './quality.js';
 import { createPrefetchStore, prefetchKeyOf, nextPrefetchIdx, shouldPrefetchNow, prefetchRetryAllowed } from './playPrefetch.js';
 import { buildFallbackNotice } from './fallbackNotice.js';
+import { sourceErrorText } from './sourceError.js';
 import {
   addToRecentlyPlayed, updatePlayStatsOnStart, updatePlayStatsOnStop, recordPlay,
   restartPlayTimer, getRecentlyPlayed, loadRecentlyPlayed, clearRecentlyPlayed,
@@ -179,7 +180,7 @@ function savePlayProgress(song, time) {
 async function restorePlayProgress(song) {
   try {
     const enabled = await api.getPref('playProgressMemory');
-    if (enabled === false) return 0;
+    if (!enabled) return 0;
     const key = _playProgressKey(song);
     const progressMap = await api.getPref('playProgressMap') || {};
     const entry = progressMap[key];
@@ -309,6 +310,13 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
 
   // ── 网络歌曲分支 ─────────────────────────────────────
   setState('_currentLocalFilePath', null);
+  // 播放开始时立即把歌词区显示为「暂无歌词」占位：
+  //  此前网络分支从不主动显示歌词区（初始/切歌后都是 display:none），
+  //  而歌词是异步获取的 —— 慢、失败、或该平台本就无词时，
+  //  歌词区就一直看不见，用户看到的现象就是「歌词不显示」。
+  //  showNoLyrics() 内部已处理「用户手动隐藏」的情形（隐藏时不覆盖），
+  //  所以这里直接调它即可；有词加载后 parseLrc 会覆盖为逐字高亮。
+  showNoLyrics();
   const titleEl = document.getElementById('playerTitle');
   const artistEl = document.getElementById('playerArtist');
   if (titleEl) titleEl.textContent = song.title || '未知歌曲';
@@ -355,8 +363,12 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
       setState('_currentLyricRaw', r.lrc);
     } else {
       setState('_currentLyricRaw', '');
+      showNoLyrics();
     }
-  } catch (_e) { /* ignore */ }
+  } catch (_e) { /* 歌词获取失败不阻断播放；置为无词占位，避免残留上一首歌词 */
+    setState('_currentLyricRaw', '');
+    showNoLyrics();
+  }
 }
 
 // ── 切歌 ─────────────────────────────────────────────
@@ -453,7 +465,8 @@ async function playSongByIdx(idx, song) {
     const result = await api.getDownloadUrlSmart(song, quality);
     if (reqId !== _playRequestId) return; // 已切到别的歌，丢弃过期结果
     if (!result || !result.url) {
-      showToast('⚠️ 暂无法获取音源', 'warn', 3000);
+      const msg = sourceErrorText(window.t, result, song.source, 'toast.noSource');
+      showToast(msg, 'warn', 4000);
       return;
     }
     song._playedQuality = quality;

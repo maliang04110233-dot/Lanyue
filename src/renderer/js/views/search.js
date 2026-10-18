@@ -17,6 +17,13 @@ import { skeletonHtml, SKEL_ROWS } from '../skeleton.js';
 import { t } from '../i18n.js';
 import { searchCacheKey, searchCacheGet, searchCacheSet } from '../searchCache.js';
 import { sourceErrorText, isLowYield } from '../sourceError.js';
+// 搜索建议 / 搜索历史 / 输入框键盘 —— 自本文件提出（等价迁移）
+import { addSearchHistory, hideSearchHistory, setupSearchSuggest } from './search/suggest.js';
+// 歌手/专辑渲染与详情 —— 自本文件提出（等价迁移）
+import {
+  renderSingerList, renderSingerPagination, renderAlbumList, renderAlbumPagination,
+  setupAlbumSinger,
+} from './search/albumSinger.js';
 
 // ── DOM 缓存（避免重复查询）──────────────────────────
 const _dom = {
@@ -64,106 +71,11 @@ function showLoadError(msg) {
   if (_dom.pagination) _dom.pagination.style.display = 'none';
 }
 
-const MAX_HISTORY = 20;
+// MAX_HISTORY 移入 search/suggest.js（等价迁移）
 
-// ── 搜索防抖 ──────────────────────────────────────────
-let _searchDebounceTimer = null;
-const SEARCH_DEBOUNCE_MS = 300;
-
-function debounceSearch() {
-  _kbdIdx = -1; // 用户重新输入，键盘建议循环归零
-  if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
-  _searchDebounceTimer = setTimeout(() => {
-    _searchDebounceTimer = null;
-    const keyword = _dom.searchInput?.value?.trim();
-    if (keyword && keyword.length >= 2) {
-      doSearch(1);
-    }
-    hideSearchSuggestions();
-  }, SEARCH_DEBOUNCE_MS);
-  // 显示搜索建议
-  showSearchSuggestions();
-}
-
-// ── 搜索建议（基于最近播放 + 搜索历史）──────────────
-function showSearchSuggestions() {
-  const input = _dom.searchInput;
-  if (!input) return;
-  const kw = input.value.trim().toLowerCase();
-  if (!kw || kw.length < 1) {
-    hideSearchSuggestions();
-    return;
-  }
-
-  // 从最近播放和搜索历史中筛选匹配项
-  const recentlyPlayed = typeof getRecentlyPlayed === 'function' ? getRecentlyPlayed() : [];
-  const suggestions = [];
-
-  // 最近播放匹配
-  for (const song of recentlyPlayed) {
-    if (suggestions.length >= 5) break;
-    const title = (song.title || '').toLowerCase();
-    const artist = (song.artist || '').toLowerCase();
-    if (title.includes(kw) || artist.includes(kw)) {
-      suggestions.push({
-        type: 'recent',
-        title: song.title,
-        artist: song.artist,
-        icon: '🎵',
-      });
-    }
-  }
-
-  // 搜索历史匹配
-  getSearchHistory().then(history => {
-    for (const h of history) {
-      if (suggestions.length >= 8) break;
-      if (h.keyword && h.keyword.toLowerCase().includes(kw)) {
-        const exists = suggestions.some(s => s.title === h.keyword);
-        if (!exists) {
-          suggestions.push({
-            type: 'history',
-            title: h.keyword,
-            icon: '🕐',
-          });
-        }
-      }
-    }
-
-    if (!suggestions.length) {
-      hideSearchSuggestions();
-      return;
-    }
-
-    // 渲染建议列表
-    let container = document.getElementById('searchSuggestions');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'searchSuggestions';
-      container.className = 'search-suggestions';
-      input.parentElement.appendChild(container);
-    }
-
-    container.innerHTML = suggestions.map(s => `
-      <div class="suggestion-item" onmousedown="selectSuggestion('${escQ(s.title)}')">
-        <span class="suggestion-icon">${s.icon}</span>
-        <span class="suggestion-title">${esc(s.title)}</span>
-        ${s.artist ? `<span class="suggestion-artist">${esc(s.artist)}</span>` : ''}
-      </div>
-    `).join('');
-    container.style.display = 'block';
-  });
-}
-
-function hideSearchSuggestions() {
-  const container = document.getElementById('searchSuggestions');
-  if (container) container.style.display = 'none';
-}
-
-// ── 键盘导航 ─────────────────────────────────────────
-// 输入框内：↑/↓ 循环当前可见的搜索建议/历史并回填输入框，Enter 搜索，Esc 收起并失焦
+// ── 结果行键盘导航 ───────────────────────────────────
+// 输入框内建议的键盘导航在 search/suggest.js；这里管结果行高亮
 // 输入框外（搜索页激活）：↑/↓ 高亮结果行，Enter 将高亮曲加入下载队列
-let _kbdIdx = -1;
 let _rowIdx = -1;
 let _visibleIdxMap = [];        // 当前可见行 → 原始 songs 索引（「隐藏已下载」过滤后不回移）
 let _hideDownloaded = false;    // 搜索页过滤开关
@@ -185,60 +97,6 @@ function cycleSearchSort() {
   if (_dlLastList) renderSongList(_dlLastList);
 }
 let _lastRenderedSongList = null;
-
-function searchInputKey(e) {
-  if (e.key === 'Enter') {
-    hideSearchSuggestions();
-    hideSearchHistory();
-    doSearch();
-    return;
-  }
-  if (e.key === 'Escape') {
-    hideSearchSuggestions();
-    hideSearchHistory();
-    e.target.blur();
-    return;
-  }
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    const kws = _visibleSuggestKeywords();
-    if (!kws.length) return;
-    e.preventDefault();
-    const n = kws.length;
-    _kbdIdx = e.key === 'ArrowDown' ? (_kbdIdx + 1) % n : (_kbdIdx - 1 + n) % n;
-    _dom.searchInput.value = kws[_kbdIdx];
-    _markSuggestActive(kws[_kbdIdx]);
-  }
-}
-
-function _visibleSuggestKeywords() {
-  const out = [];
-  const sug = document.getElementById('searchSuggestions');
-  if (sug && sug.style.display !== 'none') {
-    sug.querySelectorAll('.suggestion-item').forEach(el => {
-      const t = el.querySelector('.suggestion-title')?.textContent?.trim();
-      if (t && !out.includes(t)) out.push(t);
-    });
-  }
-  const hist = document.getElementById('searchHistory');
-  if (hist && hist.style.display !== 'none') {
-    hist.querySelectorAll('.history-kw').forEach(el => {
-      const t = el.textContent.trim();
-      if (t && !out.includes(t)) out.push(t);
-    });
-  }
-  return out;
-}
-
-function _markSuggestActive(kw) {
-  document.querySelectorAll('#searchSuggestions .kbd-active, #searchHistory .kbd-active')
-    .forEach(el => el.classList.remove('kbd-active'));
-  document.querySelectorAll('#searchSuggestions .suggestion-title, #searchHistory .history-kw').forEach(el => {
-    if (el.textContent.trim() === kw) {
-      const row = el.closest('.suggestion-item, .search-history-item');
-      if (row) row.classList.add('kbd-active');
-    }
-  });
-}
 
 function _songRows() {
   const list = document.getElementById('songList');
@@ -268,25 +126,6 @@ function searchListKey(e) {
 function _markRowActive(rows) {
   rows.forEach((r, i) => r.classList.toggle('kbd-focus', i === _rowIdx));
   if (rows[_rowIdx]) rows[_rowIdx].scrollIntoView({ block: 'nearest' });
-}
-
-function selectSuggestion(keyword) {
-  const input = _dom.searchInput;
-  if (input) {
-    input.value = keyword;
-    doSearch(1);
-  }
-  hideSearchSuggestions();
-}
-
-// ── 搜索视图清理（切换页面时调用）─────────────────────
-function searchCleanup() {
-  if (_searchDebounceTimer) {
-    clearTimeout(_searchDebounceTimer);
-    _searchDebounceTimer = null;
-  }
-  hideSearchSuggestions();
-  hideSearchHistory();
 }
 
 // ── 搜索类型状态 ─────────────────────────────────────
@@ -326,84 +165,7 @@ function exitSearchBatchMode() {
   if (songs && songs.length > 0) renderSongList(songs);
 }
 
-// ── 搜索历史（持久化到主进程 prefs.json，修复 B8）─────────────────────
-let _searchHistoryCache = null;  // 内存缓存，首次 await 加载
-
-async function getSearchHistory() {
-  if (_searchHistoryCache !== null) return _searchHistoryCache;
-  try {
-    const result = await api.getSearchHistory();
-    _searchHistoryCache = Array.isArray(result) ? result : [];
-  } catch {
-    _searchHistoryCache = [];
-  }
-  return _searchHistoryCache;
-}
-
-function addSearchHistory(keyword) {
-  getSearchHistory().then(history => {
-    const filtered = history.filter(h => h.keyword !== keyword);
-    filtered.unshift({ keyword, time: Date.now() });
-    if (filtered.length > MAX_HISTORY) filtered.length = MAX_HISTORY;
-    _searchHistoryCache = filtered;
-    api.setSearchHistory(filtered).catch(() => {});
-  });
-}
-
-function removeSearchHistory(keyword) {
-  getSearchHistory().then(history => {
-    const filtered = history.filter(h => h.keyword !== keyword);
-    _searchHistoryCache = filtered;
-    api.setSearchHistory(filtered).catch(() => {});
-    showSearchHistory();
-  });
-}
-
-function clearSearchHistory() {
-  _searchHistoryCache = [];
-  api.setSearchHistory([]).catch(() => {});
-  if (_dom.searchHistory) _dom.searchHistory.style.display = 'none';
-  showToast('搜索历史已清除', 'info');
-}
-
-function showSearchHistory() {
-  getSearchHistory().then(history => {
-    const el = _dom.searchHistory;
-    if (!el) return;
-    if (!history.length) { el.style.display = 'none'; return; }
-
-    const kw = _dom.searchInput?.value?.trim()?.toLowerCase() || '';
-    const filtered = kw
-      ? history.filter(h => h.keyword.toLowerCase().includes(kw))
-      : history;
-    if (!filtered.length) { el.style.display = 'none'; return; }
-
-    el.innerHTML = `
-      <div class="search-history-header">
-        <span>搜索历史</span>
-        <button class="history-clear-btn" onclick="event.stopPropagation();clearSearchHistory()">清空</button>
-      </div>
-      ${filtered.map(h => `
-      <div class="search-history-item">
-        <span class="history-icon">🕐</span>
-        <span class="history-kw" onmousedown="event.preventDefault();searchInput.value='${escQ(h.keyword)}';doSearch(1);hideSearchHistory()">${esc(h.keyword)}</span>
-        <span class="history-meta">
-          <span class="history-time">${fmtHistoryTime(h.time)}</span>
-          <button class="history-del-btn" onclick="event.stopPropagation();removeSearchHistory('${escQ(h.keyword)}')" title="删除">✕</button>
-        </span>
-      </div>
-    `).join('')}`;
-    el.style.display = 'block';
-  }).catch(e => logger.warn('[showSearchHistory] 加载搜索历史失败:', e.message));
-}
-
-function hideSearchHistory() {
-  setTimeout(() => {
-    if (_dom.searchHistory) _dom.searchHistory.style.display = 'none';
-  }, 200);
-}
-
-// fmtHistoryTime 已由 utils.js 全局导出
+// ── 搜索历史 → search/suggest.js（等价迁移）──────────
 
 // ── 搜索类型切换 ─────────────────────────────────────
 /**
@@ -709,229 +471,7 @@ async function doNaturalSearch() {
   }
 }
 
-// ── 歌手渲染 ─────────────────────────────────────────
-function renderSingerList(list) {
-  // 非单曲视图：清空徽标重绘锚点。否则队列/屏蔽变化（:171/:179/:888/:893）会把
-  // 本列表盖成上次的单曲搜索结果——四处重绘入口只判 `if (_dlLastList)`，不判视图类型。
-  _dlLastList = null;
-  const el = document.getElementById('songList');
-  if (!list.length) {
-    el.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">🔍</div>
-      <div class="empty-text">未找到相关歌手</div>
-      <div class="empty-hint">换个关键词试试</div>
-    </div>`;
-    return;
-  }
-  el.innerHTML = list.map(s => `
-    <div class="singer-row" ondblclick="openSingerDetail('${escQ(s.mid)}', '${escQ(s.name)}', '${escQ(s.source)}')">
-      ${s.avatar
-        ? `<img class="singer-avatar" src="${escAttr(s.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-        : ''}
-      <div class="singer-avatar-ph" ${s.avatar ? 'style="display:none"' : ''}>🎤</div>
-      <div class="singer-info">
-        <div class="singer-name">${esc(s.name)}</div>
-        <div class="singer-meta">歌曲 ${s.songCount || 0} · 专辑 ${s.albumCount || 0} · MV ${s.mvCount || 0}</div>
-      </div>
-      <div class="singer-actions">
-        <button class="action-btn" title="查看详情" onclick="openSingerDetail('${escQ(s.mid)}', '${escQ(s.name)}', '${escQ(s.source)}')">📋</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderSingerPagination(page, count, total) {
-  const pg = document.getElementById('pagination');
-  const hasMore = count >= 20 || page * 20 < total;
-  pg.style.display = 'flex';
-  pg.innerHTML = `
-    <button class="page-btn" ${page <= 1 ? 'disabled' : ''} onclick="doSearch(${page - 1})">上一页</button>
-    <button class="page-btn active">第 ${page} 页</button>
-    <button class="page-btn" ${!hasMore ? 'disabled' : ''} onclick="doSearch(${page + 1})">下一页</button>
-  `;
-}
-
-// ── 专辑渲染 ─────────────────────────────────────────
-/**
- * @param {Array} list 专辑数组
- * @param {HTMLElement|null} [targetEl] 渲染目标。默认 #songList；歌手详情内嵌时
- *   传 #singerDetailContent —— 否则会把详情页的头部/页签一起 innerHTML 掉。
- */
-function renderAlbumList(list, targetEl = null) {
-  _dlLastList = null; // 非单曲视图：同上，防止被陈旧单曲列表覆盖
-  const el = targetEl || document.getElementById('songList');
-  if (!list.length) {
-    el.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">🔍</div>
-      <div class="empty-text">未找到相关专辑</div>
-      <div class="empty-hint">换个关键词试试</div>
-    </div>`;
-    return;
-  }
-  el.innerHTML = list.map(a => `
-    <div class="album-row" ondblclick="openAlbumDetail('${escQ(a.mid)}', '${escQ(a.source)}')">
-      ${a.cover
-        ? `<img class="album-cover" src="${escAttr(a.cover)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-        : ''}
-      <div class="album-cover-ph" ${a.cover ? 'style="display:none"' : ''}>💿</div>
-      <div class="album-info">
-        <div class="album-title">${esc(a.title)}</div>
-        <div class="album-meta">${esc(a.artist)}${a.songCount ? ' · ' + a.songCount + ' 首' : ''}${a.publishTime ? ' · ' + a.publishTime : ''}</div>
-      </div>
-      <div class="album-actions">
-        <button class="action-btn" title="查看详情" onclick="openAlbumDetail('${escQ(a.mid)}', '${escQ(a.source)}')">📋</button>
-        <button class="action-btn" title="下载整张专辑" onclick="downloadAlbum('${escQ(a.mid)}', '${escQ(a.source)}')">⬇</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderAlbumPagination(page, count, total) {
-  const pg = document.getElementById('pagination');
-  const hasMore = count >= 20 || page * 20 < total;
-  pg.style.display = 'flex';
-  pg.innerHTML = `
-    <button class="page-btn" ${page <= 1 ? 'disabled' : ''} onclick="doSearch(${page - 1})">上一页</button>
-    <button class="page-btn active">第 ${page} 页</button>
-    <button class="page-btn" ${!hasMore ? 'disabled' : ''} onclick="doSearch(${page + 1})">下一页</button>
-  `;
-}
-
-// ── 专辑翻页（复用 doSearch）──────────────────────────
-// pagination onclick 已统一用 doSearch(x)
-
-// ── 打开专辑详情 ─────────────────────────────────────
-async function openAlbumDetail(albumMid, source) {
-  const el = document.getElementById('songList');
-  el.innerHTML = skeletonHtml('song', SKEL_ROWS, '加载专辑中...');
-  // 与搜索共享请求序号域：迟到的旧专辑结果不得覆盖更新的视图（连点两张专辑时）
-  const reqId = ++_typeSearchReqId;
-  try {
-    const songs = await api.getAlbumSongs(source || 'qq', albumMid, 999);
-    if (reqId !== _typeSearchReqId) return;
-    setState('songs', songs);
-    _searchType = 'song';
-    renderSongList(songs);
-    document.getElementById('pagination').style.display = 'none';
-    document.getElementById('batchToolbar').style.display = (songs.length && _searchBatchMode) ? 'flex' : 'none';
-    showToast(`专辑共 ${songs.length} 首`, 'info', 2000);
-  } catch (e) {
-    clearLoading();
-    showLoadError(errBrief(e));
-  }
-}
-
-async function downloadAlbum(albumMid, source) {
-  try {
-    const songs = await api.getAlbumSongs(source || 'qq', albumMid, 999);
-    if (!songs.length) { showToast('专辑无歌曲', 'warn'); return; }
-    // 整张专辑同源，取首首的 source 解析
-    const quality = resolveQuality((songs[0] && songs[0].source) || source || 'qq');
-    const saveDir = getState('saveDir');
-    let queued = 0, dlSkipped = 0;
-    for (const s of songs) {
-      const existing = (state.get('queueSnapshot') || []).find(q =>
-        q.id === s.id && q.source === s.source && q.status !== 'done');
-      if (existing) continue;
-      // 批量场景：历史已下载且文件还在 → 静默跳过（add-to-queue 返回 alreadyDownloaded）
-      const r = await api.addToQueue({ ...s, saveDir, quality });
-      if (r && r.queued) queued++;
-      else if (r && r.alreadyDownloaded) dlSkipped++;
-    }
-    let msg = `专辑 ${queued} 首已加入下载队列`;
-    if (dlSkipped) msg += `，跳过 ${dlSkipped} 首已下载过`;
-    showToast(msg, 'success');
-  } catch (e) {
-    showToast('下载专辑失败: ' + errBrief(e), 'error');
-  }
-}
-
-// ── 歌手详情 ─────────────────────────────────────────
-let _singerDetailTab = 'songs'; // 'songs' | 'albums'
-
-async function openSingerDetail(singerMid, singerName, source) {
-  _dlLastList = null; // 歌手详情外壳（头部+页签）也是非单曲视图
-  const el = document.getElementById('songList');
-  el.innerHTML = `
-    <div class="singer-detail-header">
-      <button class="back-btn" onclick="backToSearch()">← 返回</button>
-      <span class="singer-detail-name">${esc(singerName)}</span>
-      <button class="btn-sm" style="margin-left:auto;" title="新歌发布时提醒我" onclick="subscribeCurrentSinger()">📡 订阅</button>
-    </div>
-    <div class="singer-detail-tabs">
-      <button class="tab ${_singerDetailTab === 'songs' ? 'active' : ''}" onclick="switchSingerTab('songs', this)">热门歌曲</button>
-      <button class="tab ${_singerDetailTab === 'albums' ? 'active' : ''}" onclick="switchSingerTab('albums', this)">全部专辑</button>
-    </div>
-    <div id="singerDetailContent">${skeletonHtml('song', SKEL_ROWS, '加载中...')}</div>
-  `;
-  state.set('currentSinger', { mid: singerMid, source: source || 'qq' });
-  try {
-    await loadSingerDetail(singerMid, _singerDetailTab);
-  } catch (e) {
-    clearLoading();
-    showLoadError(errBrief(e));
-  }
-}
-
-async function switchSingerTab(tab, btn) {
-  try {
-    _singerDetailTab = tab;
-    document.querySelectorAll('.singer-detail-tabs .tab').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    const singer = state.get('currentSinger');
-    if (singer) await loadSingerDetail(singer.mid, tab);
-  } catch (e) {
-    logger.error(`[switchSingerTab] error:`, e);
-  }
-}
-
-async function loadSingerDetail(singerMid, tab) {
-  // 详情页头部/页签与 #singerDetailContent 同在 #songList 内（见 openSingerDetail）。
-  // 列表必须渲染进 #singerDetailContent，**不能**渲染进 #songList ——
-  // 后者会把头部（返回/订阅）与页签一起 innerHTML 掉，用户被卡在详情页里出不来，
-  // switchSingerTab 也随之不可达。
-  const el = document.getElementById('singerDetailContent');
-  el.innerHTML = skeletonHtml(tab === 'songs' ? 'song' : 'album', SKEL_ROWS, '加载中...');
-  const singer = state.get('currentSinger');
-  const source = singer ? singer.source : 'qq';
-  // 与搜索共享请求序号域：快速连点歌手/切页签时，迟到的旧结果不得覆盖新视图
-  const reqId = ++_typeSearchReqId;
-  try {
-    if (tab === 'songs') {
-      const songs = await api.getSingerSongs(singerMid, 50);
-      if (reqId !== _typeSearchReqId) return;
-      setState('songs', songs);
-      _searchType = 'song';
-      renderSongList(songs, el);
-      document.getElementById('batchToolbar').style.display = (songs.length && _searchBatchMode) ? 'flex' : 'none';
-      updateBatchInfo();
-    } else {
-      const result = await api.getSingerAlbums(singerMid, source, 1, 99);
-      if (reqId !== _typeSearchReqId) return;
-      const albums = (result && result.albums) || [];
-      setState('albums', albums);
-      renderAlbumList(albums, el);
-      document.getElementById('batchToolbar').style.display = 'none';
-    }
-  } catch (e) {
-    el.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">⚠️</div>
-      <div class="empty-text">加载失败</div>
-      <div class="empty-hint">${esc(errBrief(e))}</div>
-    </div>`;
-  }
-}
-
-function backToSearch() {
-  _dlLastList = null; // 退出歌手/专辑视图：锚点失效（有 kw 时 doSearch→renderSingerList 会再清一次）
-  const kw = getState('currentKeyword');
-  if (kw) {
-    _searchType = 'singer';
-    doSearch(1);
-  } else {
-    document.getElementById('songList').innerHTML = '';
-  }
-}
+// ── 歌手渲染 / 专辑渲染与详情 → search/albumSinger.js（等价迁移）──
 
 // ── 单曲渲染 ─────────────────────────────────────────
 // 下载状态徽标：记住当前列表，队列/历史变化时防抖重渲染（300ms 合并突发）
@@ -1337,6 +877,16 @@ function switchSource(src) {
 // esc(), escQ(), srcLabel(), fmtDuration() 已由 utils.js 全局导出，此处不再重复定义
 
 // ── 导出 ─────────────────────────────────────────────
+// 建议/历史/键盘域的公开面详见 search/suggest.js（本文件保持原导出名称，转出）
+export {
+  showSearchHistory,
+  hideSearchHistory,
+  clearSearchHistory,
+  removeSearchHistory,
+  debounceSearch,
+  selectSuggestion,
+  searchCleanup,
+} from './search/suggest.js';
 window.doSearch = doSearch;
 window.searchArtistSongs = searchArtistSongs;
 window.doNaturalSearch = doNaturalSearch;
@@ -1345,28 +895,24 @@ window.openAlbumSongsModal = openAlbumSongsModal;
 window.switchSearchType = switchSearchType;
 window.renderSourceSelect = renderSourceSelect;
 window.renderSongList = renderSongList;
-window.renderAlbumList = renderAlbumList;
+// renderAlbumList / openAlbumDetail / downloadAlbum / openSingerDetail /
+// switchSingerTab / backToSearch 的 window 桥在 search/albumSinger.js 内自挂
 // ── ES Module 导出 ──────────────────────────────────────
+export {
+  openAlbumDetail,
+  downloadAlbum,
+  openSingerDetail,
+  switchSingerTab,
+  backToSearch,
+} from './search/albumSinger.js';
 export {
   renderPagination,
   addDownload,
-  showSearchHistory,
-  hideSearchHistory,
-  clearSearchHistory,
-  removeSearchHistory,
   toggleSongSelect,
   toggleSelectAllSongs,
   batchDownload,
   batchPlay,
-  openAlbumDetail,
-  downloadAlbum,
   playSong,
-  openSingerDetail,
-  switchSingerTab,
-  backToSearch,
-  debounceSearch,
-  selectSuggestion,
-  searchCleanup,
   enterSearchBatchMode,
   exitSearchBatchMode,
 }
@@ -1375,15 +921,11 @@ export {
 window.renderPagination = renderPagination;
 window.switchSource = switchSource;
 window.addDownload = addDownload;
-window.searchInputKey = searchInputKey;
 window.searchListKey = searchListKey;
 window.toggleHideDownloaded = toggleHideDownloaded;
 window.cycleSearchSort = cycleSearchSort;
 window.playSearchAll = playSearchAll;
-window.showSearchHistory = showSearchHistory;
-window.hideSearchHistory = hideSearchHistory;
-window.clearSearchHistory = clearSearchHistory;
-window.removeSearchHistory = removeSearchHistory;
+// show/hide/clear/removeSearchHistory 的桥在 search/suggest.js 内自挂
 window.toggleSongSelect = toggleSongSelect;
 window.toggleSelectAllSongs = toggleSelectAllSongs;
 window.batchDownload = batchDownload;
@@ -1391,18 +933,25 @@ window.batchPlay = batchPlay;
 window.batchAddToQueue = batchAddToQueue;
 window.batchAddToPlaylist = batchAddToPlaylist;
 window.batchFavorite = batchFavorite;
-window.openAlbumDetail = openAlbumDetail;
-window.downloadAlbum = downloadAlbum;
+// 专辑/歌手详情域的桥在 search/albumSinger.js 内自挂
 window.playSong = playSong;
-window.openSingerDetail = openSingerDetail;
-window.switchSingerTab = switchSingerTab;
-window.backToSearch = backToSearch;
-window.debounceSearch = debounceSearch;
-window.selectSuggestion = selectSuggestion;
-window.searchCleanup = searchCleanup;
 window.handleLinkInput = handleLinkInput; // 剪贴板识别条复用同一链接处理流程
 window.enterSearchBatchMode = enterSearchBatchMode;
 window.exitSearchBatchMode = exitSearchBatchMode;
+// 建议/历史/键盘域的 window 桥在 search/suggest.js 内自挂
 
 // ── DOM 缓存初始化 ──────────────────────────────────
 _cacheDom();
+setupSearchSuggest({ _dom, doSearch });
+setupAlbumSinger({
+  doSearch,
+  renderSongList,
+  updateBatchInfo,
+  clearLoading,
+  showLoadError,
+  setType: (v) => { _searchType = v; },
+  resetDlList: () => { _dlLastList = null; },
+  isBatchMode: () => _searchBatchMode,
+  nextReqId: () => ++_typeSearchReqId,
+  peekReqId: () => _typeSearchReqId,
+});

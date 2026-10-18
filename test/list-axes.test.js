@@ -50,7 +50,7 @@ test('wireAxes：init() 只同步按钮，不换档不回调', async () => {
   let mode = 'all';
   let refiltered = 0;
   const g = wireAxes([
-    { id: 'a', btnId: 'axA', get: () => mode, set: (m) => { mode = m; }, next: (m) => 'zzz', label: (m) => 'L:' + m },
+    { id: 'a', btnId: 'axA', get: () => mode, set: (m) => { mode = m; }, next: (_m) => 'zzz', label: (m) => 'L:' + m },
   ], () => { refiltered++; });
   g.init();
   assert.equal(mode, 'all', 'init 不得换档');

@@ -98,7 +98,8 @@ test('接线：dragdrop 接管音频投放、player 走 blob 分支、app.js 恢
   assert.ok(pl.includes('拖放歌曲已失效'), '缺失效提示');
 
   const app = read('js/app.js');
-  const m = app.match(/restorePlayQueueFromSaved\(sanitizeSavedQueue\(saved\)\);/g) || [];
+  // 两个恢复调用点已随持久化接线外提（app.js → init.js）
+  const m = (app + '\n' + read('js/init.js')).match(/restorePlayQueueFromSaved\(sanitizeSavedQueue\(saved\)\);/g) || [];
   assert.strictEqual(m.length, 2, '两个恢复调用点必须都先消毒');
 
   const m3u = read('js/m3uToPlaylist.js');

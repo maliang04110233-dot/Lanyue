@@ -435,8 +435,6 @@ function toggleLocalSelect(filePathOrEncoded, idx, e) { _sel.toggle(idx, filePat
 
 function selectAllLocal() { _sel.selectAll(); }
 function deselectAllLocal() { _sel.deselectAll(); }
-function updateLocalSelectionBar() { _sel.syncBar(); }
-
 // 导出 m3u：选择模式下勾了歌就导勾选，否则导当前过滤/排序视图（所见即所得）
 async function exportLocalM3u() {
   const localFiltered = getState('localFiltered') || [];

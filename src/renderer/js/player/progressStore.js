@@ -47,7 +47,7 @@ export function createProgressWriter(deps) {
   async function run(key, time) {
     try {
       const enabled = await getPref('playProgressMemory');
-      if (enabled === false) return;
+      if (!enabled) return;
       const map = (await getPref('playProgressMap')) || {};
       map[key] = { time, savedAt: now() };
       const entries = Object.entries(map);

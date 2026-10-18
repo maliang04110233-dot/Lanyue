@@ -84,8 +84,9 @@ test('showActionToast：可交互 toast 只有一个实现，「仍要下载」�
 });
 
 test('接线：播放器 error 分流后，可重下的本地行走带按钮的 toast，别的照旧', () => {
-  const src = read('src/renderer/js/app.js');
-  const at = src.indexOf('_audio.addEventListener(\'error\'');
+  // 音频事件块抽出后，error 分流接线在 audio-events.js
+  const src = read('src/renderer/js/audio-events.js');
+  const at = src.indexOf('audio.addEventListener(\'error\'');
   assert.ok(at > -1, 'error 分流点必须还在原位');
   const body = src.slice(at, at + 1200);
   assert.match(body, /playFailureRetry\(/);
@@ -112,8 +113,9 @@ test('零新通道：新链路只走既有 addToQueue，播放器那段接线自
   // 真往 preload 白名单塞名字，test/ipc-contract.test.js 的计数钉会先炸。
   const retryApi = new Set([...read('src/renderer/js/playRetry.js').matchAll(/\bapi\.([A-Za-z0-9_]+)/g)].map(m => m[1]));
   assert.deepEqual([...retryApi], ['addToQueue'], 'playRetry.js 只许用既有 addToQueue');
-  const src = read('src/renderer/js/app.js');
-  const at = src.indexOf("_audio.addEventListener('error'");
+  // error 分流接线自 app.js 提出，归到 audio-events.js
+  const src = read('src/renderer/js/audio-events.js');
+  const at = src.indexOf("audio.addEventListener('error'");
   const close = src.slice(at).indexOf('\n      });'); // 监听器自己那一层的收尾
   assert.ok(close > 200, 'error 监听器结构变了，请重定截取边界');
   const body = src.slice(at, at + close);

@@ -70,8 +70,9 @@ test('缺曲名/缺 code 的脏组合不炸，且每句都带"下一曲"提示�
   }
 });
 
-test('接线：app.js 唯一调用点改用分流文案，本地失败展示更久，零新 IPC 通道', async () => {
-  const app = read('src/renderer/js/app.js');
+test('接线：音频事件绑定内的 error 分流改用分流文案，本地失败展示更久，零新 IPC 通道', async () => {
+  // 音频事件块自 init() 提出，接线随实现落在 audio-events.js
+  const app = read('src/renderer/js/audio-events.js');
   // 花括号留白：155 给同一模块加了兄弟导出（playFailureRetry 等），钉住"名字在里面"即可
   assert.match(app, /import \{[^}]*\bdescribePlayError\b[^}]*\} from '\.\/playError\.js';/, '模块没被加载');
   assert.match(app, /describePlayError\(cur, _audio\.error\.code\)/, '错误监听没吃到 MediaError.code');

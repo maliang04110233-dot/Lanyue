@@ -52,8 +52,12 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const RAW = fs.readFileSync(
-  path.join(__dirname, '..', 'src', 'renderer', 'js', 'views', 'search.js'), 'utf8');
+// 2026-10-17 歌手/专辑渲染与详情自 search.js 提出（views/search/albumSinger.js），
+// 本文件的函数体抽取（fnBody/fnSrc/allFnNames）改为对两个文件合并扫描。
+const RAW = [
+  'src/renderer/js/views/search.js',
+  'src/renderer/js/views/search/albumSinger.js',
+].map((p) => fs.readFileSync(path.join(__dirname, '..', ...p.split('/')), 'utf8')).join('\n');
 
 /** 剥注释：块注释换成等长空格（保留换行，行号不漂），行注释整段去掉 */
 function stripComments(src) {
@@ -134,15 +138,15 @@ test('回归钉：写 #songList 的非单曲渲染函数必须清空 _dlLastList
     const body = fnBody(CODE, fn);
     assert.ok(body.includes("getElementById('songList')"),
       `${fn}() 应当仍在写 #songList（前提已变？若已改渲染目标，请更新本钉）`);
-    assert.ok(body.includes('_dlLastList = null'),
-      `${fn}() 写 #songList 却没清空 _dlLastList —— 队列/屏蔽变化（:171/:179/:888/:893 只判 if(_dlLastList)）会把它盖成上次的单曲搜索结果`);
+    assert.ok(body.includes('resetDlList()'),
+      `${fn}() 写 #songList 却没清空徽标锚点（应走注入的 resetDlList()）—— 队列/屏蔽变化（四处重绘入口只判 if(_dlLastList)）会把它盖成上次的单曲搜索结果`);
   }
 });
 
 test('接线钉：_dlLastList 的赋值形态受限（= list 仅 renderSongList 一处，= null 为非单曲清空点）', () => {
   const code = CODE.replace(/^\s*let\s+_dlLastList\s*=\s*null;\s*$/m, ''); // 排除声明行
   const assigns = [...code.matchAll(/_dlLastList\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
-  assert.ok(assigns.length >= 5, `_dlLastList 赋值点过少（${assigns.length}），本钉可能已失效`);
+  assert.ok(assigns.length >= 2, `_dlLastList 赋值点过少（${assigns.length}），本钉可能已失效`);
 
   const unexpected = assigns.filter((v) => v !== 'list' && v !== 'null');
   assert.deepStrictEqual(unexpected, [],
@@ -152,9 +156,16 @@ test('接线钉：_dlLastList 的赋值形态受限（= list 仅 renderSongList 
   assert.strictEqual(asList.length, 1,
     `「= list」只允许 renderSongList 一处，实际 ${asList.length} 处 —— 多一处就多一个会被队列变化重绘的陈旧锚点`);
 
+  // = null 的直接赋值收敛进 search.js 的 resetDlList 闭包（注入给 albumSinger.js）；
+  // 非单曲视图清空点 = 该闭包 + 四处 resetDlList() 调用（歌手列表/专辑列表/歌手详情/返回）
   const asNull = assigns.filter((v) => v === 'null');
-  assert.ok(asNull.length >= 4,
-    `非单曲视图清空点应 ≥4（歌手列表/专辑列表/歌手详情/返回），实际 ${asNull.length}`);
+  // 两处合法 = null：resetDlList 注入闭包 + renderSongList 的 targetEl 分支（内嵌渲染即弃锚点）
+  assert.strictEqual(asNull.length, 2,
+    `search.js 里 _dlLastList = null 只允许 resetDlList 闭包与 renderSongList 的 targetEl 分支，实际 ${asNull.length} 处`);
+  const nulledByReset = ['renderSingerList', 'renderAlbumList', 'openSingerDetail', 'backToSearch']
+    .filter((fn) => fnBody(CODE, fn).includes('resetDlList()'));
+  assert.deepStrictEqual(nulledByReset, ['renderSingerList', 'renderAlbumList', 'openSingerDetail', 'backToSearch'],
+    `非单曲视图清空点四个都得走 resetDlList()，实际走到: ${nulledByReset.join(', ')}`);
 });
 
 test('回归钉：renderSongList 必须是 _dlLastList 的唯一「= list」写入者', () => {
@@ -204,26 +215,37 @@ test('回归钉：凡 async 且会渲染列表的函数，必须「先占号、a
   for (const fn of renderers) {
     const full = fnSrc(CODE, fn);
     const body = fnBody(CODE, fn);
-    const alloc = full.indexOf('++_typeSearchReqId');
+    // 占号/比较号两种形态：search.js 内联 ++ _typeSearchReqId（及其直接比较），
+    // 或经注入钩子 nextReqId()（占号）/ peekReqId()（比较）—— 语义同一个共享计数器。
+    const allocIdx = /(?:\+\+_typeSearchReqId)|(?:\bnextReqId\(\))/.exec(full);    const cmpRe = /!==\s*(?:_typeSearchReqId)|(?:!==\s*peekReqId\(\))/;
+    const alloc = allocIdx ? allocIdx.index : -1;
     const firstAwait = full.indexOf('await ');
     const lastAwait = full.lastIndexOf('await ');
-    const firstCmp = body.indexOf('!== _typeSearchReqId');
-    const lastCmp = body.lastIndexOf('!== _typeSearchReqId');
+    const firstCmp = body.search(cmpRe);
 
     assert.ok(alloc >= 0,
-      `${fn}() 会渲染列表却没占请求序号（++_typeSearchReqId）—— 它 await 期间发起的更新搜索，会被它这次迟到渲染覆盖`);
+      `${fn}() 会渲染列表却没占请求序号（++_typeSearchReqId 或注入的 nextReqId()）—— 它 await 期间发起的更新搜索，会被它这次迟到渲染覆盖`);
     assert.ok(firstAwait >= 0,
       `${fn}() 已不再是「await 后渲染」的形态，请复核本钉是否仍有意义`);
     assert.ok(alloc < firstAwait,
       `${fn}() 的占号排在首个 await 之后 —— 并发的两次调用会由「谁先返回」决定谁赢，先发起的后返回就会覆盖新视图`);
     assert.ok(firstCmp > firstAwait,
-      `${fn}() 缺「await 之后比较序号」的守卫（!== _typeSearchReqId）—— 迟到结果会覆盖更新的视图`);
+      `${fn}() 缺「await 之后比较序号」的守卫（!== _typeSearchReqId 或 !== peekReqId()）—— 迟到结果会覆盖更新的视图`);
     // 一处比较只能守一处 await：多分支函数（loadSingerDetail 的 songs/albums）
     // 每个分支各自 await，就必须各自比较，否则后一个分支的迟到结果照样落地。
-    assert.ok(lastCmp > lastAwait,
+    const lastCmp2 = lastIndexOfRe(body, cmpRe);
+    assert.ok(lastCmp2 > lastAwait,
       `${fn}() 有 await 落在最后一次序号比较之后 —— 该分支的迟到结果没人拦（每个 await 分支都要有自己的比较）`);
   }
 });
+
+/** String.prototype.search 找不到「最后出现」——用正则全局扫出最后下标 */
+function lastIndexOfRe(text, re) {
+  let last = -1, m;
+  const g = new RegExp(re.source, 'g');
+  while ((m = g.exec(text)) !== null) last = m.index;
+  return last;
+}
 
 test('回归钉：doSearch 必须在 await handleLinkInput 之前占号，并把号传给下游', () => {
   const full = fnSrc(CODE, 'doSearch');

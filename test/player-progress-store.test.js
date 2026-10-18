@@ -171,12 +171,13 @@ test('playProgressMemory 关闭时一个字都不写', async () => {
   assert.deepEqual(api.store.playProgressMap, { old: { time: 5, savedAt: 1 } });
 });
 
-test('无记忆开关记录（undefined）按开启处理：与旧判据一致', async () => {
+test('无记忆开关记录（undefined）按关闭处理：默认关闭，未设置=不记忆', async () => {
   const api = fakePrefs({ map: {} });
   api.store.playProgressMemory = undefined;
   const w = createProgressWriter({ getPref: api.getPref, setPref: api.setPref });
   await w.save('a:1', 100);
-  assert.equal(api.store.playProgressMap['a:1'].time, 100);
+  assert.equal(api.store.playProgressMap['a:1'], undefined,
+    'undefined 应视为关闭（与新版默认 false 一致），否则用户从没改过该项也一直在存进度');
 });
 
 test('首次写入时 prefs 里没有 playProgressMap（getPref 返回 undefined）', async () => {

@@ -16,7 +16,7 @@ export const GENERAL_PREFS = {
   notifications: { key: 'notifications',  default: true,          el: 'settingNotifications' },
   clipboardWatch: { key: 'clipboardWatch', default: true,         el: 'settingClipboardWatch' },
   subscriptionCheckIntervalHours: { key: 'subscriptionCheckIntervalHours', default: 6, el: 'settingSubCheckInterval' },
-  playProgressMemory: { key: 'playProgressMemory', default: true, el: 'settingPlayProgressMemory' },
+  playProgressMemory: { key: 'playProgressMemory', default: false, el: 'settingPlayProgressMemory' },
   globalShortcuts: { key: 'globalShortcuts', default: true, el: 'settingGlobalShortcuts' },
   shortcutPlayPause: { key: 'shortcutPlayPause', default: 'MediaPlayPause', el: 'settingShortcutPlayPause' },
   shortcutPrev: { key: 'shortcutPrev', default: 'MediaPreviousTrack', el: 'settingShortcutPrev' },

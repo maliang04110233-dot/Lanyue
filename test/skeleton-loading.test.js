@@ -117,7 +117,9 @@ test('home.js 交出骨架实现，只留「本节用哪种形状」的判断', 
 // ── 接线钉：9 处加载态 ──────────────────────────────────
 
 test('搜索域六处加载态各按其真实形状出骨架，且沿用原本文案', () => {
-  const src = read('js', 'views', 'search.js');
+  // 专辑详情/歌手详情块自 search.js 提出，落在 search/albumSinger.js —— 合并计数
+  const src = read('js', 'views', 'search.js')
+    + '\n' + read('js', 'views', 'search', 'albumSinger.js');
   const pins = [
     // doSearch：搜索类型即形状（song/album/singer 三个 tab 的行高互不相同）
     "skeletonHtml(_searchType, SKEL_ROWS, '搜索中...')",

@@ -17,9 +17,6 @@ import './state.js';
 import './toast.js';
 import './utils.js';
 import { buildFallbackNotice } from './fallbackNotice.js';
-import { describePlayError, playFailureRetry, playFailureRetryText } from './playError.js';
-import { createPlayFailGuard } from './playFailGuard.js';
-import { retryAfterPlayFailure } from './playRetry.js';
 import { pickQueueCopyRows, queueCopyToastText } from './queueCopy.js';
 import { toTrackLines } from './songListText.js';
 import { listAccessHint, term } from './listAccess.js';
@@ -30,16 +27,21 @@ import { skeletonHtml, SKEL_ROWS } from './skeleton.js';
 import './router.js';
 
 // 播放器和快捷键
-import { updateProgress, onAudioEnded, parseLrc, showNoLyrics, loadAndPlay, playQueueIdx } from './player.js';
-import { initMediaSession } from './player/mediaSession.js';
-import { heartBtnHtml, queueFavSong } from './favorites.js';
+import { parseLrc, showNoLyrics, loadAndPlay, playQueueIdx } from './player.js';
+// 音频元素事件绑定（timeupdate/error/25s 守卫/熔断器）自本文件提出
+import { setupAudioEvents } from './audio-events.js';
+import { initMediaSession } from './player/mediaSession.js';import { heartBtnHtml, queueFavSong } from './favorites.js';
 import './shortcuts.js';
 
-// 播放状态外发同步 + 队列恢复（自 init() 内闭包提出，等价迁移）
+// 播放状态外发同步（自 init() 内闭包提出，等价迁移）
 import {
-  syncToTray, syncToMiniPlayer, resetMiniPlayerSong, syncToDesktopLyric, resetDesktopLyricSong,
-  restorePlayQueueFromSaved,
+  syncToMiniPlayer, resetMiniPlayerSong, syncToDesktopLyric, resetDesktopLyricSong,
 } from './player-sync.js';
+
+// 播放队列持久化接线（自 init() 内闭包提出，等价迁移 —— 4 订阅 + 兜底加载）
+import { wirePlayQueuePersistence } from './init.js';
+// 启动期偏好恢复（自 init() 内闭包提出，等价迁移）
+import { restoreStartupPrefs } from './boot-restore.js';
 
 // 视图模块
 import './views/home.js';
@@ -76,7 +78,6 @@ import './autoLyricOnDone.js';
 import './autoCoverOnDone.js';
 import './firstDownloadCelebration.js';
 import './m3uToPlaylist.js';
-import { sanitizeSavedQueue } from './dropPlay.js';
 import { pickCheckedSongs, toPlaylistRows, buildSavedPlaylist } from './plModalSave.js';
 import './scheduledDownload.js';
 import './commandPalette.js';
@@ -99,6 +100,7 @@ import './tasteProfile.js';
 import './init.js';
 // t 要在本文件里直接取 toast.* 词条：动态文案的家是语言包，不是调用点
 import { t } from './i18n.js';
+import { sourceErrorText } from './sourceError.js';
 import './logger.js';
 import './updater.js';
 import { applyFeatureFlags, tabAllowed } from './features.js';
@@ -131,11 +133,6 @@ let api = buildApi();
 
 // ── 音频元素（模块级，init 绑定事件后以实参传给 player-sync.js）──
 let _audio = null;
-// 25s 加载超时守卫状态（事件绑定区使用）
-let _loadWatchSince = 0;
-let _loadWatchTimer = null;
-// 连续播放失败熔断器（模块级单例：跨 error / playing / 超时守卫三处共用一份计数）
-const _playFailGuard = createPlayFailGuard();
 
 // ── 初始化 ─────────────────────────────────────────────
 async function init() {
@@ -154,65 +151,8 @@ async function init() {
 
   // 调试：定位 init 哪一步抛错
   try {
-    // 无相互依赖的启动 IPC 并发拉取：弱机上首屏不再被十几次
-    // 串行 round-trip 拖慢。下面的消费顺序保持不变。
-    const [savedSaveDir, savedQuality, savedTheme, savedTemplate, savedLocalDir] =
-      await Promise.all([
-        api.getPref('saveDir'),
-        api.getPref('quality').catch(() => null),
-        api.getPref('theme').catch(() => null),
-        api.getPref('namingTemplate'),
-        api.getPref('localDirPath'),
-      ]);
-
-    if (savedSaveDir) setState('saveDir', savedSaveDir);
-    // 未设置过下载目录时显示主进程默认目录（音乐\MusicDownloader），
-    // 避免首页路径栏空白让用户误以为必须手动选目录
-    document.getElementById('saveDirText').textContent = getState('saveDir') || (await api.getDefaultDir()) || '';
-
-    // 恢复音质选择（此前仅设置页变更时同步，启动时从未恢复）
-    if (savedQuality) {
-      const qs = document.getElementById('qualitySelect');
-      if (qs) qs.value = savedQuality;
-    }
-
-    // 恢复主题（尽早应用，避免闪烁）
-    if (savedTheme && typeof applyTheme === 'function') applyTheme(savedTheme);
-
-    // 平台清单（v3）：源下拉 / 平台名 / 徽标配色的唯一来源，来自主进程 registry。
-    // ⚠️ 必须在 applyTranslations() **之前** —— 本步会重建源下拉 DOM，
-    //    若放在之后，新插入的「全部」选项拿不到翻译（设计稿 §4.4 的顺序陷阱）。
-    try {
-      const platforms = await api.getPlatforms();
-      setPlatforms(platforms);
-      renderSourceSelect(platforms);
-    } catch (_e) {
-      logger.warn('[init] 获取平台清单失败，降级到内置兜底表:', _e && _e.message);
-      renderSourceSelect(getPlatforms());
-    }
-
-    // 加载语言包并应用翻译（applyTranslations 内部自会读一次 language pref）
-    try {
-      if (window.i18n) await window.i18n.applyTranslations();
-    } catch (_e) { /* 忽略 */ }
-
-    // 显示版本号 + commit（与上面 prefs 已并发，此处只消费结果）
-    try {
-      const versionEl = document.getElementById('appVersion');
-      const commitEl = document.getElementById('appCommit');
-      const ver = await api.getVersion();
-      if (versionEl) versionEl.textContent = ver;
-      if (window.__APP_COMMIT__ && commitEl) {
-        commitEl.textContent = 'commit ' + window.__APP_COMMIT__.slice(0, 7);
-      }
-    } catch (_e) { /* 忽略 */ }
-
-    // 恢复命名模板（编辑入口在设置页，这里只同步 state）
-    if (savedTemplate) {
-      setState('namingTemplate', savedTemplate);
-    }
-
-    if (savedLocalDir) setState('localDirPath', savedLocalDir);
+    // 启动偏好/平台清单/版本回显/进度记忆迁移 —— 已外提到 boot-restore.js（等价迁移）
+    await restoreStartupPrefs(api);
 
     api.onQueueUpdated((queue) => {
       state.set('queueSnapshot', queue);
@@ -267,125 +207,13 @@ async function init() {
     }
   });
 
-  // 音频事件（独立 try-catch，不被前面的 getPref 失败影响）
+  // 音频元素事件（独立 try-catch，不被前面的 getPref 失败影响）。
+  // 绑定实现自 init() 闭包提出，等价迁移到 audio-events.js：
+  // 25s 超时守卫与播放失败熔断器随之迁住（三处共用同一份计数）。
+  // _audio 仍在此处从 DOM 取得：迷你播放器/托盘后续接线以实参消费它。
   try {
     _audio = document.getElementById('audioPlayer');
-    if (_audio) {
-      // timeupdate 只注册一次：同时驱动进度条和迷你播放器同步
-      // （此前注册了两个 timeupdate，updateProgress 每帧跑两遍）
-      _audio.addEventListener('timeupdate', () => {
-        updateProgress();
-        syncToMiniPlayer(_audio);
-        syncToDesktopLyric(_audio);
-      });
-      _audio.addEventListener('ended', onAudioEnded);
-      // 音源加载/解码出错（URL 失效、代理文件损坏）：toast + 跳下一曲，避免静默卡死。
-      // 文案按行来源分流：本地文件被移走时不能说"音源出错"，那会把人支去查网络。
-      _audio.addEventListener('error', () => {
-        const cur = getState('currentPlaying');
-        if (!cur || !_audio.error) return;
-        // 连续失败熔断：循环模式下 nextSong 是无限循环，一次失败会被放大成
-        // toast 糊满整屏（截图实证）。到线就停在这里，并把计数让给用户的手动操作。
-        const guard = _playFailGuard.fail();
-        if (guard.tripped) {
-          _playFailGuard.reset();
-          _audio.pause();
-          showToast(t('toast.playFailStreak', { n: guard.threshold }), 'warn', 6000);
-          return;
-        }
-        const e = describePlayError(cur, _audio.error.code);
-        // 本地文件行播不出来 = 盘和记录的引用断了，就地给一口「⬇ 重新下载」，
-        // 不必让人翻到下载历史页去找那一行。判据（哪些行真有源可下）在 playError.js。
-        const retry = playFailureRetry(cur, _audio.error.code);
-        if (retry) {
-          showActionToast({
-            text: playFailureRetryText(cur), btnLabel: t('toast.redownloadBtn'), ttl: 9000, onConfirm: () => retryAfterPlayFailure(retry),
-          });
-        } else {
-          showToast(e.text, e.kind, e.local ? 5500 : 3000);
-        }
-        if (typeof window.nextSong === 'function') window.nextSong();
-      });
-      // 25s 加载超时守卫（借鉴 lx usePlayEvent）：一直没等到可播数据则跳下一曲，
-      // 避免 CDN 半开连接导致播放器永久卡死
-      _loadWatchTimer = setInterval(() => {
-        const cur = getState('currentPlaying');
-        const isStuck = cur && _audio.readyState < 2 && !_audio.paused;
-        if (isStuck) {
-          const now = Date.now();
-          if (!_loadWatchSince) _loadWatchSince = now;
-          if (now - _loadWatchSince > 25000) {
-            _loadWatchSince = 0;
-            // 超时也是"起不来"，走同一条熔断：不接进来，超时这条侧门会继续刷屏
-            const g2 = _playFailGuard.fail();
-            if (g2.tripped) {
-              _playFailGuard.reset();
-              _audio.pause();
-              showToast(t('toast.playFailStreak', { n: g2.threshold }), 'warn', 6000);
-              return;
-            }
-            showToast(t('toast.streamTimeout'), 'warn', 3000);
-            if (typeof window.nextSong === 'function') window.nextSong();
-          }
-        } else {
-          _loadWatchSince = 0;
-        }
-      }, 1000);
-      // 页面卸载时停掉守卫定时器，避免遗留 interval
-      window.addEventListener('beforeunload', () => {
-        if (_loadWatchTimer) clearInterval(_loadWatchTimer);
-      });
-      _audio.addEventListener('playing', () => {
-        _loadWatchSince = 0;
-        _playFailGuard.succeed(); // 真响过一次：熔断计数归零，偶发失败别拖垮整轮
-      });
-      _audio.addEventListener('pause', () => { _loadWatchSince = 0; });
-      _audio.addEventListener('pause', () => {
-        const icon = document.getElementById('btnPlayIcon');
-        if (icon) icon.innerHTML = '<path d="M8 5v14l11-7z" fill="currentColor"/>';
-        document.getElementById('btnPlay')?.setAttribute('aria-pressed', 'false');
-        document.getElementById('btnPlay')?.classList.remove('buffering');
-        document.getElementById('playerCard')?.classList.remove('playing');
-        // 暂停姿态：明确表达"是暂停不是卡死"（封面降饱和 + ⏸ 角标）
-        if (getState('currentPlaying')) document.getElementById('playerCard')?.classList.add('paused');
-        // 状态文案统一按 audio 真实状态推导（不再用 currentPlaying 当判据，
-        // 换歌时它可能仍指向旧歌 → 误显示「已暂停」）
-        if (typeof refreshPlayerState === 'function') refreshPlayerState();
-        if (typeof stopSpectrum === 'function') stopSpectrum();
-        syncToMiniPlayer(_audio);
-        syncToTray(_audio);
-      });
-      _audio.addEventListener('play', () => {
-        const icon = document.getElementById('btnPlayIcon');
-        if (icon) icon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>';
-        document.getElementById('btnPlay')?.setAttribute('aria-pressed', 'true');
-        document.getElementById('playerCard')?.classList.remove('paused');
-        document.getElementById('playerCard')?.classList.add('playing');
-        if (typeof refreshPlayerState === 'function') refreshPlayerState();
-        if (typeof startSpectrum === 'function') startSpectrum();
-        syncToMiniPlayer(_audio);
-        syncToTray(_audio);
-      });
-      // 缓冲反馈：waiting/stalled → 播放按钮转圈呼吸；playing/canplay → 恢复
-      // （此前缓冲与暂停视觉上无法区分，用户分不清"正在缓冲"还是"出错"）
-      _audio.addEventListener('waiting', () => {
-        if (getState('currentPlaying')) document.getElementById('btnPlay')?.classList.add('buffering');
-      });
-      _audio.addEventListener('stalled', () => {
-        if (getState('currentPlaying')) document.getElementById('btnPlay')?.classList.add('buffering');
-      });
-      _audio.addEventListener('playing', () => {
-        document.getElementById('btnPlay')?.classList.remove('buffering');
-      });
-      _audio.addEventListener('canplay', () => {
-        document.getElementById('btnPlay')?.classList.remove('buffering');
-      });
-      _audio.addEventListener('loadedmetadata', () => {
-        document.getElementById('timeTotal').textContent = fmtTime(_audio.duration);
-      });
-    } else {
-      // audio 元素不存在，跳过
-    }
+    setupAudioEvents(_audio);
   } catch (e) {
     logger.warn('[init] 音频事件绑定失败:', e.message);
   }
@@ -434,63 +262,12 @@ async function init() {
     });
   }
 
-  // ── 播放状态外发同步 / 队列恢复 ──────────────────────
-  // 这四个函数已外提到 player-sync.js（等价迁移）：它们原先定义在此处，
-  // 仅被 init 调用、彼此互调，故可整体外提；_audio 改为显式传参。
-  // 见 src/renderer/js/player-sync.js 与 test/player-sync.test.js。
-
-  // 监听 playQueueRestored 事件（主进程启动时推送）
-  api.onPlayQueueRestored((saved) => {
-    restorePlayQueueFromSaved(sanitizeSavedQueue(saved));
-  });
-
-  // 订阅 playQueue 变化自动持久化
-  state.subscribe('playQueue', (queue) => {
-    if (Array.isArray(queue)) {
-      const playIdx = getState('playIdx');
-      const loopMode = getState('loopMode');
-      const isShuffled = getState('isShuffled');
-      api.savePlayQueue({ queue, playIdx, loopMode, isShuffled }).catch(e => logger.warn('[playQueue] 保存失败:', e));
-    }
-  });
-
-  // 订阅 playIdx 变化自动持久化
-  state.subscribe('playIdx', (playIdx) => {
-    const queue = getState('playQueue');
-    const loopMode = getState('loopMode');
-    const isShuffled = getState('isShuffled');
-    if (Array.isArray(queue) && queue.length) {
-      api.savePlayQueue({ queue, playIdx, loopMode, isShuffled }).catch(e => logger.warn('[playIdx] 保存失败:', e));
-    }
-  });
-
-  // 订阅 loopMode 变化自动持久化
-  state.subscribe('loopMode', (loopMode) => {
-    const queue = getState('playQueue');
-    const playIdx = getState('playIdx');
-    const isShuffled = getState('isShuffled');
-    if (Array.isArray(queue) && queue.length) {
-      api.savePlayQueue({ queue, playIdx, loopMode, isShuffled }).catch(e => logger.warn('[loopMode] 保存失败:', e));
-    }
-  });
-
-  // 订阅 isShuffled 变化自动持久化
-  state.subscribe('isShuffled', (isShuffled) => {
-    const queue = getState('playQueue');
-    const playIdx = getState('playIdx');
-    const loopMode = getState('loopMode');
-    if (Array.isArray(queue) && queue.length) {
-      api.savePlayQueue({ queue, playIdx, loopMode, isShuffled }).catch(e => logger.warn('[isShuffled] 保存失败:', e));
-    }
-  });
-
-  // 加载已持久化的播放队列（兜底）
-  try {
-    const saved = await api.loadPlayQueue();
-    restorePlayQueueFromSaved(sanitizeSavedQueue(saved));
-  } catch (e) {
-    logger.warn('[init] 加载播放队列失败:', e.message);
-  }
+  // ── 播放队列持久化接线 ──────────────────────────────
+  // 监听 + 四个订阅自动保存 + 启动兜底加载，已外提到 init.js（等价迁移）；
+  // 这四个外发/恢复函数本体在 player-sync.js，_audio / api 改为显式传参。
+  // 见 src/renderer/js/player-sync.js、init.js 与 test/player-sync.test.js。
+  // ⚠️ 必须 await：启动兜底 loadPlayQueue 原本在 init 的串行时序里。
+  await wirePlayQueuePersistence(api);
 
   // 加载首页推荐（失败不阻断主流程）
   loadHomeRecommendations().catch(e => logger.warn('首页推荐加载失败:', e.message));
@@ -797,11 +574,7 @@ async function playPlaylistModalSong(idx) {
     const result = await api.getDownloadUrlSmart(song, quality);
     if (reqId !== _plModalPlayRequestId) return;
     if (!result || !result.url) {
-      if (result && result.code === 'VIP_REQUIRED') {
-        showToast(t('toast.vipRequired'), 'warn', 5000);
-      } else {
-        showToast(t('toast.noSource'), 'warn', 5000);
-      }
+      showToast(sourceErrorText(t, result, song.source, 'toast.noSource'), 'warn', 5000);
       return;
     }
     const notice = buildFallbackNotice(result, song.source);

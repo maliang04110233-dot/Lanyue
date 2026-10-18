@@ -14,6 +14,7 @@ import { loadAndPlay } from '../../player.js';
 import { resolveQuality } from '../../quality.js';
 import { buildFallbackNotice } from '../../fallbackNotice.js';
 import { planSelEnqueue, enqueueSkipSuffix } from '../../plSelBatch.js';
+import { sourceErrorText } from '../../sourceError.js';
 import { plState } from './state.js';
 
 // ── 播放歌单中的歌曲 ──────────────────────────────────
@@ -32,11 +33,7 @@ async function _playFrom(list, idx) {
     const result = await api.getDownloadUrlSmart(song, quality);
     if (reqId !== plState._playlistPlayRequestId) return; // 已点别的歌，丢弃过期结果
     if (!result || !result.url) {
-      if (result && result.code === 'VIP_REQUIRED') {
-        showToast(t('toast.vipRequired'), 'warn', 5000);
-      } else {
-        showToast(t('toast.noSource'), 'warn', 5000);
-      }
+      showToast(sourceErrorText(t, result, song.source, 'toast.noSource'), 'warn', 5000);
       return;
     }
     song._playedQuality = quality;

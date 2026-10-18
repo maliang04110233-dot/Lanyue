@@ -97,7 +97,8 @@ test('P2-1（守卫钉）：渲染层那条「main 端已节流」的注释必�
 });
 
 test('P2-3（守卫钉）：library 通道不再无条件放行整个系统音乐目录', () => {
-  const lib = fs.readFileSync(path.join(ROOT, 'src/main/ipc/library.js'), 'utf8');
+  // 沙箱守卫拆到 library/sandbox.js
+  const lib = fs.readFileSync(path.join(ROOT, 'src/main/ipc/library/sandbox.js'), 'utf8');
   assert.ok(!lib.includes("bases.push(app.getPath('music'))"),
     '旧实现让 %USERPROFILE%\\Music 下任意路径都过沙箱，与 open-folder / 下载落盘的'
     + '严格口径不一致；默认目录已由 index.js approve，无需在这里额外开口子');

@@ -756,7 +756,14 @@ const LEDGER = {
   // 37 → 35（同日）：播放流程的两条正常态 toast 按「只有报错才提示」删除。
   // 35 → 33（2026-10-16）：playSong 的音源失败 toast 改用 sourceErrorText（sourceError.js），
   // 本文件少 2 处硬编码中文；具体文案由错误码映射决定。
-  'src/renderer/js/views/search.js': 33,
+  // 32 → 29（2026-10-17）：歌手/专辑渲染与详情自 search.js 提出（views/search/albumSinger.js），
+  // search.js 少 3 处硬编码（「未找到相关歌手/专辑」「专辑共 N 首」等 15 条文案随块迁走，
+  // 大多与既有词条同形；albumSinger.js 新记 3 条见下）。
+  'src/renderer/js/views/search.js': 29,
+  // 1：建议/历史域拆分时的存量欠账（原 search.js 的台账随块迁走，按台账家法新文件新记）
+  'src/renderer/js/views/search/suggest.js': 1,
+  // 3：歌手/专辑域拆分时的存量欠账（原 search.js 的台账随块迁走）
+  'src/renderer/js/views/search/albumSinger.js': 3,
 };
 
 test('欠账台账与实际逐字相等（新增欠账要改表，还清欠账也要改表）', () => {

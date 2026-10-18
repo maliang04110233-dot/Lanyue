@@ -9,8 +9,9 @@ const path = require('node:path');
 const SONG_MENU = fs.readFileSync(
   path.join(__dirname, '../src/renderer/js/songMenu.js'), 'utf8'
 );
-const SEARCH_JS = fs.readFileSync(
-  path.join(__dirname, '../src/renderer/js/views/search.js'), 'utf8'
+// 下载整张专辑的接线随歌手/专辑域拆出（views/search/albumSinger.js）
+const ALBUM_SINGER_JS = fs.readFileSync(
+  path.join(__dirname, '../src/renderer/js/views/search/albumSinger.js'), 'utf8'
 );
 
 global.window = global.window || {
@@ -61,5 +62,5 @@ test('接线钉桩：openSongRowMenu 注入的动作走既有 window 桥且有 t
   assert.match(SONG_MENU, /items\.push\(\.\.\.albumMenuItems\(song, \{/);
   assert.match(SONG_MENU, /typeof window\.openAlbumView === 'function'\) window\.openAlbumView\(s\.albumMid, s\.source, s\.album\)/);
   assert.match(SONG_MENU, /typeof window\.downloadAlbum === 'function'\) window\.downloadAlbum\(s\.albumMid, s\.source\)/);
-  assert.match(SEARCH_JS, /window\.downloadAlbum = downloadAlbum;/);
+  assert.match(ALBUM_SINGER_JS, /window\.downloadAlbum = downloadAlbum;/);
 });

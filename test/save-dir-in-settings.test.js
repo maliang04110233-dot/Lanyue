@@ -19,7 +19,6 @@ const ROOT = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 const HTML = read('src/renderer/index.html');
-const APP_JS = read('src/renderer/js/app.js');
 const LAYOUT_CSS = read('src/renderer/styles/layout.css');
 const OVERLAY_CSS = read('src/renderer/styles/overlays.css');
 const ZH = read('src/renderer/js/lang/zh.json');
@@ -67,8 +66,14 @@ test('#saveDirText 全页只有一处（两处会让 app.js 只写中第一个�
 });
 
 test('app.js 两处写入仍指向 saveDirText：启动回填 + 改完即时刷新', () => {
-  const writes = APP_JS.match(/getElementById\('saveDirText'\)\.textContent/g) || [];
+  // 启动回填自 init() 提出，落在 boot-restore.js；changeSaveDir 仍在 app.js
+  const APP_JS = read('src/renderer/js/app.js');
+  const BOOT_JS = read('src/renderer/js/boot-restore.js');
+  const all = APP_JS + '\n' + BOOT_JS;
+  const writes = all.match(/getElementById\('saveDirText'\)\.textContent/g) || [];
   assert.strictEqual(writes.length, 2, `写入点应为 2 处（启动回填 + changeSaveDir 后刷新），实际 ${writes.length}`);
+  assert.ok(/getElementById\('saveDirText'\)\.textContent = getState\('saveDir'\) \|\|/.test(BOOT_JS),
+    '启动回填得在 boot-restore.js');
   const changeBody = APP_JS.slice(APP_JS.indexOf('async function changeSaveDir()'));
   assert.match(changeBody.slice(0, 600), /getElementById\('saveDirText'\)\.textContent = d;/,
     '改完目录没刷新界面 = 用户以为没生效，又点一次');

@@ -39,6 +39,9 @@ const APP_CODE = stripComments(read('src/renderer/js/app.js'));
 const SYNC_CODE = stripComments(read('src/renderer/js/player-sync.js'));
 const SYNC_SRC = read('src/renderer/js/player-sync.js');
 
+/** 音频事件块抽出后（audio-events.js），app 同域扫描按文件轮询时用 */
+const APP_CODE_OF = (rel) => stripComments(read(rel));
+
 /** player-sync.js 的 export 面（兼容 `export function f` 与独立 `export { a }`） */
 function exportsOf(src) {
   const out = new Set();
@@ -78,17 +81,24 @@ test('player-sync.js: 公开面恰为 7 个函数', () => {
 test('app.js: 每个 syncTo* 调用点都传了 _audio 实参', () => {
   // 必须先剔除 import 语句：`import { syncToMiniPlayer } from ...` 里出现的
   // 函数名后紧跟 `}`，会被当成一个「零实参调用」而误报。
-  const body = APP_CODE.replace(/^\s*import\s[\s\S]*?;\s*$/gm, '');
+  // 音频事件块抽出后（audio-events.js），调用点分居两处 —— 都要扫。
   const offenders = [];
-  const re = /\b(syncToTray|syncToMiniPlayer|syncToDesktopLyric)\s*\(([^)]*)\)/g;
-  let m;
   let seen = 0;
-  while ((m = re.exec(body))) {
-    seen++;
-    const args = m[2].trim();
-    if (args !== '_audio') {
-      const line = body.slice(0, m.index).split('\n').length;
-      offenders.push(`${m[1]}(${args}) @L${line}`);
+  const files = [
+    'src/renderer/js/app.js',
+    'src/renderer/js/audio-events.js',
+  ];
+  for (const rel of files) {
+    const body = APP_CODE_OF(rel).replace(/^\s*import\s[\s\S]*?;\s*$/gm, '');
+    const re = /\b(syncToTray|syncToMiniPlayer|syncToDesktopLyric)\s*\(([^)]*)\)/g;
+    let m;
+    while ((m = re.exec(body))) {
+      seen++;
+      const args = m[2].trim();
+      if (args !== '_audio') {
+        const line = body.slice(0, m.index).split('\n').length;
+        offenders.push(`${rel} ${m[1]}(${args}) @L${line}`);
+      }
     }
   }
   assert.ok(seen > 0, '未找到任何 syncTo* 调用 —— 扫描器或代码结构已变');
@@ -196,28 +206,36 @@ test('app.js: 从 player-sync.js import 的恰好是实际用到的那些', () =
   assert.ok(m, 'app.js 未从 ./player-sync.js import');
   const imported = m[1].split(',').map(s => s.trim()).filter(Boolean).sort();
   // applyRestoredPlayMode 由 restorePlayQueueFromSaved 内部调用，app.js 不需要；
-  // resetMiniPlayerSong 由 app.js 的 onSyncMiniPlayer 回调调用（M13 迷你窗口首帧修复）
+  // resetMiniPlayerSong 由 app.js 的 onSyncMiniPlayer 回调调用（M13 迷你窗口首帧修复）；
+  // syncToTray 的消费点（audio pause/play 外发）随音频事件块住在 audio-events.js；
+  // restorePlayQueueFromSaved 的消费点（队列恢复）随持久化接线住在 init.js
   assert.deepEqual(
     imported,
-    ['resetDesktopLyricSong', 'resetMiniPlayerSong', 'restorePlayQueueFromSaved', 'syncToDesktopLyric', 'syncToMiniPlayer', 'syncToTray'],
+    ['resetDesktopLyricSong', 'resetMiniPlayerSong', 'syncToDesktopLyric', 'syncToMiniPlayer'],
     'import 名单变化了 —— 请确认没有引入未使用的符号或被删掉必要符号'
   );
 });
 
 test('app.js: 仍保留 playQueueRestored 监听与 4 个持久化订阅', () => {
-  assert.ok(/api\.onPlayQueueRestored\(/.test(APP_CODE), 'playQueueRestored 监听丢失 → 启动不再恢复队列');
+  // 持久化接线自 init() 提出，落在 init.js 的 wirePlayQueuePersistence
+  const PERSIST_CODE = APP_CODE_OF('src/renderer/js/init.js');
+  assert.ok(/api\.onPlayQueueRestored\(/.test(PERSIST_CODE), 'playQueueRestored 监听丢失 → 启动不再恢复队列');
   for (const key of ['playQueue', 'playIdx', 'loopMode', 'isShuffled']) {
     assert.ok(
-      new RegExp(`state\\.subscribe\\(\\s*'${key}'`).test(APP_CODE),
+      new RegExp(`state\\.subscribe\\(\\s*'${key}'`).test(PERSIST_CODE),
       `state.subscribe('${key}') 丢失 → ${key} 变化不再持久化`
     );
   }
+  assert.ok(/wirePlayQueuePersistence\(api\)/.test(APP_CODE), 'app.js 未接线持久化模块');
 });
 
 test('app.js: 仍保留 _audio 模块级声明与事件绑定', () => {
+  // 音频事件块提出到 audio-events.js 后：声明与获取留在 app.js，绑定在 audio-events.js
   assert.ok(/^let _audio = null;/m.test(APP_CODE), '_audio 模块级声明丢失');
   assert.ok(/document\.getElementById\('audioPlayer'\)/.test(APP_CODE), '_audio 不再从 DOM 获取');
-  assert.ok(/addEventListener\('timeupdate'/.test(APP_CODE), 'timeupdate 绑定丢失');
+  assert.ok(/setupAudioEvents\(_audio\)/.test(APP_CODE), '音频事件绑定调用丢失');
+  const AUDIO_CODE = stripComments(read('src/renderer/js/audio-events.js'));
+  assert.ok(/addEventListener\('timeupdate'/.test(AUDIO_CODE), 'timeupdate 绑定丢失');
 });
 
 // ── E. 自检：确认扫描器真的在读代码 ───────────────────────────
@@ -225,6 +243,6 @@ test('自检: stripComments 生效，且两份源码都被正确读取', () => {
   assert.ok(!stripComments('/* syncToTray() */ let a = 1;').includes('syncToTray'), '块注释未剥离');
   assert.ok(!stripComments('let a = 1; // syncToTray()').includes('syncToTray'), '行注释未剥离');
   assert.ok(stripComments('syncToTray(_audio);').includes('syncToTray'), '代码被误剥离');
-  assert.ok(APP_CODE.includes('onPlayQueueRestored'), 'app.js 读取内容异常');
+  assert.ok(APP_CODE.includes('buildApi'), 'app.js 读取内容异常');
   assert.ok(SYNC_CODE.includes('syncToMiniPlayer'), 'player-sync.js 读取内容异常');
 });

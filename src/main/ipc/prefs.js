@@ -41,6 +41,9 @@ const ALLOWED_PREF_KEYS = new Set([
   'autoLyric', 'autoCover',
   // 播放行为
   'lyricFontSize', 'lyricOffset', 'playProgressMemory', 'playerVolume',
+  // 迁移标记：记忆播放进度默认改为关闭的一次性迁移标记（渲染层 app.js 读写，
+  // 不在白名单的话 set-pref 会拒写，导致迁移每次启动都空跑一次）
+  'playProgressMemoryMigrated',
   'playbackRate', 'globalShortcuts',
   // 四枚全局动作各自的 accelerator（主进程 registerGlobalShortcuts 读；
   // 候选白名单与默认值的家在 src/shared/accelerators.js）
