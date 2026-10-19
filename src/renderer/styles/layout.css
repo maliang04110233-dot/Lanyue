@@ -53,39 +53,33 @@
   position: relative;   /* 侧栏 overlay 的定位上下文 */
 }
 
-/* ══ 侧栏：64px 图标轨，悬停浮出 ══════════════════════════════════
-   绝对定位 + 悬停变宽 = 展开时覆盖而非推挤主区，避免内容重排跳动。
-   窄态用 font-size:0 收起裸文本节点（nav-item 文字没有包裹 span，
-   这是本仓 DOM 的现实约束，改 HTML 前只能这样收）。 */
+/* ══ 侧栏：200px 常驻展开（D4 播放器化）══════════════════════════
+   旧态是 64px 图标轨 + 悬停浮出 overlay。两个问题：
+   1. D1 的分组重排（发现/我的音乐/订阅与更新）只有悬停展开才看得见，
+      等于改了个寂寞——用户实证「跟原版没区别」；
+   2. overlay 悬停即盖内容，误触率高。
+   播放器产品的侧栏天天要看，常驻才是正解。窄态 font-size:0 收起
+   文本的 tricks 随之下线。 */
 .sidebar {
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 64px;
+  flex-shrink: 0;
+  width: 200px;
   z-index: var(--z-side);
   background: var(--bg-card);
   border-right: 1px solid var(--stroke-1);
   display: flex; flex-direction: column;
   padding: var(--sp-3) 10px;
   gap: 2px;
-  overflow: hidden;
-  transition: width var(--dur-2) var(--ease-out),
-              box-shadow var(--dur-2) var(--ease-out);
-}
-.sidebar:hover {
-  width: 216px;
-  box-shadow: var(--shadow-lg);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-/* 分区标题：窄态收起（高度归零，不留空隙） */
+/* 分区标题：常驻可见 */
 .sidebar-title {
   font-size: 10px; color: var(--fg-3); text-transform: uppercase;
   letter-spacing: 1.1px; padding: 0 var(--sp-2); margin: 14px 0 6px;
   white-space: nowrap;
-  transition: opacity var(--dur-1) var(--ease);
 }
 .sidebar-title:first-child { margin-top: 0; }
-.sidebar:not(:hover) .sidebar-title {
-  opacity: 0; height: 0; margin: 0; padding: 0; pointer-events: none;
-}
 
 /* 导航项：40px 高 / 圆角 8px / 激活靠「淡底 + 左侧指示条」 */
 .nav-item {
@@ -101,16 +95,14 @@
 }
 .nav-item:hover { background: var(--elev-1); color: var(--fg-1); }
 .nav-item.active { background: var(--accent-soft); color: var(--accent-ui); }
-/* 激活指示条：贴侧栏左边缘，只在展开态出现 */
+/* 激活指示条：贴侧栏左边缘 */
 .nav-item.active::before {
   content: '';
   position: absolute; left: -10px; top: 50%;
   transform: translateY(-50%);
   width: 3px; height: 17px; border-radius: 0 var(--r-xs) var(--r-xs) 0;
   background: var(--accent-ui);
-  opacity: 0; transition: opacity var(--dur-2) var(--ease);
 }
-.sidebar:hover .nav-item.active::before { opacity: 1; }
 .nav-item .icon {
   font-size: 15px; width: 20px; text-align: center; flex-shrink: 0;
   line-height: 1;
@@ -121,12 +113,6 @@
   background: var(--accent-ui); color: var(--on-accent);
   font-weight: var(--fw-bold);
 }
-/* 窄态：收起文字与徽标，图标居中 */
-.sidebar:not(:hover) .nav-item {
-  font-size: 0; gap: 0; padding: 0; justify-content: center;
-}
-.sidebar:not(:hover) .nav-item .icon { font-size: 17px; width: auto; }
-.sidebar:not(:hover) .nav-item .nav-badge { display: none; }
 
 /* 平台状态指示器 */
 .platform-status-list {
@@ -145,15 +131,13 @@
 .platform-dot.active { background: var(--c-ok); opacity: 1; }
 .platform-dot.cookie { background: var(--c-warn); opacity: 1; }
 .platform-name-s { flex: 1; }
-/* 窄态整块收起：否则 6 行文字被 64px 边框裁成竖排残字 */
-.sidebar:not(:hover) .platform-status-list { display: none; }
 
-/* ── 内容区（左侧留出图标轨宽度） ───────────────────── */
+/* ── 内容区 ─────────────────────────────────────────────
+   侧栏改为流内常驻后，这里不再需要 64px 让位 padding。 */
 .content {
   flex: 1; display: flex; flex-direction: row;
   overflow: hidden;
   padding: var(--sp-5);
-  padding-left: calc(64px + var(--sp-5));
   gap: var(--sp-4);
   min-width: 0;
 }
