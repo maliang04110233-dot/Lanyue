@@ -158,10 +158,23 @@ function ensureEqGraph() {
 
   // 向引擎要图。引擎尚未就绪（迁移期）或无 AudioContext 时返回 null。
   const engine = typeof window !== 'undefined' ? window.__playbackEngine : null;
-  if (!engine || typeof engine.getAudioGraph !== 'function') return false;
+  if (!engine || typeof engine.getAudioGraph !== 'function') {
+    // 阶段 3 · P1：建图职责已移交引擎，本文件无法自建图。
+    // 这条日志是「EQ 静默失效」的唯一可诊断痕迹 —— 缺了它就退回到
+    // 「EQ 开了没效果、控制台一行报错都没有」的老陷阱。
+    if (typeof window !== 'undefined' && typeof window.logger?.warn === 'function') {
+      window.logger.warn('[eq] 播放引擎未就绪，音频图不可用（EQ/频谱将不生效）');
+    }
+    return false;
+  }
 
   const graph = engine.getAudioGraph();
-  if (!graph) return false;
+  if (!graph) {
+    if (typeof window !== 'undefined' && typeof window.logger?.warn === 'function') {
+      window.logger.warn('[eq] 引擎未能提供音频图（可能无 AudioContext 或元素已被占用）');
+    }
+    return false;
+  }
 
   audioCtx = graph.ctx;
   preampNode = graph.preamp;
