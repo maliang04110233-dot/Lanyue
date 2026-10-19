@@ -1427,3 +1427,109 @@ audio { display: none; }
   background: color-mix(in srgb, var(--accent-ui) 4%, transparent);
   pointer-events: none;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   D2-A：播放器面板视觉强化（播放器化重构 · 阶段 A）
+   ──────────────────────────────────────────────────────────────
+   目标：在不改动 .main 骨架（播放器仍在右侧 320px 竖栏）的前提下，
+   让面板一眼看上去是「音乐播放器」而不是「下载器的附属卡片」。
+
+   三条硬约束：
+   1. 只动视觉（尺寸/间距/层次/强调），不新增 DOM、不改 id；
+   2. 不碰 player.js 的任何 getElementById 目标 —— 元素仍在原处；
+   3. 所有规则限定在 .side-panel 内，主内容区零影响。
+
+   为什么用视觉而非结构：结构搬迁（右栏 → 底部横条）要重排 .main
+   的 flex/grid 并逐个核对 player.js 的 DOM 引用，属独立一轮。
+   本轮先交付「看得见的变化」，且可随时整段删除回退。
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 面板本身：给播放器一个「舞台」而不是一张白卡 ── */
+.side-panel .player-card {
+  background:
+    radial-gradient(120% 80% at 50% 0%,
+      color-mix(in srgb, var(--accent-ui) 7%, transparent) 0%,
+      transparent 62%),
+    var(--bg-card);
+  border-left: 1px solid var(--stroke-1);
+  padding: var(--sp-2);
+  gap: var(--sp-2);
+}
+
+/* ── 封面：占满面板宽度、圆角加大、悬浮有层次 ── */
+.side-panel .pc-cover {
+  border-radius: var(--r-lg);
+  border: 1px solid color-mix(in srgb, var(--accent-ui) 12%, var(--stroke-1));
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px color-mix(in srgb, var(--accent-ui) 6%, transparent);
+  transition: box-shadow var(--dur-2) var(--ease-out);
+}
+/* 正在播放时，封面外圈呼吸光 —— 播放器最直观的「活着」信号 */
+.side-panel .player-card.playing .pc-cover {
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px color-mix(in srgb, var(--accent-ui) 22%, transparent),
+    0 0 26px -6px color-mix(in srgb, var(--accent-ui) 30%, transparent);
+}
+
+/* ── 顶栏状态：播放中更醒目 ── */
+.side-panel .pc-state {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.side-panel .player-card.playing .pc-state {
+  text-shadow: 0 0 12px color-mix(in srgb, var(--accent-ui) 45%, transparent);
+}
+
+/* ── 进度条：加粗、拉满宽度，可拖拽的手感更明确 ── */
+.side-panel .player-progress-track {
+  height: 5px;
+  border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--fg-3) 22%, transparent);
+}
+.side-panel .player-progress-fill {
+  border-radius: var(--r-xs);
+  background: var(--accent-ui);
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--accent-ui) 60%, transparent);
+}
+.side-panel .player-progress-thumb {
+  width: 13px; height: 13px;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-ui) 70%, transparent);
+}
+
+/* ── 时间轴文案：等宽数字，跳动时不抖 ──
+   真实类名是 pc-clock / pc-clock-sep —— player-time / time-now / time-total
+   在 HTML 里不存在（那是别的模块的类名），写上去就是死规则。 */
+.side-panel .pc-clock,
+.side-panel .pc-clock-sep {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+}
+
+/* ── 歌名/歌手：播放器的主角信息，加大加粗 ── */
+.side-panel .player-title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.side-panel .pc-artist {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+/* ── 主控制按钮：播放键加大，成为视觉锚点 ── */
+.side-panel .ctrl-btn.play-btn {
+  width: 46px;
+  height: 46px;
+  box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--accent-ui) 55%, transparent);
+  transition: transform var(--dur-1) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out);
+}
+.side-panel .ctrl-btn.play-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 8px 26px -6px color-mix(in srgb, var(--accent-ui) 70%, transparent);
+}
+.side-panel .ctrl-btn.play-btn:active { transform: scale(.97); }
