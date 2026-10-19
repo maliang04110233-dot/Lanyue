@@ -38,6 +38,10 @@ import {
   syncToMiniPlayer, resetMiniPlayerSong, syncToDesktopLyric, resetDesktopLyricSong,
 } from './player-sync.js';
 
+// 播放引擎接线（阶段 3 · P0）：创建引擎实例，把取流/代理/进度记忆注入进去。
+// 此刻**尚未接管任何调用方**，对用户可见行为零影响；P1-P5 逐个迁移调用方。
+import { createWiredPlaybackEngine } from './playback/wire.js';
+
 // 播放队列持久化接线（自 init() 内闭包提出，等价迁移 —— 4 订阅 + 兜底加载）
 import { wirePlayQueuePersistence } from './init.js';
 // 启动期偏好恢复（自 init() 内闭包提出，等价迁移）
@@ -134,6 +138,13 @@ let api = buildApi();
 // ── 音频元素（模块级，init 绑定事件后以实参传给 player-sync.js）──
 let _audio = null;
 
+/**
+ * 播放引擎实例（阶段 3 · P0）。
+ * 创建后暂不接管调用方；P1-P5 逐个把 audio 的直接操作者接过来。
+ * 阶段 4 收口时，它将成为全仓唯一持有 #audioPlayer 的模块。
+ */
+let playbackEngine = null;
+
 // ── 初始化 ─────────────────────────────────────────────
 async function init() {
   // 如果 init 时 window.musicAPI 还没就绪（理论上 preload 已先执行），动态覆盖
@@ -216,6 +227,22 @@ async function init() {
     setupAudioEvents(_audio);
   } catch (e) {
     logger.warn('[init] 音频事件绑定失败:', e.message);
+  }
+
+  // ── 播放引擎接线（阶段 3 · P0）──────────────────────────
+  // 独立 try-catch：引擎接线失败不得影响上面的既有事件绑定。
+  // 此刻引擎只被创建、无人订阅、无人调用 —— 对用户可见行为零影响。
+  // 后续 P1-P5 逐个迁移调用方时，每一步都从这里取实例。
+  try {
+    if (_audio) {
+      playbackEngine = createWiredPlaybackEngine({ audio: _audio, api, logger });
+      // 挂到 window 供尚未改成 import 的迁移中模块取用（阶段 4 收口时删除）。
+      // 这不是新增业务能力，是迁移期的过渡通道，已在阶段 3 计划里登记。
+      window.__playbackEngine = playbackEngine;
+      logger.log('[init] 播放引擎已就绪，state=', playbackEngine.getSnapshot().state);
+    }
+  } catch (e) {
+    logger.error('[init] 播放引擎接线失败:', e.message);
   }
 
   // ── 迷你播放器 IPC 监听 ──────────────────────────────
