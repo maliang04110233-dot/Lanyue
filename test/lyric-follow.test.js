@@ -62,8 +62,12 @@ test('接线钉：lyrics.js 门控滚动、三事件监听、跳播复位；纯�
     LYRICS_JS.includes('hoverSet(_follow, true)') &&
     LYRICS_JS.includes("document.addEventListener('mouseout'") &&
     LYRICS_JS.includes('hoverSet(_follow, false)'), '悬停进/出（mouseover/out 冒泡捕获跨子元素）');
-  assert.ok(/audio\.currentTime[\s\S]{0,120}_follow = followReset\(\);[\s\S]{0,40}_prevLyricIdx = -1;/.test(LYRICS_JS),
+  // 阶段 3 · P4：seek 已改走引擎（engine.seek），不再直改 audio.currentTime。
+  // 不变量不变：点行跳播后必须立即恢复跟随 + 强制下次 update 重新居中。
+  assert.ok(/engine\.seek\([\s\S]{0,160}_follow = followReset\(\);[\s\S]{0,40}_prevLyricIdx = -1;/.test(LYRICS_JS),
     '点行跳播立即恢复并强制重居中');
+  assert.ok(!/audio\.currentTime\s*=/.test(LYRICS_JS),
+    'lyrics.js 不得再直改 audio.currentTime —— seek 归引擎管（越界钳制与快照广播在引擎里）');
   const PURE = fs.readFileSync(path.join(__dirname, '../src/renderer/js/lyricFollow.js'), 'utf8')
     .replace(/^\/\*\*[\s\S]*?\*\//, '');
   assert.ok(!/api\.|window\.|document\./.test(PURE));

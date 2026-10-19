@@ -4,18 +4,28 @@
  * - 定时停止播放
  */
 
+/** 取播放引擎（阶段 3 · P4：seek 归引擎管，它负责越界钳制与快照广播） */
+function _engine() {
+  return typeof window !== 'undefined' ? window.__playbackEngine : null;
+}
+
 /** 前进 10 秒 */
 function seekForward10() {
-  const audio = document.getElementById('audioPlayer');
-  if (!audio || isNaN(audio.duration)) return;
-  audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
+  const engine = _engine();
+  if (!engine) return;
+  const snap = engine.getSnapshot();
+  // duration 为 0/NaN 时不 seek（与旧实现 `isNaN(audio.duration)` 守卫等价）
+  if (!snap || !(snap.duration > 0)) return;
+  engine.seekBy(10);
 }
 
 /** 后退 10 秒 */
 function seekBack10() {
-  const audio = document.getElementById('audioPlayer');
-  if (!audio || isNaN(audio.duration)) return;
-  audio.currentTime = Math.max(0, audio.currentTime - 10);
+  const engine = _engine();
+  if (!engine) return;
+  const snap = engine.getSnapshot();
+  if (!snap || !(snap.duration > 0)) return;
+  engine.seekBy(-10);
 }
 
 // ── 定时停止 ──────────────────────────────────────────

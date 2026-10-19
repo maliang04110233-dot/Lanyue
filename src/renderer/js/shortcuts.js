@@ -128,16 +128,18 @@ function handleKey(e) {
       return;
     }
 
-    // 音量
+    // 音量（阶段 3 · P4：音量唯一主人在引擎，快捷键不再直接改 audio.volume）
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      audio.volume = Math.min(1, audio.volume + 0.05);
+      const engine = typeof window !== 'undefined' ? window.__playbackEngine : null;
+      if (engine) engine.setVolume(Math.min(1, engine.getVolume() + 0.05));
       showVolumeToast();
       return;
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      audio.volume = Math.max(0, audio.volume - 0.05);
+      const engine = typeof window !== 'undefined' ? window.__playbackEngine : null;
+      if (engine) engine.setVolume(Math.max(0, engine.getVolume() - 0.05));
       showVolumeToast();
       return;
     }

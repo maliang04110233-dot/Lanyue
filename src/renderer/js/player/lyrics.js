@@ -297,11 +297,14 @@ document.addEventListener('click', (e) => {
   if (!row) return;
   const t = parseFloat(row.getAttribute('data-t-line'));
   if (!Number.isFinite(t)) return; // 静态歌词无时间戳，不接管
-  const audio = document.getElementById('audioPlayer');
-  if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+  // 阶段 3 · P4：seek 归引擎（它负责越界钳制与快照广播），不再直改 audio.currentTime
+  const engine = typeof window !== 'undefined' ? window.__playbackEngine : null;
+  if (!engine) return;
+  const snap = engine.getSnapshot();
+  if (!snap || !(snap.duration > 0)) return;
   // 行时间按带偏移的口径换算回播放时间：显示匹配用 playT+offset≥T
   const target = Math.max(0, t - _lyricOffset / 1000);
-  audio.currentTime = Math.min(target, Math.max(0, audio.duration - 0.5));
+  engine.seek(Math.min(target, Math.max(0, snap.duration - 0.5)));
   // 跳播=「回到当前」语义，立即恢复跟随并强制下次 update 重新居中
   _follow = followReset();
   _prevLyricIdx = -1;
