@@ -45,6 +45,21 @@ export function buildPositionState(audio) {
   return { duration, playbackRate: Number(audio.playbackRate) || 1, position };
 }
 
+/**
+ * 引擎快照 → buildPositionState 认识的形状。
+ *
+ * 为什么不直接改 buildPositionState 的签名：它是导出函数且有既有测试按
+ * 「audio 元素」口径断言（test/mediaSession*.test.js）。迁移期保持它的契约不变，
+ * 在调用点做一次适配，比让一个纯函数同时认两种形状要干净。
+ */
+function _snapshotAsPositionSource(snap) {
+  return {
+    duration: snap.duration,
+    currentTime: snap.position,
+    playbackRate: snap.rate,
+  };
+}
+
 function _call(name) {
   try {
     if (typeof window[name] === 'function') window[name]();
@@ -56,18 +71,25 @@ function _call(name) {
 /** 刷新元数据 + 播放态 + 进度（audio 事件驱动，全部来源统一走这里） */
 function _syncNow() {
   try {
-    const audio = document.getElementById('audioPlayer');
-    const song = (typeof getState === 'function' && getState('currentPlaying')) || null;
+    // 阶段 3 · P2：播放状态改从引擎快照读，不再自己 getElementById('audioPlayer')。
+    // 引擎是 audio 元素的唯一所有者，读它的 snapshot 才不会出现
+    // 「UI 显示在播、audio 实际已暂停」这类双源不一致。
+    const engine = typeof window !== 'undefined' ? window.__playbackEngine : null;
+    const snap = engine && typeof engine.getSnapshot === 'function' ? engine.getSnapshot() : null;
+    const song = (snap && snap.song)
+      || (typeof getState === 'function' && getState('currentPlaying'))
+      || null;
     if (song) {
       const meta = buildMediaMetadata(song);
       if (meta && window.MediaMetadata) {
         navigator.mediaSession.metadata = new window.MediaMetadata(meta);
       }
     }
-    if (!audio) return;
-    navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+    if (!snap) return;
+    // state 是引擎的显式状态机；playing 之外一律视为暂停（含 loading/error/idle）
+    navigator.mediaSession.playbackState = snap.state === 'playing' ? 'playing' : 'paused';
     if (typeof navigator.mediaSession.setPositionState === 'function') {
-      navigator.mediaSession.setPositionState(buildPositionState(audio));
+      navigator.mediaSession.setPositionState(buildPositionState(_snapshotAsPositionSource(snap)));
     }
   } catch (e) {
     logger.warn('[mediaSession] sync 失败:', e.message);
