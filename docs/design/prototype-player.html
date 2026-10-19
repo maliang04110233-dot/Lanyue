@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>揽乐 · 播放器界面原型（对标 AlgerMusicPlayer）</title>
+<style>
+:root{
+  --bg-deep:#0b0c0e; --bg-card:#131417; --bg-hover:#1b1d21; --bg-input:#16171b;
+  --border:#262930; --accent:#00ffc8; --accent-dim:rgba(0,255,200,.15);
+  --text:#ecedef; --text-dim:#9aa0a8; --text-muted:#6b7280;
+  --radius:12px; --font:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --neon-purple:#a78bfa; --neon-blue:#38bdf8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg-deep); color:var(--text); font-family:var(--font);
+  height:100vh; display:grid;
+  grid-template-columns:220px 1fr 300px;
+  grid-template-rows:1fr 88px;
+  grid-template-areas:"nav main queue" "player player player";
+  overflow:hidden;
+}
+/* ── 左：导航 ── */
+.nav{grid-area:nav;background:var(--bg-card);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:16px 10px;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 18px;font-size:17px;font-weight:600}
+.brand-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 12px var(--accent)}
+.nav-group{margin-bottom:6px}
+.nav-title{font-size:11px;color:var(--text-muted);padding:10px 10px 6px;letter-spacing:.08em}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;
+  color:var(--text-dim);cursor:pointer;font-size:13.5px;transition:.15s}
+.nav-item:hover{background:var(--bg-hover);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);font-weight:500}
+.nav-item .ico{width:18px;text-align:center;font-size:15px}
+.nav-spacer{flex:1}
+/* ── 中：主内容 ── */
+.main{grid-area:main;overflow-y:auto;padding:22px 26px}
+.main-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.main-title{font-size:22px;font-weight:600}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--bg-input);
+  border:1px solid var(--border);border-radius:20px;padding:8px 15px;width:300px}
+.search-box input{background:none;border:none;outline:none;color:var(--text);
+  font-size:13px;width:100%;font-family:var(--font)}
+.search-box input::placeholder{color:var(--text-muted)}
+.hero{position:relative;border-radius:16px;overflow:hidden;margin-bottom:26px;
+  background:linear-gradient(120deg,#1a1d24,#12141a 60%,#0f1115);
+  border:1px solid var(--border);padding:26px 28px;display:flex;align-items:center;gap:24px}
+.hero-cover{width:110px;height:110px;border-radius:12px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--neon-purple),var(--neon-blue));
+  box-shadow:0 10px 30px rgba(0,0,0,.5);display:flex;align-items:center;
+  justify-content:center;font-size:34px}
+.hero-info h2{font-size:20px;margin-bottom:6px}
+.hero-info p{color:var(--text-dim);font-size:13px;margin-bottom:14px}
+.btn{background:var(--accent);color:#06110e;border:none;border-radius:20px;
+  padding:9px 22px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border);margin-left:8px}
+.section-title{font-size:15px;font-weight:600;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+  padding:12px;cursor:pointer;transition:.18s}
+.card:hover{background:var(--bg-hover);transform:translateY(-2px)}
+.card-cover{width:100%;aspect-ratio:1;border-radius:9px;margin-bottom:10px;
+  display:flex;align-items:center;justify-content:center;font-size:26px}
+.card-name{font-size:13px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-sub{font-size:11.5px;color:var(--text-muted)}
+/* ── 右：播放队列 ── */
+.queue{grid-area:queue;background:var(--bg-card);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden}
+.queue-head{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 16px 12px;font-size:13.5px;font-weight:600}
+.queue-count{font-size:11px;color:var(--text-muted);font-weight:400}
+.queue-list{flex:1;overflow-y:auto;padding:0 8px 8px}
+.q-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;
+  cursor:pointer;font-size:12.5px}
+.q-item:hover{background:var(--bg-hover)}
+.q-item.playing{background:var(--accent-dim)}
+.q-item.playing .q-name{color:var(--accent)}
+.q-idx{width:16px;color:var(--text-muted);font-size:11px;text-align:center;flex-shrink:0}
+.q-meta{min-width:0;flex:1}
+.q-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-artist{font-size:11px;color:var(--text-muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.q-dur{font-size:11px;color:var(--text-muted);flex-shrink:0}
+/* ── 底：播放条 ── */
+.player{grid-area:player;background:var(--bg-card);border-top:1px solid var(--border);
+  display:grid;grid-template-columns:260px 1fr 260px;align-items:center;
+  padding:0 22px;gap:20px}
+.now{display:flex;align-items:center;gap:12px;min-width:0}
+.now-cover{width:54px;height:54px;border-radius:9px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--neon-purple),var(--neon-blue));
+  display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
+.now-meta{min-width:0}
+.now-title{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now-artist{font-size:11.5px;color:var(--text-dim);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.center{display:flex;flex-direction:column;align-items:center;gap:7px}
+.controls{display:flex;align-items:center;gap:20px}
+.ctrl{background:none;border:none;color:var(--text-dim);cursor:pointer;
+  font-size:16px;padding:4px;transition:.15s}
+.ctrl:hover{color:var(--text)}
+.ctrl.main{width:38px;height:38px;border-radius:50%;background:var(--accent);
+  color:#06110e;font-size:15px;display:flex;align-items:center;justify-content:center}
+.progress-row{display:flex;align-items:center;gap:10px;width:100%;max-width:460px}
+.time{font-size:11px;color:var(--text-muted);width:34px;text-align:center;flex-shrink:0}
+.bar{flex:1;height:4px;background:var(--bg-hover);border-radius:2px;position:relative;cursor:pointer}
+.bar-fill{height:100%;width:36%;background:var(--accent);border-radius:2px;position:relative}
+.bar-fill::after{content:'';position:absolute;right:-5px;top:-4px;width:12px;height:12px;
+  border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.right{display:flex;align-items:center;justify-content:flex-end;gap:14px}
+.vol{display:flex;align-items:center;gap:7px}
+.vol-bar{width:74px;height:3px;background:var(--bg-hover);border-radius:2px}
+.vol-fill{height:100%;width:70%;background:var(--text-dim);border-radius:2px}
+.badge{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--accent-dim);
+  color:var(--accent)}
+/* 滚动条 */
+::-webkit-scrollbar{width:7px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#33373f}
+</style>
+</head>
+<body>
+
+<!-- ══ 左：导航（播放器优先）══ -->
+<aside class="nav">
+  <div class="brand"><span class="brand-dot"></span>揽乐</div>
+
+  <div class="nav-group">
+    <div class="nav-item active"><span class="ico">▶</span>正在播放</div>
+    <div class="nav-item"><span class="ico">🔍</span>发现</div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-title">我的音乐</div>
+    <div class="nav-item"><span class="ico">🎼</span>我的歌单</div>
+    <div class="nav-item"><span class="ico">📂</span>本地曲库</div>
+    <div class="nav-item"><span class="ico">❤</span>我喜欢的</div>
+    <div class="nav-item"><span class="ico">🕘</span>最近播放</div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-title">发现</div>
+    <div class="nav-item"><span class="ico">📊</span>跨源聚合</div>
+    <div class="nav-item"><span class="ico">📡</span>订阅更新</div>
+  </div>
+
+  <div class="nav-spacer"></div>
+
+  <div class="nav-group">
+    <div class="nav-title">工具</div>
+    <div class="nav-item"><span class="ico">⬇</span>下载管理</div>
+    <div class="nav-item"><span class="ico">🔄</span>格式转换</div>
+    <div class="nav-item"><span class="ico">🤖</span>AI 助手</div>
+    <div class="nav-item"><span class="ico">⚙</span>设置</div>
+  </div>
+</aside>
+
+<!-- ══ 中：主内容（发现页）══ -->
+<main class="main">
+  <div class="main-head">
+    <div class="main-title">发现</div>
+    <div class="search-box">
+      <span style="color:var(--text-muted)">🔍</span>
+      <input placeholder="搜索歌曲、歌手、歌单，或粘贴链接…">
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-cover">🎵</div>
+    <div class="hero-info">
+      <h2>今日推荐</h2>
+      <p>根据你的口味画像生成 · 24 首</p>
+      <button class="btn">▶ 立即播放</button>
+      <button class="btn ghost">＋ 收藏</button>
+    </div>
+  </div>
+
+  <div class="section-title">为你精选</div>
+  <div class="grid">
+    <div class="card">
+      <div class="card-cover" style="background:linear-gradient(135deg,#a78bfa,#6366f1)">🎼</div>
+      <div class="card-name">深夜代码</div><div class="card-sub">32 首 · 我的歌单</div>
+    </div>
+    <div class="card">
+      <div class="card-cover" style="background:linear-gradient(135deg,#38bdf8,#0ea5e9)">🔥</div>
+      <div class="card-name">网易云热歌榜</div><div class="card-sub">100 首 · 榜单</div>
+    </div>
+    <div class="card">
+      <div class="card-cover" style="background:linear-gradient(135deg,#00ffc8,#14b8a6)">💿</div>
+      <div class="card-name">最近添加</div><div class="card-sub">18 首 · 本地</div>
+    </div>
+    <div class="card">
+      <div class="card-cover" style="background:linear-gradient(135deg,#fbbf24,#f59e0b)">🎧</div>
+      <div class="card-name">通勤路上</div><div class="card-sub">45 首 · 智能歌单</div>
+    </div>
+    <div class="card">
+      <div class="card-cover" style="background:linear-gradient(135deg,#f87171,#ef4444)">📡</div>
+      <div class="card-name">订阅更新</div><div class="card-sub">3 个歌单有更新</div>
+    </div>
+  </div>
+</main>
+
+<!-- ══ 右：播放队列 ══ -->
+<aside class="queue">
+  <div class="queue-head">
+    <span>播放队列</span>
+    <span class="queue-count">24 首</span>
+  </div>
+  <div class="queue-list">
+    <div class="q-item playing">
+      <span class="q-idx">♪</span>
+      <div class="q-meta"><div class="q-name">晴天</div><div class="q-artist">周杰伦</div></div>
+      <span class="q-dur">4:29</span>
+    </div>
+    <div class="q-item">
+      <span class="q-idx">2</span>
+      <div class="q-meta"><div class="q-name">稻香</div><div class="q-artist">周杰伦</div></div>
+      <span class="q-dur">3:43</span>
+    </div>
+    <div class="q-item">
+      <span class="q-idx">3</span>
+      <div class="q-meta"><div class="q-name">夜曲</div><div class="q-artist">周杰伦</div></div>
+      <span class="q-dur">3:47</span>
+    </div>
+    <div class="q-item">
+      <span class="q-idx">4</span>
+      <div class="q-meta"><div class="q-name">七里香</div><div class="q-artist">周杰伦</div></div>
+      <span class="q-dur">4:59</span>
+    </div>
+    <div class="q-item">
+      <span class="q-idx">5</span>
+      <div class="q-meta"><div class="q-name">告白气球</div><div class="q-artist">周杰伦</div></div>
+      <span class="q-dur">3:35</span>
+    </div>
+    <div class="q-item">
+      <span class="q-idx">6</span>
+      <div class="q-meta"><div class="q-name">青花瓷</div><div class="q-artist">周杰伦</div></div>
+      <span class="q-dur">3:59</span>
+    </div>
+    <div class="q-item">
+      <span class="q-idx">7</span>
+      <div class="q-meta"><div class="q-name">简单爱</div><div class="q-artist">周杰伦</div></div>
+      <span class="q-dur">4:30</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ══ 底：播放条 ══ -->
+<footer class="player">
+  <div class="now">
+    <div class="now-cover">🎵</div>
+    <div class="now-meta">
+      <div class="now-title">晴天</div>
+      <div class="now-artist">周杰伦 · 叶惠美</div>
+    </div>
+    <span class="badge">320K</span>
+  </div>
+
+  <div class="center">
+    <div class="controls">
+      <button class="ctrl" title="随机">🔀</button>
+      <button class="ctrl" title="上一首">⏮</button>
+      <button class="ctrl main" title="播放/暂停">⏸</button>
+      <button class="ctrl" title="下一首">⏭</button>
+      <button class="ctrl" title="循环">🔁</button>
+    </div>
+    <div class="progress-row">
+      <span class="time">1:38</span>
+      <div class="bar"><div class="bar-fill"></div></div>
+      <span class="time">4:29</span>
+    </div>
+  </div>
+
+  <div class="right">
+    <button class="ctrl" title="歌词">📝</button>
+    <button class="ctrl" title="音量">🔊</button>
+    <div class="vol"><div class="vol-bar"><div class="vol-fill"></div></div></div>
+    <button class="ctrl" title="播放队列">☰</button>
+  </div>
+</footer>
+
+</body>
+</html>

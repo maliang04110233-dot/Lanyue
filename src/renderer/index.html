@@ -76,36 +76,43 @@
 <div class="main">
 
   <!-- 侧边栏 -->
+  <!-- D1（播放器化重构）：分组顺序按「播放器优先」重排 ——
+       正在播放/发现上位，下载从首项降级到工具区。
+       注意：data-tab 值一律不改，只调顺序与分组标题，
+       switchTab 的路由与 NAV_ALIAS 因此完全不受影响。 -->
   <div class="sidebar">
     <button class="nav-item active" data-tab="home" onclick="switchTab('home',this)">
-      <span class="icon">🔍</span> 搜歌
+      <span class="icon">🔍</span> 发现
     </button>
-    <div class="sidebar-title">下载</div>
-    <button class="nav-item" data-tab="download" onclick="switchTab('download',this)">
-      <span class="icon">⬇</span> 下载
-    </button>
-    <div class="sidebar-title">曲库</div>
-    <button class="nav-item" data-tab="local" onclick="switchTab('local',this)">
-      <span class="icon">📂</span> 本地曲库
-    </button>
+
+    <div class="sidebar-title">我的音乐</div>
     <button class="nav-item" data-tab="playlist" onclick="switchTab('playlist',this)">
       <span class="icon">🎼</span> 歌单
+    </button>
+    <button class="nav-item" data-tab="local" onclick="switchTab('local',this)">
+      <span class="icon">📂</span> 本地曲库
     </button>
     <button class="nav-item" data-tab="aggregate" onclick="switchTab('aggregate',this)">
       <span class="icon">&#128202;</span> <span data-i18n="nav.aggregate">跨源聚合</span>
     </button>
+
+    <div class="sidebar-title">订阅与更新</div>
     <button class="nav-item" data-tab="subscription" onclick="switchTab('subscription',this)">
       <span class="icon">📡</span> 订阅更新 <span class="nav-badge" id="subBadge" style="display:none;"></span>
     </button>
+
     <div class="sidebar-title">工具</div>
+    <button class="nav-item" data-tab="download" onclick="switchTab('download',this)">
+      <span class="icon">⬇</span> 下载管理
+    </button>
+    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)">
+      <span class="icon">🔄</span> 格式转换
+    </button>
     <button class="nav-item" data-tab="ai-music" data-feature="ai" onclick="switchTab('ai-music',this)">
       <span class="icon">🤖</span> AI 创作
     </button>
     <button class="nav-item" data-tab="assistant" onclick="switchTab('assistant',this)">
       <span class="icon">🪄</span> <span data-i18n="nav.assistant">AI 助手</span>
-    </button>
-    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)">
-      <span class="icon">🔄</span> 格式转换
     </button>
 
     <div class="sidebar-title" data-i18n="nav.operations.title">操作</div>
