@@ -163,24 +163,10 @@
   height: 100%; min-height: 0;
 }
 
-/* ── 右侧播放器面板 ───────────────────────────────── */
-.side-panel {
-  width: 320px; flex-shrink: 0;
-  display: flex; flex-direction: column;
-  height: 100%; min-height: 0;
-  gap: 0;
-}
-.side-panel .player-card {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex; flex-direction: column;
-  overflow: hidden;
-}
-/* 队列面板展开时，播放器卡片不占满全部空间 */
-.side-panel:has(.pq-panel.open) .player-card {
-  flex: 0 1 65%;
-  min-height: 280px;
-}
+/* ── 播放器容器 ─────────────────────────────────────
+   D3：播放器从右侧 320px 竖栏（.side-panel）搬到底部全宽条（.bottom-bar）。
+   条体自身样式与三栏 grid 在 player.css 的 D3 段；这里只保留它是
+   .app 纵向 flex 的直接子元素、不参与 .main 横排这一事实的说明。 */
 
 /* 下载页面 */
 .download-page { width: 100%; }

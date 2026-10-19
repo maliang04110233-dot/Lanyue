@@ -588,8 +588,11 @@
     </div><!-- /content-main -->
   </div><!-- /content -->
 
-  <!-- 右侧播放器 -->
-  <div class="side-panel">
+  </div><!-- /main -->
+
+  <!-- 底部播放器条（D3 播放器化：从右侧 320px 竖栏搬到底部全宽。
+       player.js 的 25 个 DOM 引用全部按 id 查询，与容器位置无关，故 JS 零改动。） -->
+  <div class="bottom-bar">
     <div class="player-card" id="playerCard">
 
       <div class="pc-topbar">
@@ -676,15 +679,18 @@
           </div>
           <img class="player-disc-img" id="playerDiscImg" style="display:none;" alt="">
         </div>
+      </div>
 
+      <!-- D3：进度条从封面内搬到中栏（底部条布局里它独立占一行） -->
+      <div class="bb-progress">
         <div class="player-progress-track" id="playerProgressBar" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div class="player-progress-fill" id="playerProgressFill"></div>
           <div class="player-progress-thumb" id="playerProgressThumb"></div>
           <div class="player-progress-hover-time" id="progressHoverTime"></div>
         </div>
-
-        <canvas id="vizCanvas" class="viz-canvas" style="display:none;" height="34" aria-hidden="true" title="实时频谱（📊 按钮开关）"></canvas>
       </div>
+
+      <canvas id="vizCanvas" class="viz-canvas" style="display:none;" height="34" aria-hidden="true" title="实时频谱（📊 按钮开关）"></canvas>
 
       <div class="pc-meta">
         <div class="pc-title-row">
@@ -763,9 +769,7 @@
         </div>
       </div>
     </div>
-  </div>
-
-  </div>
+  </div><!-- /bottom-bar -->
 
 <!-- ID3 编辑弹窗 -->
 <div class="edit-overlay hidden" id="editOverlay" onclick="closeEditOnBg(event)" data-modal data-modal-close="closeEdit" data-modal-pri="80">
