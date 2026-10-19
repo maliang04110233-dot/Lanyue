@@ -66,7 +66,7 @@ test('eq.js: eqFilters 存在填充点（EQ 已接入音频图，回退即红）
   );
 });
 
-test('eq.js: 音频图创建点存在且全仓只此一处（createMediaElementSource/createBiquadFilter）', () => {
+test('eq.js: 音频图创建点全仓只此一处（迁移期允许 engine.js 旁路，但必须证明它未被消费）', () => {
   const pattern = /\.(createBiquadFilter|createMediaElementSource|createGain)\s*\(/;
   const offenders = [];
   const walk = (dir) => {
@@ -80,9 +80,37 @@ test('eq.js: 音频图创建点存在且全仓只此一处（createMediaElementS
     }
   };
   walk(path.resolve('src'));
+
+  // 迁移期（Sprint 1）的豁免是**有条件**的：playback/engine.js 已具备幂等建图能力，
+  // 但生产链路还没接（引擎是旁路建设的）。阶段 3 完成 eq.js 改造后，
+  // 期望值应收紧为只剩 engine.js 一处 —— 届时本断言会因 eq.js 不再建图而自动要求收紧。
   assert.deepEqual(
-    offenders, ['src/renderer/js/player/eq.js'],
-    '音频图创建点应当只有 eq.js 一处；多出文件 = 第二套劫持 #audioPlayer 的图（会打架）'
+    [...offenders].sort(),
+    ['src/renderer/js/playback/engine.js', 'src/renderer/js/player/eq.js'],
+    '音频图创建点只允许 eq.js 与迁移期的 playback/engine.js；多出第三个文件 = 第二套劫持 #audioPlayer 的图（会打架）'
+  );
+
+  // 豁免的代价：必须证明 engine 那张图**还没被任何生产代码消费**。
+  // 否则 eq.js 与 engine 会各建一张图抢同一个 #audioPlayer ——
+  // 第二次 createMediaElementSource 抛 InvalidStateError，而 eq.js 的 catch 会静默吞掉，EQ 无声失效。
+  const consumers = [];
+  const walkConsumers = (dir) => {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) { walkConsumers(full); continue; }
+      if (!ent.name.endsWith('.js')) continue;
+      const rel = path.relative(process.cwd(), full).replace(/\\/g, '/');
+      if (rel === 'src/renderer/js/playback/engine.js') continue; // 定义处，非消费
+      if (/getAudioGraph\s*\(/.test(stripComments(fs.readFileSync(full, 'utf8')))) {
+        consumers.push(rel);
+      }
+    }
+  };
+  walkConsumers(path.resolve('src'));
+  assert.deepEqual(
+    consumers, [],
+    'engine.getAudioGraph() 已被生产代码消费，但 eq.js 仍在自建图 —— 两套图会抢 #audioPlayer。'
+    + '请同批完成阶段 3 的 eq.js 改造（改为消费引擎的图），并把本断言的期望值收紧为只剩 engine.js。'
   );
 });
 
