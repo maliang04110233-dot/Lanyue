@@ -57,7 +57,8 @@ function exportsOf(src) {
 
 const PUBLIC = [
   'applyRestoredPlayMode', 'resetDesktopLyricSong', 'resetMiniPlayerSong',
-  'restorePlayQueueFromSaved', 'syncToDesktopLyric', 'syncToMiniPlayer', 'syncToTray',
+  'restorePlayQueueFromSaved', 'songKeyOf',
+  'syncToDesktopLyric', 'syncToMiniPlayer', 'syncToTray',
 ];
 
 // ── A. 迁移完整性 ─────────────────────────────────────────────
@@ -73,8 +74,21 @@ test('app.js: 四个函数已不在 init() 内定义（外提完成，无残留�
   assert.deepEqual(leaked, [], `app.js 仍残留已外提的实现：${leaked.join(', ')}`);
 });
 
-test('player-sync.js: 公开面恰为 7 个函数', () => {
+test('player-sync.js: 公开面恰为 8 个函数（阶段 3 P3 新增 songKeyOf）', () => {
   assert.deepEqual(exportsOf(SYNC_CODE), PUBLIC, 'player-sync.js 的 export 面发生了变化');
+});
+
+test('player-sync.js: 换曲键只有一份实现（songKeyOf），三处同步都经它', () => {
+  // 阶段 3 · P3：原先 syncToMiniPlayer 与 syncToDesktopLyric 各写一遍
+  // `String(song.id) + ':' + String(song.source || '')`，各养一个游标。
+  // 这里钉住「同一概念只有一份实现」—— 再多写一份就转红。
+  const inlineKeys = [...SYNC_CODE.matchAll(/String\(\s*song\.id\s*\)\s*\+\s*':'/g)];
+  assert.equal(
+    inlineKeys.length, 1,
+    '换曲键被就地重写了（只允许 songKeyOf 内部那一处）'
+  );
+  const usages = [...SYNC_CODE.matchAll(/songKeyOf\s*\(/g)].length;
+  assert.ok(usages >= 3, `songKeyOf 应被三处同步共用，实际只有 ${usages} 处（含定义）`);
 });
 
 // ── B. 调用签名（本轮真正的失败模式） ──────────────────────────

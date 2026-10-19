@@ -16,13 +16,31 @@
 // ── 播放状态同步到系统托盘 ──────────────────────────
 export function syncToTray(audio) {
   if (typeof api.trayUpdatePlayState !== 'function') return;
-  const song = getState('currentPlaying') || (getState('playQueue') || [])[getState('playIdx')] || null;
+  const song = _currentSong();
   const isPlaying = audio && !audio.paused;
   api.trayUpdatePlayState({
     isPlaying,
     title: song?.title || '',
     artist: song?.artist || '',
   });
+}
+
+// ── 换曲判定：两处同步共用的唯一实现 ──────────────────
+// 阶段 3 · P3：syncToMiniPlayer 与 syncToDesktopLyric 原先各写一份
+// `String(song.id) + ':' + String(song.source || '')` 并各养一个模块级
+// `let _lastSongKey`。同一概念两份实现正是 CONTRIBUTING 铁律 2 要消灭的模式，
+// 只是它长在渲染层、铁律清单没覆盖到。这里收敛为纯函数 + 两个独立游标。
+//
+// 为什么仍保留两个游标而不是合成一个：两个窗口的「重推时机」不同 ——
+// 迷你播放器在窗口打开时要重推元信息，桌面歌词要重推整份歌词；
+// 若共用一个游标，重置其中一个会误让另一个以为「歌没变」而跳过推送。
+export function songKeyOf(song) {
+  return song ? String(song.id) + ':' + String(song.source || '') : '';
+}
+
+/** 当前正在播放的歌（含播放队列兜底），三处同步共用同一取法 */
+function _currentSong() {
+  return getState('currentPlaying') || (getState('playQueue') || [])[getState('playIdx')] || null;
 }
 
 // ── 播放状态同步到迷你播放器 ──────────────────────────
@@ -36,7 +54,7 @@ export function resetMiniPlayerSong() {
 
 export function syncToMiniPlayer(audio) {
   if (typeof api.syncMiniPlayer !== 'function' || !audio) return;
-  const song = getState('currentPlaying') || (getState('playQueue') || [])[getState('playIdx')] || null;
+  const song = _currentSong();
   const progress = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
 
   // 获取当前歌词行
@@ -59,7 +77,7 @@ export function syncToMiniPlayer(audio) {
     lyric: currentLyric,
     time: timeStr,
   };
-  const songKey = song ? String(song.id) + ':' + String(song.source || '') : '';
+  const songKey = songKeyOf(song);
   if (songKey !== _mpLastSongKey) {
     _mpLastSongKey = songKey;
     payload.title = song ? song.title : '未在播放';
@@ -77,9 +95,9 @@ let _dlLastLyricSongId = null;
 
 export function syncToDesktopLyric(audio) {
   if (typeof api.syncDesktopLyric !== 'function' || !audio) return;
-  const song = getState('currentPlaying') || (getState('playQueue') || [])[getState('playIdx')] || null;
+  const song = _currentSong();
   const payload = { currentTime: audio.currentTime };
-  const songKey = song ? String(song.id) + ':' + String(song.source || '') : '';
+  const songKey = songKeyOf(song);
   if (songKey !== _dlLastLyricSongId) {
     _dlLastLyricSongId = songKey;
     const parsed = getState('parsedLyrics') || [];
