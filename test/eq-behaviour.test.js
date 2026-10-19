@@ -66,7 +66,7 @@ test('eq.js: eqFilters 存在填充点（EQ 已接入音频图，回退即红）
   );
 });
 
-test('eq.js: 音频图创建点全仓只此一处（迁移期允许 engine.js 旁路，但必须证明它未被消费）', () => {
+test('eq.js: 音频图创建点全仓唯一 —— 只在 playback/engine.js', () => {
   const pattern = /\.(createBiquadFilter|createMediaElementSource|createGain)\s*\(/;
   const offenders = [];
   const walk = (dir) => {
@@ -81,36 +81,32 @@ test('eq.js: 音频图创建点全仓只此一处（迁移期允许 engine.js �
   };
   walk(path.resolve('src'));
 
-  // 迁移期（Sprint 1）的豁免是**有条件**的：playback/engine.js 已具备幂等建图能力，
-  // 但生产链路还没接（引擎是旁路建设的）。阶段 3 完成 eq.js 改造后，
-  // 期望值应收紧为只剩 engine.js 一处 —— 届时本断言会因 eq.js 不再建图而自动要求收紧。
+  // 阶段 3 · P1 之后期望值已收紧：eq.js 不再自建图，改为向引擎要。
+  // 若这条转红且 offenders 里出现 eq.js，说明有人把建图逻辑又搬回去了 ——
+  // 那会与引擎抢同一个 #audioPlayer，第二次 createMediaElementSource 抛
+  // InvalidStateError，而静默 catch 会让 EQ 无声失效。
   assert.deepEqual(
-    [...offenders].sort(),
-    ['src/renderer/js/playback/engine.js', 'src/renderer/js/player/eq.js'],
-    '音频图创建点只允许 eq.js 与迁移期的 playback/engine.js；多出第三个文件 = 第二套劫持 #audioPlayer 的图（会打架）'
+    offenders,
+    ['src/renderer/js/playback/engine.js'],
+    '音频图创建点必须全仓唯一（playback/engine.js）；多出任何文件都是第二套劫持 #audioPlayer 的图'
   );
+});
 
-  // 豁免的代价：必须证明 engine 那张图**还没被任何生产代码消费**。
-  // 否则 eq.js 与 engine 会各建一张图抢同一个 #audioPlayer ——
-  // 第二次 createMediaElementSource 抛 InvalidStateError，而 eq.js 的 catch 会静默吞掉，EQ 无声失效。
-  const consumers = [];
-  const walkConsumers = (dir) => {
-    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, ent.name);
-      if (ent.isDirectory()) { walkConsumers(full); continue; }
-      if (!ent.name.endsWith('.js')) continue;
-      const rel = path.relative(process.cwd(), full).replace(/\\/g, '/');
-      if (rel === 'src/renderer/js/playback/engine.js') continue; // 定义处，非消费
-      if (/getAudioGraph\s*\(/.test(stripComments(fs.readFileSync(full, 'utf8')))) {
-        consumers.push(rel);
-      }
-    }
-  };
-  walkConsumers(path.resolve('src'));
-  assert.deepEqual(
-    consumers, [],
-    'engine.getAudioGraph() 已被生产代码消费，但 eq.js 仍在自建图 —— 两套图会抢 #audioPlayer。'
-    + '请同批完成阶段 3 的 eq.js 改造（改为消费引擎的图），并把本断言的期望值收紧为只剩 engine.js。'
+test('eq.js: 建图改为向引擎要 —— 不再自己 new AudioContext', () => {
+  assert.ok(
+    !/new\s+AC\s*\(/.test(EQ_CODE) && !/new\s+AudioContext/.test(EQ_CODE),
+    'eq.js 仍在自己创建 AudioContext —— 建图职责应已移交 playback/engine.js'
+  );
+  assert.ok(
+    /__playbackEngine/.test(EQ_CODE) && /getAudioGraph\s*\(/.test(EQ_CODE),
+    'eq.js 未通过 window.__playbackEngine.getAudioGraph() 取图'
+  );
+});
+
+test('eq.js: 不得 close 引擎的 AudioContext（所有权在引擎）', () => {
+  assert.ok(
+    !/audioCtx\.close\s*\(/.test(EQ_CODE),
+    'eq.js 仍在 close AudioContext —— 那会关掉引擎的上下文，让引擎状态与图脱节'
   );
 });
 

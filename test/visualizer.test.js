@@ -47,22 +47,26 @@ test('computeBars：脏输入容错（null 数据 / 0 或负 bars → 空或全 
   assert.deepEqual(computeBars(new Uint8Array(128), -3), []);
 });
 
-test('所有权钉：visualizer.js 不创建任何音频节点（图唯一主是 eq.js）', async () => {
+test('所有权钉：visualizer.js 不创建任何音频节点（图唯一主是 playback/engine.js）', async () => {
   const src = read('src/renderer/js/player/visualizer.js');
   assert.doesNotMatch(
     src,
     /\.(createAnalyser|createBiquadFilter|createMediaElementSource|createGain|AudioContext)\s*\(?/,
-    'visualizer 自造音频节点会与 eq.js 的图双主冲突（element 只能挂一次源）'
+    'visualizer 自造音频节点会与引擎的图双主冲突（element 只能挂一次源）'
   );
 });
 
-test('eq.js：analyser 已串入图尾（filters→analyser→destination）并导出访问器', () => {
-  const src = read('src/renderer/js/player/eq.js');
-  assert.match(src, /createAnalyser\s*\(\s*\)/, '图中缺 AnalyserNode');
-  assert.match(src, /node\.connect\(analyserNode\)/, 'analyser 未接在滤波链尾');
-  assert.match(src, /analyserNode\.connect\(audioCtx\.destination\)/, 'analyser 未桥到 destination（会哑音）');
-  assert.match(src, /export function ensureAudioGraph/, 'ensureAudioGraph 未导出');
-  assert.match(src, /export function getAnalyser/, 'getAnalyser 未导出');
+test('engine.js：analyser 已串入图尾（filters→analyser→destination）；eq.js 仍导出访问器', () => {
+  // 阶段 3 · P1：建图职责已从 eq.js 移交 playback/engine.js。
+  // 不变量不变（analyser 在滤波链尾、桥到 destination），断言宿主跟着搬家。
+  const engineSrc = read('src/renderer/js/playback/engine.js');
+  assert.match(engineSrc, /createAnalyser\s*\(\s*\)/, '引擎图中缺 AnalyserNode');
+  assert.match(engineSrc, /node\.connect\(analyser\)/, 'analyser 未接在滤波链尾');
+  assert.match(engineSrc, /analyser\.connect\(ctx\.destination\)/, 'analyser 未桥到 destination（会哑音）');
+
+  const eqSrc = read('src/renderer/js/player/eq.js');
+  assert.match(eqSrc, /export function ensureAudioGraph/, 'ensureAudioGraph 未导出');
+  assert.match(eqSrc, /export function getAnalyser/, 'getAnalyser 未导出');
 });
 
 test('接线钉：app.js 副作用 import、index.html canvas+按钮、命令面板入口齐备', () => {

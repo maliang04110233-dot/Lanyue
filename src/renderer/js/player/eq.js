@@ -137,50 +137,41 @@ function _syncBypassBtn() {
  * 懒建音频图。只应在用户手势上下文或 playing 事件里调用——
  * 创建 AudioContext 后元素声音即被劫持进图，必须保证能 resume。
  * 返回是否已有可用图。
+ *
+ * 阶段 3 · P1：建图职责已移交播放引擎（playback/engine.js）。
+ * 本函数只负责「向引擎要图」并把节点缓存到本地引用，不再自己调用
+ * createMediaElementSource / createGain / createBiquadFilter。
+ *
+ * 为什么必须移交给引擎
+ * --------------------
+ * `createMediaElementSource(audio)` 对同一个元素只能调用一次，第二次抛
+ * InvalidStateError。旧实现在这里 try/catch 后静默 return false，表现为
+ * 「EQ 开了却没效果、控制台一行报错都没有」。引擎用显式幂等标志建图，
+ * 全仓只此一处，这个陷阱才被真正堵住。
  */
 function ensureEqGraph() {
+  // 已缓存过图：直接把 suspended 的上下文唤醒即可（幂等，不重建）
   if (audioCtx) {
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
     return true;
   }
-  const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
-  const audio = typeof document !== 'undefined' && document.getElementById('audioPlayer');
-  if (!AC || !audio) return false;
-  try {
-    audioCtx = new AC();
-    let node = audioCtx.createMediaElementSource(audio);
-    // 链首 preamp：source → preamp → filters → analyser → destination
-    preampNode = audioCtx.createGain();
-    preampNode.gain.value = 1;
-    node.connect(preampNode);
-    node = preampNode;
-    eqFilters.length = 0;
-    for (const band of EQ_BANDS) {
-      const f = audioCtx.createBiquadFilter();
-      f.type = band.type;
-      f.frequency.value = band.freq;
-      f.Q.value = 1;
-      node.connect(f);
-      node = f;
-      eqFilters.push(f);
-    }
-    // analyser 落在滤波链尾：频谱量到的是 EQ 曲线本身，不含 preamp trim ——
-    // 取舍写在文件头与 preampNode 声明处，不是「顺手接在最后一个节点上」。
-    analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 256;
-    analyserNode.smoothingTimeConstant = 0.8;
-    node.connect(analyserNode);
-    analyserNode.connect(audioCtx.destination);
-    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-    _mirrorToGraph();
-    return true;
-  } catch (e) {
-    audioCtx = null;
-    analyserNode = null;
-    preampNode = null;
-    eqFilters.length = 0;
-    return false;
-  }
+
+  // 向引擎要图。引擎尚未就绪（迁移期）或无 AudioContext 时返回 null。
+  const engine = typeof window !== 'undefined' ? window.__playbackEngine : null;
+  if (!engine || typeof engine.getAudioGraph !== 'function') return false;
+
+  const graph = engine.getAudioGraph();
+  if (!graph) return false;
+
+  audioCtx = graph.ctx;
+  preampNode = graph.preamp;
+  analyserNode = graph.analyser;
+  eqFilters.length = 0;
+  for (const f of graph.filters) eqFilters.push(f);
+
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  _mirrorToGraph();
+  return true;
 }
 
 // ── 频谱可视化公开面：确保建图 + analyser 只读访问 ──
@@ -308,12 +299,11 @@ if (typeof document !== 'undefined' && typeof window !== 'undefined') {
   const audio = document.getElementById('audioPlayer');
   if (audio) audio.addEventListener('playing', boot, { once: true });
   window.addEventListener('beforeunload', () => {
-    if (audioCtx) {
-      audioCtx.close().catch(() => {});
-      audioCtx = null;
-      eqFilters.length = 0;
-      preampNode = null;
-      analyserNode = null;
-    }
+    // 阶段 3 · P1：AudioContext 的所有权在播放引擎，本文件**不得** close 它
+    // （close 掉引擎的上下文会让引擎状态与图脱节）。这里只丢本地引用。
+    audioCtx = null;
+    eqFilters.length = 0;
+    preampNode = null;
+    analyserNode = null;
   });
 }

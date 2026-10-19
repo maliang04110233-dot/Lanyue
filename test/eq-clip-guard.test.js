@@ -35,6 +35,8 @@ function stripComments(src) {
 const freshEq = () => import(`../src/renderer/js/player/eq.js?tc=${Math.random()}`);
 const EQ_SRC = read('src/renderer/js/player/eq.js');
 const EQ_CODE = stripComments(EQ_SRC);
+// 阶段 3 · P1：音频图建图职责已移交引擎。链序不变量改为在引擎源码上钉。
+const ENGINE_CODE = stripComments(read('src/renderer/js/playback/engine.js'));
 const PALETTE = read('src/renderer/js/commandPalette.js');
 const PLAYER = stripComments(read('src/renderer/js/player.js'));
 
@@ -67,29 +69,32 @@ test('eq.js: 老名字 clipGuardDb 不得复活（名字承诺的比它能做的
 });
 
 // ── 图接线：链首 preamp GainNode ───────────────────────
+// 阶段 3 · P1：建图职责已从 eq.js 移交 playback/engine.js。
+// 这两条守卫的**不变量不变**（preamp 在链首、analyser 在链尾、由 preampTrimDb 驱动），
+// 只是断言的宿主文件从 eq.js 换成了 engine.js —— 不降低标准，跟着实现搬家。
 
-test('eq.js: 图内有 createGain preamp 节点，且由 preampTrimDb(_effective) 驱动', () => {
-  assert.match(EQ_CODE, /createGain\s*\(/, '缺 preamp GainNode');
+test('engine.js: 图内有 createGain preamp 节点；eq.js 仍以 preampTrimDb 驱动它', () => {
+  assert.match(ENGINE_CODE, /createGain\s*\(/, '引擎缺 preamp GainNode');
   assert.match(EQ_CODE, /preampTrimDb\s*\(/, 'preamp 增益必须走纯函数，不许就地心算第二份');
   assert.match(EQ_CODE, /_effective\s*\(\)/, 'trim 应基于有效增益（bypass 时增益全 0 → trim 0）');
-  // sole-owner 钉已允许 createGain 只出现在 eq.js
+  // sole-owner 钉：visualizer 不得自造节点
   assert.ok(
     !/createGain\s*\(/.test(stripComments(read('src/renderer/js/player/visualizer.js'))),
     'visualizer 仍不得自造节点'
   );
 });
 
-test('eq.js: preamp 串在滤波链首、analyser 落在链尾（source → preamp → filters → analyser → destination）', () => {
-  // ensureEqGraph 内的三段顺序钉（靠下标先后，不靠注释）：
+test('engine.js: preamp 串在滤波链首、analyser 落在链尾（source → preamp → filters → analyser → destination）', () => {
+  // 建图顺序钉（靠下标先后，不靠注释）：
   // ① 建 preamp 并接在 source 之后   ② 五段 biquad 接在 preamp 之后
   // ③ analyser 接在最后一个 biquad 之后并直通 destination
-  const at = EQ_CODE.indexOf('function ensureEqGraph');
-  assert.ok(at > -1, '未找到 ensureEqGraph');
-  const body = EQ_CODE.slice(at, EQ_CODE.indexOf('\n}', at));
-  const preamp = body.indexOf('node.connect(preampNode)');
+  const at = ENGINE_CODE.indexOf('function getAudioGraph');
+  assert.ok(at > -1, '未找到 getAudioGraph');
+  const body = ENGINE_CODE.slice(at, ENGINE_CODE.indexOf('\n  }', at));
+  const preamp = body.indexOf('source.connect(preamp)');
   const loop = body.indexOf('for (const band of EQ_BANDS)');
-  const analyser = body.indexOf('node.connect(analyserNode)');
-  const toDest = body.indexOf('analyserNode.connect(audioCtx.destination)');
+  const analyser = body.indexOf('node.connect(analyser)');
+  const toDest = body.indexOf('analyser.connect(ctx.destination)');
   assert.ok(preamp > -1, 'preamp 未串入图');
   assert.ok(loop > -1, '五段 biquad 循环不见了');
   assert.ok(analyser > -1, 'analyser 未接在当前 node 尾');
@@ -99,7 +104,7 @@ test('eq.js: preamp 串在滤波链首、analyser 落在链尾（source → prea
   assert.ok(analyser < toDest, 'destination 必须接在 analyser 之后（断桥即哑音）');
   // 反向钉：preamp 一旦被挪到 analyser 之后（= 回到 filters 尾），上面的下标序会立刻破
   assert.ok(
-    !/analyserNode\.connect\(\s*preampNode\s*\)/.test(EQ_CODE),
+    !/analyser\.connect\(\s*preamp\s*\)/.test(ENGINE_CODE),
     'preamp 接到了 analyser 之后 = 频谱又变回「含 trim 的真输出」，与链首决定相悖'
   );
 });
