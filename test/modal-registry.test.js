@@ -185,6 +185,10 @@ test('⑥ index.html 全量对账：浮层要么授关闭契约、要么在 DEBT
     playlistEditorModal: ['closePlaylistEditor', '92'],
     playlistTrashModal: ['closePlaylistTrash'],
     playlistSelectModal: ['closePlaylistSelectModal', '93'],
+    // S3 沉浸播放页：契约函数 exitImmersive 挂 window（immersive.js），
+    // 关闭语义是纯 hidden 复位（无写盘无副作用，符合 199 的授契约标准）；
+    // pri 90：盖在 settings(70)/edit(80) 之上、与 playlistModal 同层按文档序。
+    immersiveRoot: ['exitImmersive', '90'],
   };
   const DEBT = []; // 198 登记六笔，199 还清；新浮层裸挂 data-modal 未授契约必须先在此立债（附核实计划）
   const seen = new Set();
@@ -209,7 +213,8 @@ test('⑥ index.html 全量对账：浮层要么授关闭契约、要么在 DEBT
   // 契约函数必须真挂在 window 上：注册表按 window[name] 找函数，
   // 挂空 = 每次 Esc 白吃不放行（closeActiveModal 对缺席函数仍返回 true 的 legacy 语义）
   const srcs = ['js/app.js', 'js/views/local.js', 'js/views/settings.js',
-    'js/views/playlist.js', 'js/converter-core.js', 'js/commandPalette.js', 'js/shortcuts.js']
+    'js/views/playlist.js', 'js/converter-core.js', 'js/commandPalette.js', 'js/shortcuts.js',
+    'js/immersive.js']
     .map((f) => readFile(f)).join('\n');
   for (const [fn] of Object.values(CLOSABLE)) {
     assert.ok(new RegExp('window\\.' + fn + '\\s*=').test(srcs),

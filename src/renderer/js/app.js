@@ -30,6 +30,7 @@ import './router.js';
 import { parseLrc, showNoLyrics, loadAndPlay, playQueueIdx } from './player.js';
 // 音频元素事件绑定（timeupdate/error/25s 守卫/熔断器）自本文件提出
 import { setupAudioEvents } from './audio-events.js';
+import { wireImmersive } from './immersive.js';
 import { initMediaSession } from './player/mediaSession.js';import { heartBtnHtml, queueFavSong } from './favorites.js';
 import './shortcuts.js';
 
@@ -227,6 +228,13 @@ async function init() {
     setupAudioEvents(_audio);
   } catch (e) {
     logger.warn('[init] 音频事件绑定失败:', e.message);
+  }
+
+  // 沉浸播放页接线（S3）：独立 try-catch —— 它炸了不得影响主链路。
+  try {
+    wireImmersive();
+  } catch (e) {
+    logger.warn('[init] 沉浸页接线失败:', e.message);
   }
 
   // ── 播放引擎接线（阶段 3 · P0）──────────────────────────

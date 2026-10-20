@@ -1634,3 +1634,239 @@ audio { display: none; }
   box-shadow: var(--shadow-lg);
   z-index: var(--z-sticky);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   S3：沉浸式播放页（Void Glass 全屏形态）
+   ──────────────────────────────────────────────────────────────
+   点底栏封面进入。取色背景 = 封面主色氛围光（--cover-color 由
+   JS 注入；无取色时退 --accent-ui，效果仍成立）。
+   纪律：色值全走令牌/派生（css-token-integrity 钉），圆角走 --r-*。
+   ══════════════════════════════════════════════════════════════ */
+
+.immersive {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-deep);
+  /* 封面取色的静态默认定义（幽灵令牌钉的正解）：JS 换歌时用 inline
+     setProperty 覆盖，class 声明是兜底基线。 */
+  --cover-color: var(--accent-ui);
+  animation: imm-in var(--dur-3) var(--ease-out);
+}
+.immersive.hidden { display: none; }
+@keyframes imm-in {
+  from { opacity: 0; transform: scale(1.015); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 取色氛围光背景：--cover-color 由 .immersive 定义基线、JS inline 覆盖 */
+.imm-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 18%,
+      color-mix(in srgb, var(--cover-color) 42%, transparent) 0%,
+      transparent 62%),
+    radial-gradient(90% 70% at 82% 88%,
+      color-mix(in srgb, var(--cover-color) 18%, transparent) 0%,
+      transparent 55%);
+  filter: blur(60px) saturate(140%);
+  pointer-events: none;
+}
+/* 上下遮罩保文字可读（设计师规格：顶 20% 底 30%） */
+.imm-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--bg-deep) 72%, transparent) 0%, transparent 22%),
+    linear-gradient(to top,    color-mix(in srgb, var(--bg-deep) 82%, transparent) 0%, transparent 32%);
+  pointer-events: none;
+}
+
+/* ── 顶部工具栏 ── */
+.imm-topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 var(--sp-6);
+  flex-shrink: 0;
+}
+.imm-back, .imm-queue {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border: none; border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.imm-back:hover, .imm-queue:hover { background: var(--elev-1); color: var(--fg-1); }
+.imm-source {
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  letter-spacing: .04em;
+}
+
+/* ── 主体：封面 + 信息 + 歌词 ── */
+.imm-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  padding: 0 var(--sp-6);
+}
+.imm-cover-wrap {
+  position: relative;
+  width: min(46vh, 340px);
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  background: var(--bg-deep);
+  border: 1px solid var(--stroke-1);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 60px 10px color-mix(in srgb, var(--cover-color) 26%, transparent);
+  transition: box-shadow var(--dur-3) var(--ease-out);
+}
+.imm-cover { width: 100%; height: 100%; object-fit: cover; display: block; }
+.imm-cover-ph {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-3); opacity: .45;
+}
+.imm-info { text-align: center; min-width: 0; max-width: 70vw; }
+.imm-title {
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  color: var(--fg-1);
+  letter-spacing: .01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.imm-artist {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-lg);
+  color: var(--fg-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 歌词区：当前行放大高亮，相邻行淡出（Void Glass 规格） */
+.imm-lyrics {
+  width: min(680px, 86vw);
+  max-height: 132px;
+  overflow-y: auto;
+  text-align: center;
+  scrollbar-width: none;
+  /* 上下边缘淡出遮罩 */
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+}
+.imm-lyrics::-webkit-scrollbar { display: none; }
+.imm-lyric-line {
+  padding: 5px 0;
+  font-size: var(--fs-md);
+  color: var(--fg-3);
+  opacity: .5;
+  cursor: pointer;
+  transition: opacity var(--dur-2) var(--ease), color var(--dur-2) var(--ease),
+              transform var(--dur-2) var(--ease-out);
+}
+.imm-lyric-line:hover { opacity: .85; }
+.imm-lyric-line.active {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semi);
+  color: var(--fg-1);
+  opacity: 1;
+  transform: scale(1.02);
+}
+.imm-lyric-empty { font-size: var(--fs-md); color: var(--fg-3); opacity: .6; }
+
+/* ── 进度行 ── */
+.imm-progress-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: min(680px, 86vw);
+  margin: 0 auto;
+  padding-bottom: var(--sp-2);
+}
+.imm-time {
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+}
+.imm-time:last-child { text-align: right; }
+.imm-track {
+  flex: 1;
+  position: relative;
+  height: 4px;
+  border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--fg-3) 26%, transparent);
+  cursor: pointer;
+}
+.imm-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  border-radius: var(--r-xs);
+  background: var(--accent-grad);
+}
+.imm-thumb {
+  position: absolute;
+  top: 50%; left: 0%;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent-ui);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.imm-track:hover .imm-thumb { opacity: 1; }
+
+/* ── 底部控制区 ── */
+.imm-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-6);
+  height: 96px;
+  flex-shrink: 0;
+}
+.imm-controls .ctrl-btn {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
+              transform var(--dur-1) var(--ease-out);
+}
+.imm-controls .ctrl-btn:hover { color: var(--fg-1); background: var(--elev-1); }
+.imm-controls .imm-play {
+  width: 64px; height: 64px;
+  background: var(--accent-grad);
+  color: var(--on-accent);
+  box-shadow: 0 8px 28px -8px var(--accent-glow);
+}
+.imm-controls .imm-play:hover {
+  background: var(--accent-grad);
+  transform: scale(1.06);
+  box-shadow: var(--glow-primary);
+}
+.imm-controls .imm-play:active { transform: scale(.96); }
