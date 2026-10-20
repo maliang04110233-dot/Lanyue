@@ -1546,7 +1546,9 @@ audio { display: none; }
   left: 0; top: 0; bottom: 0;
   height: auto;
   width: 0%;
-  background: var(--accent-ui);
+  /* S2 Void Glass：渐变填充 + 微光（浅色主题 --accent-glow 透明 → 光自动关） */
+  background: var(--accent-grad);
+  box-shadow: 0 0 8px var(--accent-glow);
   transition: width var(--dur-1) linear;
 }
 .bb-progress .player-progress-track.dragging .player-progress-fill { transition: none; }
@@ -1575,15 +1577,16 @@ audio { display: none; }
   width: 72px;
   height: 40px;
   border-radius: var(--r-full);
-  background: var(--accent-soft);
-  color: var(--accent-ui);
-  box-shadow: none;
-  transition: background var(--dur-1) var(--ease),
+  /* S2 Void Glass：播放键升格为渐变实心（设计师规则：主操作才配实心渐变） */
+  background: var(--accent-grad);
+  color: var(--on-accent);
+  box-shadow: 0 4px 18px -6px var(--accent-glow);
+  transition: box-shadow var(--dur-2) var(--ease-out),
               transform var(--dur-1) var(--ease-out);
 }
 .bottom-bar .ctrl-btn.play-btn:hover {
-  background: color-mix(in srgb, var(--accent-ui) 22%, transparent);
-  transform: scale(1.04);
+  transform: scale(1.05);
+  box-shadow: var(--glow-primary);
 }
 .bottom-bar .ctrl-btn.play-btn:active { transform: scale(.97); }
 

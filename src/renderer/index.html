@@ -1010,6 +1010,11 @@
                 <span class="theme-name" data-i18n="settings.general.theme.forest">Forest 森林</span>
                 <span class="theme-check" aria-hidden="true">✓</span>
               </button>
+              <button type="button" class="theme-card" data-theme-value="void" onclick="selectTheme('void')" style="--sw-bg:#03050b;--sw-card:#080c16;--sw-accent:#00e5ff">
+                <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-name" data-i18n="settings.general.theme.void">Void 深黑蓝</span>
+                <span class="theme-check" aria-hidden="true">✓</span>
+              </button>
             </div>
             <!-- 真实承载主题值的元素：色卡只负责显示，读写仍走这里，故 GENERAL_PREFS 无需改动 -->
             <select id="settingTheme" class="visually-hidden" tabindex="-1" aria-hidden="true">
@@ -1020,6 +1025,7 @@
               <option value="aurora" data-i18n="settings.general.theme.aurora">Aurora 极光</option>
               <option value="sunset" data-i18n="settings.general.theme.sunset">Sunset 日落</option>
               <option value="forest" data-i18n="settings.general.theme.forest">Forest 森林</option>
+              <option value="void" data-i18n="settings.general.theme.void">Void 深黑蓝</option>
             </select>
           </div>
 

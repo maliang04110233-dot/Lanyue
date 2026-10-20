@@ -127,6 +127,14 @@
   --shadow-md: 0 4px 14px -4px color-mix(in srgb, var(--bg-deep) 70%, transparent);
   --shadow-lg: 0 16px 40px -12px color-mix(in srgb, var(--bg-deep) 85%, transparent);
   --focus-ring: color-mix(in srgb, var(--accent-ui) 70%, transparent);
+
+  /* ══ S2 Void Glass 派生令牌（跨主题级联） ═════════════════════
+     渐变主色：accent-ui → accent2（各主题自带辅色，无辅色主题自动
+     退化为同色渐变 = 纯色，不会坏）。光晕走 --accent-glow：
+     浅色主题该值是透明 → 光效自动关闭，这正是"霓虹只在深色开"的
+     令牌化实现，不需要按主题写分支。 */
+  --accent-grad: linear-gradient(135deg, var(--accent-ui) 0%, var(--accent2) 100%);
+  --glow-primary: 0 0 20px 4px var(--accent-glow);
 }
 
 /* ── 浅色主题 ─────────────────────────────────────── */
@@ -300,6 +308,44 @@
   --neon-green:      #32cd32;
   --neon-text:       #e8f5e8;
   --neon-dim:        rgba(232,245,232,0.5);
+  --neon-red:        var(--red);
+  --neon-orange:     var(--orange);
+  --neon-yellow:     var(--gold);
+}
+
+/* ── Void Glass 深黑蓝（S2 播放器化主推主题，2026-10-20）──────
+   科技玻璃拟态：电青主色 + 暗紫辅色做渐变终点，霓虹克制在
+   呼吸光/换源扫描/取色辉光三处。派生令牌（--accent-ui/--glass/
+   --elev-*）在 :root 经 var() 级联自动跟随，这里只需给基色。 */
+[data-theme="void"] {
+  --bg-deep:   #03050b;
+  --bg-card:   #080c16;
+  --bg-hover:  #0f1420;
+  --bg-input:  #060a13;
+  --border:    #161c2e;
+  --accent:    #00e5ff;
+  --accent2:   #7c3aed;
+  --accent-glow: rgba(0,229,255,0.14);
+  --text:      #eaf2ff;
+  --text-dim:  #6b82a8;
+  --text-muted:#3d5275;
+  --green:     #00d68f;
+  --red:       #ff4f6e;
+  --red-dim: rgba(255,79,110,0.15);
+  --gold-dim: rgba(245,166,35,0.15);
+  --orange:    #ffa500;
+  --gold:      #f5a623;
+  --shadow:    0 8px 32px rgba(0,0,0,.6);
+  --neon-cyan:       #00e5ff;
+  --neon-cyan-dim:   rgba(0,229,255,0.15);
+  --neon-purple:     #7c3aed;
+  --neon-purple-dim: rgba(124,58,237,0.18);
+  --neon-blue:       #38bdf8;
+  --neon-blue-dim:   rgba(56,189,248,0.18);
+  --neon-pink:       #f472b6;
+  --neon-green:      #00d68f;
+  --neon-text:       #eaf2ff;
+  --neon-dim:        rgba(234,242,255,0.5);
   --neon-red:        var(--red);
   --neon-orange:     var(--orange);
   --neon-yellow:     var(--gold);

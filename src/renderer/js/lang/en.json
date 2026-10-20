@@ -307,6 +307,7 @@
   "settings.general.theme.aurora": "Aurora",
   "settings.general.theme.sunset": "Sunset",
   "settings.general.theme.forest": "Forest",
+  "settings.general.theme.void": "Void",
   "settings.general.lyricSectionTitle": "Lyrics Display",
   "settings.general.lyricFontSize": "LyricsFont size",
   "settings.general.lyricFontSizeHint": "Only affects the font size inside the lyrics panel",

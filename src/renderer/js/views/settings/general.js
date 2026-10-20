@@ -85,18 +85,20 @@ export function applyTheme(theme) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     _themeMediaQuery = mq;
     const applySystem = (isDark) => {
-      document.documentElement.setAttribute('data-theme', isDark ? 'default' : 'light');
+      document.documentElement.setAttribute('data-theme', isDark ? 'void' : 'light');
     };
     applySystem(mq.matches);
     mq.onchange = (e) => applySystem(e.matches);
   } else if (themeId === 'default') {
-    document.documentElement.removeAttribute('data-theme');
+    // S2：产品默认主题从 :root 旧暗色切换为 Void Glass（深黑蓝）。
+    // :root 块保留 —— 它仍是未知主题值与 light 混色派生的兜底。
+    document.documentElement.setAttribute('data-theme', 'void');
   } else {
     document.documentElement.setAttribute('data-theme', themeId);
   }
 }
 
-const THEME_CARDS = ['auto', 'default', 'light', 'cyber', 'aurora', 'sunset', 'forest'];
+const THEME_CARDS = ['auto', 'default', 'light', 'cyber', 'aurora', 'sunset', 'forest', 'void'];
 
 export function syncThemeCards(value) {
   const sel = document.getElementById('settingTheme');
