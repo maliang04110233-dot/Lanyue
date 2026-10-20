@@ -24,11 +24,11 @@ const OVERLAY_CSS = read('src/renderer/styles/overlays.css');
 const ZH = read('src/renderer/js/lang/zh.json');
 const EN = read('src/renderer/js/lang/en.json');
 
-/** 侧栏区块：从 .sidebar 开标签到内容区开标签（右边界不再依赖已搬走的下载目录块） */
+/** 导航区块（D6 起在顶栏 .topbar，侧栏已退役）：到 .main 开标签为止 */
 function sidebarSlice() {
-  const start = HTML.indexOf('<div class="sidebar">');
-  const end = HTML.indexOf('<div class="content">');
-  assert.ok(start >= 0 && end > start, '侧栏区块截取失败（锚点改名时同步本测试）');
+  const start = HTML.indexOf('<div class="topbar">');
+  const end = HTML.indexOf('<div class="main">');
+  assert.ok(start >= 0 && end > start, '导航区块截取失败（锚点改名时同步本测试）');
   return HTML.slice(start, end);
 }
 
@@ -98,11 +98,12 @@ test('layout.css 不再定义 .save-dir / .sidebar .btn-sm；路径样式落在�
   assert.match(OVERLAY_CSS, /\.setting-path\s*\{[^}]*word-break:\s*break-all/, '路径要能折行看全（省略号会藏掉落点）');
 });
 
-// ──  反漂移：侧栏结构钉的右边界不许指回已删掉的块 ──────
-test('renderer-audit 的侧栏右边界不再依赖 .save-dir（删块会让 indexOf 返回 -1，slice 从末尾取）', () => {
+// ──  反漂移：导航结构钉的右边界不许指回已删掉的块 ──────
+test('renderer-audit 的导航右边界不再依赖 .save-dir（删块会让 indexOf 返回 -1，slice 从末尾取）', () => {
   const audit = read('test/renderer-audit.test.js');
   assert.ok(!audit.includes("html.indexOf('<div class=\"save-dir\">')"),
-    '侧栏区块右边界还钉在已删除的 .save-dir 上 —— 三条侧栏结构钉的截取范围会静默变形');
-  assert.ok(audit.includes("html.indexOf('<div class=\"content\">')"),
-    '右边界应改为内容区开标签');
+    '导航区块右边界还钉在已删除的 .save-dir 上 —— 结构钉的截取范围会静默变形');
+  // D6 起侧栏退役搬进顶栏：右边界锚点从 .content 改为 .main（topbar 在 main 之前）
+  assert.ok(audit.includes("html.indexOf('<div class=\"main\">')"),
+    '右边界应改为主体开标签（D6 顶栏口径）');
 });

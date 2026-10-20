@@ -56,73 +56,40 @@
 <body>
 <div class="app">
 
-<!-- 标题栏 -->
-<div class="titlebar">
-  <div class="titlebar-left">
-    <div class="app-logo">🎵</div>
-    <div>
-      <div class="app-title" data-i18n="app.title">揽乐</div>
-      <div class="app-subtitle" data-i18n="app.subtitle">网易云 · QQ音乐 · 哔哩哔哩</div>
-    </div>
+<!-- 顶部导航（D6：照 YesPlayMusic Navbar —— 侧栏搬成顶栏，
+     文字链接居中，active=主色文字。nav-item 类名与 data-tab 原样
+     保留：switchTab / NAV_ALIAS / commandPalette 零改动。
+     D6.1：原 52px 品牌标题栏并入本条（YesPlay 一体式 Navbar 即标题栏，
+     -webkit-app-region: drag 在 .topbar 上），窗口控制移到右端。） -->
+<div class="topbar">
+  <div class="topbar-links">
+    <button class="nav-item active" data-tab="home" onclick="switchTab('home',this)">发现</button>
+    <button class="nav-item" data-tab="playlist" onclick="switchTab('playlist',this)">歌单</button>
+    <button class="nav-item" data-tab="local" onclick="switchTab('local',this)">本地曲库</button>
+    <button class="nav-item" data-tab="aggregate" onclick="switchTab('aggregate',this)"><span data-i18n="nav.aggregate">跨源聚合</span></button>
+    <button class="nav-item" data-tab="subscription" onclick="switchTab('subscription',this)">订阅更新 <span class="nav-badge" id="subBadge" style="display:none;"></span></button>
+    <button class="nav-item" data-tab="download" onclick="switchTab('download',this)">下载管理</button>
+    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)">格式转换</button>
+    <button class="nav-item" data-tab="ai-music" data-feature="ai" onclick="switchTab('ai-music',this)">AI 创作</button>
+    <button class="nav-item" data-tab="assistant" onclick="switchTab('assistant',this)"><span data-i18n="nav.assistant">AI 助手</span></button>
   </div>
-  <div class="winctrls">
-    <button onclick="api.windowMinimize()" title="最小化" aria-label="最小化">─</button>
-    <button onclick="api.windowMaximize()" title="最大化" aria-label="最大化">□</button>
-    <button class="close" onclick="api.windowClose()" title="关闭" aria-label="关闭">✕</button>
+  <div class="topbar-right">
+    <button class="icon-btn" onclick="openFolderSafe(getState('saveDir'))" title="打开下载目录" aria-label="打开下载目录">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    </button>
+    <button class="icon-btn" onclick="openSettings()" title="设置 / Cookie" aria-label="设置">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <div class="winctrls">
+      <button onclick="api.windowMinimize()" title="最小化" aria-label="最小化">─</button>
+      <button onclick="api.windowMaximize()" title="最大化" aria-label="最大化">□</button>
+      <button class="close" onclick="api.windowClose()" title="关闭" aria-label="关闭">✕</button>
+    </div>
   </div>
 </div>
 
 <!-- 主体 -->
 <div class="main">
-
-  <!-- 侧边栏 -->
-  <!-- D1（播放器化重构）：分组顺序按「播放器优先」重排 ——
-       正在播放/发现上位，下载从首项降级到工具区。
-       注意：data-tab 值一律不改，只调顺序与分组标题，
-       switchTab 的路由与 NAV_ALIAS 因此完全不受影响。 -->
-  <div class="sidebar">
-    <button class="nav-item active" data-tab="home" onclick="switchTab('home',this)">
-      <span class="icon">🔍</span> 发现
-    </button>
-
-    <div class="sidebar-title">我的音乐</div>
-    <button class="nav-item" data-tab="playlist" onclick="switchTab('playlist',this)">
-      <span class="icon">🎼</span> 歌单
-    </button>
-    <button class="nav-item" data-tab="local" onclick="switchTab('local',this)">
-      <span class="icon">📂</span> 本地曲库
-    </button>
-    <button class="nav-item" data-tab="aggregate" onclick="switchTab('aggregate',this)">
-      <span class="icon">&#128202;</span> <span data-i18n="nav.aggregate">跨源聚合</span>
-    </button>
-
-    <div class="sidebar-title">订阅与更新</div>
-    <button class="nav-item" data-tab="subscription" onclick="switchTab('subscription',this)">
-      <span class="icon">📡</span> 订阅更新 <span class="nav-badge" id="subBadge" style="display:none;"></span>
-    </button>
-
-    <div class="sidebar-title">工具</div>
-    <button class="nav-item" data-tab="download" onclick="switchTab('download',this)">
-      <span class="icon">⬇</span> 下载管理
-    </button>
-    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)">
-      <span class="icon">🔄</span> 格式转换
-    </button>
-    <button class="nav-item" data-tab="ai-music" data-feature="ai" onclick="switchTab('ai-music',this)">
-      <span class="icon">🤖</span> AI 创作
-    </button>
-    <button class="nav-item" data-tab="assistant" onclick="switchTab('assistant',this)">
-      <span class="icon">🪄</span> <span data-i18n="nav.assistant">AI 助手</span>
-    </button>
-
-    <div class="sidebar-title" data-i18n="nav.operations.title">操作</div>
-    <button class="nav-item" onclick="openFolderSafe(getState('saveDir'))">
-      <span class="icon">📥</span> 打开下载目录
-    </button>
-    <button class="nav-item" onclick="openSettings()">
-      <span class="icon">⚙️</span> 设置 / Cookie
-    </button>
-  </div>
 
   <!-- 内容区 -->
   <div class="content">

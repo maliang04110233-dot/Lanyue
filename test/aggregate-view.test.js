@@ -24,9 +24,9 @@ const VIEW = read('src/renderer/js/views/aggregate.js');
 const zh = JSON.parse(read('src/renderer/js/lang/zh.json'));
 const en = JSON.parse(read('src/renderer/js/lang/en.json'));
 
-/** 侧栏 data-tab 序列 */
+/** 导航 data-tab 序列（D6 起在顶栏 .topbar，侧栏已退役） */
 function sidebarTabs() {
-  const sb = HTML.slice(HTML.indexOf('<div class="sidebar">'), HTML.indexOf('<div class="content">'));
+  const sb = HTML.slice(HTML.indexOf('<div class="topbar">'), HTML.indexOf('<div class="main">'));
   return [...sb.matchAll(/data-tab="([^"]+)"/g)].map((m) => m[1]);
 }
 

@@ -9,34 +9,8 @@
 /* ── 应用骨架（原先只定义在 base.css，重写时并入外壳层） ── */
 .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-/* ── 标题栏 ─────────────────────────────────────────── */
-.titlebar {
-  display: flex; align-items: center; justify-content: space-between;
-  height: 52px; padding: 0 var(--sp-4) 0 var(--sp-5);
-  background: var(--glass);
-  backdrop-filter: blur(16px) saturate(130%);
-  border-bottom: 1px solid var(--stroke-1);
-  -webkit-app-region: drag;
-  flex-shrink: 0;
-  z-index: var(--z-sticky);
-}
-.titlebar-left { display: flex; align-items: center; gap: var(--sp-3); }
-.app-logo {
-  width: 32px; height: 32px; border-radius: var(--r-md);
-  background: linear-gradient(140deg, var(--accent-soft), transparent 85%);
-  border: 1px solid var(--accent-line);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; flex-shrink: 0;
-}
-.app-icon { font-size: 20px; }
-.app-title {
-  font-size: var(--fs-lg); font-weight: var(--fw-semi);
-  letter-spacing: -.2px; color: var(--fg-1); line-height: 1.2;
-}
-.app-subtitle {
-  font-size: 10.5px; color: var(--fg-3); margin-top: 1px; letter-spacing: .3px;
-}
-.winctrls { display: flex; gap: var(--sp-1); -webkit-app-region: no-drag; }
+/* ── 窗口控制按钮（D6.1：原 52px 品牌标题栏并入顶栏，这里只剩按钮组） ── */
+.winctrls { display: flex; gap: var(--sp-1); margin-left: var(--sp-2); -webkit-app-region: no-drag; }
 .winctrls button {
   width: 30px; height: 30px; border-radius: var(--r-sm); border: none;
   background: transparent; color: var(--fg-3); font-size: var(--fs-md);
@@ -53,91 +27,71 @@
   position: relative;   /* 侧栏 overlay 的定位上下文 */
 }
 
-/* ══ 侧栏：200px 常驻展开（D4 播放器化）══════════════════════════
-   旧态是 64px 图标轨 + 悬停浮出 overlay。两个问题：
-   1. D1 的分组重排（发现/我的音乐/订阅与更新）只有悬停展开才看得见，
-      等于改了个寂寞——用户实证「跟原版没区别」；
-   2. overlay 悬停即盖内容，误触率高。
-   播放器产品的侧栏天天要看，常驻才是正解。窄态 font-size:0 收起
-   文本的 tricks 随之下线。 */
-.sidebar {
+/* ══ 顶栏导航（D6：照 YesPlayMusic Navbar，侧栏退役）════════════
+   拆解自 qier222/YesPlayMusic src/components/Navbar.vue（实抓源码，
+   结论见 docs/design/YESPLAY-RESEARCH.md）：
+   · 高 64px，三段式：左品牌｜中文链接居中｜右动作图标
+   · 左右 10vw 大留白 —— YesPlay 呼吸感的来源，窗口窄时 clamp 保底
+   · 链接 = 粗体文字，无底色；hover 淡底，active 主色文字
+   · 毛玻璃 backdrop-filter，与 titlebar 同族
+   流内布局（不用 fixed+padding 补偿）：.app 纵向 flex 自然堆叠。 */
+.topbar {
   flex-shrink: 0;
-  width: 200px;
+  height: 64px;
+  display: flex; align-items: center;
+  padding: 0 clamp(16px, 8vw, 140px);
+  gap: var(--sp-4);
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--stroke-1);
+  -webkit-app-region: drag;
   z-index: var(--z-side);
-  background: var(--bg-card);
-  border-right: 1px solid var(--stroke-1);
-  display: flex; flex-direction: column;
-  padding: var(--sp-3) 10px;
+}
+.topbar button, .topbar a { -webkit-app-region: no-drag; }
+.topbar-links {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
   gap: 2px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.topbar-links::-webkit-scrollbar { display: none; }
+.topbar-right {
+  display: flex; align-items: center; gap: var(--sp-1);
+  flex-shrink: 0;
 }
 
-/* 分区标题：常驻可见 */
-.sidebar-title {
-  font-size: 10px; color: var(--fg-3); text-transform: uppercase;
-  letter-spacing: 1.1px; padding: 0 var(--sp-2); margin: 14px 0 6px;
-  white-space: nowrap;
-}
-.sidebar-title:first-child { margin-top: 0; }
-
-/* 导航项：40px 高 / 圆角 8px / 激活靠「淡底 + 左侧指示条」 */
+/* 导航项（顶栏形态）：文字链接，active=主色文字（YesPlay 同款，
+   不是色块）。类名沿用 nav-item——switchTab 靠它找按钮。 */
 .nav-item {
   position: relative;
-  display: flex; align-items: center; gap: var(--sp-2);
-  height: 38px; padding: 0 10px;
-  border-radius: var(--r-md);
+  display: flex; align-items: center; gap: 2px;
+  height: 34px; padding: 0 12px;
+  border-radius: var(--r-sm);
   cursor: pointer; color: var(--fg-2);
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-  font-size: var(--fs-md); font-weight: var(--fw-med);
-  border: none; background: transparent; width: 100%; text-align: left;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+              transform var(--dur-1) var(--ease);
+  font-size: var(--fs-md); font-weight: 700;
+  border: none; background: transparent; text-align: center;
   white-space: nowrap; flex-shrink: 0;
 }
 .nav-item:hover { background: var(--elev-1); color: var(--fg-1); }
-.nav-item.active { background: var(--accent-soft); color: var(--accent-ui); }
-/* 激活指示条：贴侧栏左边缘 */
-.nav-item.active::before {
-  content: '';
-  position: absolute; left: -10px; top: 50%;
-  transform: translateY(-50%);
-  width: 3px; height: 17px; border-radius: 0 var(--r-xs) var(--r-xs) 0;
-  background: var(--accent-ui);
-}
-.nav-item .icon {
-  font-size: 15px; width: 20px; text-align: center; flex-shrink: 0;
-  line-height: 1;
-}
+.nav-item:active { transform: scale(.92); }
+.nav-item.active { background: transparent; color: var(--accent-ui); }
+.nav-item .icon { display: none; } /* 顶栏文字链接不放图标（YesPlay 形态） */
 .nav-item .nav-badge {
-  margin-left: auto; font-size: 10px; padding: 1px 7px;
+  font-size: 10px; padding: 1px 7px;
   border-radius: var(--r-full);
   background: var(--accent-ui); color: var(--on-accent);
   font-weight: var(--fw-bold);
 }
 
-/* 平台状态指示器 */
-.platform-status-list {
-  margin: var(--sp-2) 0 var(--sp-1); display: flex; flex-direction: column; gap: var(--sp-1);
-}
-.platform-status-row {
-  display: flex; align-items: center; gap: var(--sp-2);
-  padding: 5px 10px; border-radius: var(--r-sm);
-  font-size: 11.5px; color: var(--fg-3); white-space: nowrap;
-}
-.platform-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-  background: var(--fg-3); opacity: .45;
-  transition: background var(--dur-3) var(--ease), opacity var(--dur-3) var(--ease);
-}
-.platform-dot.active { background: var(--c-ok); opacity: 1; }
-.platform-dot.cookie { background: var(--c-warn); opacity: 1; }
-.platform-name-s { flex: 1; }
-
-/* ── 内容区 ─────────────────────────────────────────────
-   侧栏改为流内常驻后，这里不再需要 64px 让位 padding。 */
+/* ── 内容区（D6：侧栏退役后占满全宽） ─────────────────── */
 .content {
   flex: 1; display: flex; flex-direction: row;
   overflow: hidden;
-  padding: var(--sp-5);
+  padding: var(--sp-5) clamp(16px, 8vw, 140px);
   gap: var(--sp-4);
   min-width: 0;
 }

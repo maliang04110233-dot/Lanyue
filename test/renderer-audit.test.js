@@ -494,92 +494,62 @@ test('接线钉：renderSection 成功路径必须清除 is-unavailable（否则
 });
 
 // ── （IA 收敛第一步）：侧边栏聚为五组 → （第二步）：首页+搜索合为单一「搜歌」入口
-//    → （D1 播放器化重构）：分组按「播放器优先」重排，下载从首项降级到工具区 ──
+//    → （D1 播放器化重构）：分组按「播放器优先」重排，下载从首项降级到工具区
+//    → （D6 照 YesPlayMusic）：侧栏退役，导航搬进顶栏 .topbar —— 分组标题
+//      随竖栏消失（横排链接不需要分组），守卫口径从「分组归属」改为
+//      「链接序列 + 动作按钮隔离」，其余判据（tab 集合、onclick 形状、
+//      叫法统一、徽标在场）原样保留 ──
 
-test('侧边栏分组：四个分区标题按序就位（D1 起为 我的音乐 / 订阅与更新 / 工具 / 操作）', () => {
+test('顶栏 D6：侧栏已退役，导航链接在 .topbar 内按播放器优先排列', () => {
   const html = read('index.html');
-  const sb = html.slice(html.indexOf('<div class="sidebar">'), html.indexOf('<div class="content">'));
-  assert.ok(sb.length > 200, '侧边栏区块截取失败（锚点改名时同步本测试）');
-  const titles = [...sb.matchAll(/class="sidebar-title"[^>]*>([^<]+)</g)].map(m => m[1].trim());
-  // D1（播放器化）：原「下载 / 曲库 / 工具 / 操作」改为「我的音乐 / 订阅与更新 / 工具 / 操作」。
-  // 变更理由：产品身份从「下载器」转为「播放器」——下载降级为工具，曲库升为「我的音乐」。
-  assert.deepStrictEqual(titles, ['我的音乐', '订阅与更新', '工具', '操作'],
-    '分区标题恰好这四个且按此序 —— D1 起按播放器优先重排，下载降级到「工具」组');
-  assert.ok(!sb.includes('nav.sidebar.title'),
-    '「导航」单段旧头已退役：分组标题是纯中文硬写（改版决议：收缩为纯中文），不许再挂 i18n');
-  assert.ok(sb.includes('data-i18n="nav.operations.title"'), '「操作」段沿用既有 i18n 键，不动');
-  // 孤儿键清扫必须 zh/en 成对（教训），否则「键集合一致」钉会红
-  for (const f of ['js/lang/zh.json', 'js/lang/en.json']) {
-    assert.ok(!read(...f.split('/')).includes('nav.sidebar.title'), `${f} 残留 nav.sidebar.title`);
-  }
-});
-
-test('侧边栏 D1：发现入口在最上，下载降级到工具组（播放器优先）', () => {
-  const html = read('index.html');
-  const sb = html.slice(html.indexOf('<div class="sidebar">'), html.indexOf('<div class="content">'));
-  // 播放器身份的第一判据：栏顶第一个 data-tab 必须是发现（home），不是下载。
-  const firstTab = sb.match(/data-tab="([^"]+)"/);
-  assert.ok(firstTab, '侧边栏没有任何 data-tab 条目');
+  assert.ok(!html.includes('<div class="sidebar">'),
+    'D6 起侧栏退役 —— 复活 .sidebar 说明顶栏/侧栏双导航并存，switchTab 高亮会分裂');
+  const tb = html.slice(html.indexOf('<div class="topbar">'), html.indexOf('<div class="main">'));
+  assert.ok(tb.length > 200, '顶栏区块截取失败（锚点改名时同步本测试）');
+  // 播放器身份的第一判据：第一个 data-tab 必须是发现（home），不是下载。
+  const firstTab = tb.match(/data-tab="([^"]+)"/);
+  assert.ok(firstTab, '顶栏没有任何 data-tab 条目');
   assert.strictEqual(firstTab[1], 'home',
-    '栏顶第一个入口必须是「发现」——下载器时代它是 download，播放器时代必须是 home');
-
-  // 第二个判据：download 必须落在「工具」组内，而不是自成一组。
-  const parts = sb.split(/class="sidebar-title"[^>]*>/);
-  const seg = {};
-  for (let i = 1; i < parts.length; i++) {
-    seg[parts[i].slice(0, parts[i].indexOf('<')).trim()] = parts[i];
-  }
-  assert.ok(seg['工具'] && seg['工具'].includes('data-tab="download"'),
-    '下载必须降级到「工具」组内（D1 决议：它不再是产品主入口）');
-  assert.ok(!seg['我的音乐'].includes('data-tab="download"'),
-    '下载不得留在「我的音乐」组 —— 那是播放器的主内容区');
-});
-
-test('侧边栏条目：九个 data-tab，D1 起顺序按播放器优先重排', () => {
-  const html = read('index.html');
-  const sb = html.slice(html.indexOf('<div class="sidebar">'), html.indexOf('<div class="content">'));
-  const tabs = [...sb.matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]);
-  // D1（播放器化）：顺序由「download 打头」改为「home 打头」，
-  // playlist 提到 local 之前（歌单是播放器主入口），download 降到工具组。
-  // 集合仍是这 9 个 —— 只换序，不增删页面。
-  assert.deepStrictEqual(tabs, ['home', 'playlist', 'local', 'aggregate', 'subscription', 'download', 'converter', 'ai-music', 'assistant'],
-    '条目增删/换序会破坏 switchTab 兜底查询与 ⌘K/快捷键的 data-tab 反查 —— D1 只换序不增删');
-  for (const t of tabs) {
-    assert.ok(sb.includes(`onclick="switchTab('${t}',this)"`), `${t} 的 onclick 形状被改，切换链路可能断`);
-  }
-  assert.ok(!sb.includes('data-tab="search"'),
-    '搜索不再是导航条目 —— 它是「搜歌」入口的第二个视图，高亮归属走 app.js 的 NAV_ALIAS');
-  assert.ok(sb.includes('发现'), '合并后的入口叫「发现」（播放器语义，替代下载器时代的「搜歌」）');
-  assert.ok(!sb.includes('首页'), '导航条目退役后侧栏不许残留「首页」叫法（发现视图的说法留在 ⌘K 括注里）');
-  // 按标题切段做归属核对（parts[0] = 首个标题之前的段落，即栏顶条目）
-  const seg = {};
-  const parts = sb.split(/class="sidebar-title"[^>]*>/);
-  seg['栏顶'] = parts[0];
-  for (let i = 1; i < parts.length; i++) {
-    const name = parts[i].slice(0, parts[i].indexOf('<')).trim();
-    seg[name] = parts[i];
-  }
-  assert.deepStrictEqual([...seg['栏顶'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['home'],
-    '栏顶必须只有「发现」一项（多出来的说明有页面绕过分组挂在了栏顶）');
-  assert.deepStrictEqual([...seg['我的音乐'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['playlist', 'local', 'aggregate'],
-    '「我的音乐」组：歌单 → 本地曲库 → 跨源聚合');
-  assert.deepStrictEqual([...seg['订阅与更新'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['subscription']);
-  assert.deepStrictEqual([...seg['工具'].matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]), ['download', 'converter', 'ai-music', 'assistant'],
-    '「工具」组：下载管理打头（它仍是常用功能，只是不再是产品主入口）');
-  assert.ok(!seg['操作'].includes('data-tab'), '「操作」两项是动作按钮不是页面，挂上 data-tab 会被 switchTab 兜底误高亮');
-  // 「操作」段的打开目录按钮走 openFolderSafe（utils.js 的唯一出口）——
+    '顶栏第一个入口必须是「发现」——下载器时代它是 download，播放器时代必须是 home');
+  // 「操作」两项（打开目录/设置）是动作按钮不是页面，必须留在 .topbar-right，
+  // 挂上 data-tab 会被 switchTab 兜底误高亮。
+  const right = tb.slice(tb.indexOf('topbar-right'));
+  assert.ok(!right.includes('data-tab'), 'topbar-right 两项是动作按钮，不得挂 data-tab');
+  // 打开目录按钮走 openFolderSafe（utils.js 的唯一出口）——
   // 裸调 api.openFolder 在主进程沙箱拒绝时是静默失败，用户点了没反应也没提示。
-  assert.ok(seg['操作'].includes('openFolderSafe(') && seg['操作'].includes('openSettings()'));
-  // D1：订阅条目已从「曲库」组独立到「订阅与更新」组，徽标断言跟着搬。
-  assert.ok(seg['订阅与更新'].includes('id="subBadge"'), '订阅未读徽标必须仍长在订阅条目上，挪丢=红点静默消失');
+  assert.ok(right.includes('openFolderSafe(') && right.includes('openSettings()'),
+    '顶栏右端必须保留 打开下载目录 + 设置 两个动作');
+  // 订阅徽标必须仍长在订阅条目上（挪丢=红点静默消失）
+  const subItem = tb.slice(tb.indexOf('data-tab="subscription"'), tb.indexOf('data-tab="download"'));
+  assert.ok(subItem.includes('id="subBadge"'), '订阅未读徽标必须仍在订阅条目内');
+  // 分组标题随侧栏退役：i18n 孤儿键不许复活
+  assert.ok(!tb.includes('nav.sidebar.title') && !tb.includes('nav.operations.title'),
+    '侧栏分组 i18n 键已随竖栏退役，顶栏不挂分组标题');
 });
 
-test('侧边栏条目叫法统一：本地曲库 / 歌单（与首页统计、⌘K、快捷键浮层同一词汇）', () => {
+test('顶栏条目：九个 data-tab，顺序沿用 D1 播放器优先重排', () => {
   const html = read('index.html');
-  const sb = html.slice(html.indexOf('<div class="sidebar">'), html.indexOf('<div class="content">'));
-  assert.ok(sb.includes('本地曲库'), '侧栏本地条目应与全站通用叫法「本地曲库」一致');
-  assert.ok(!sb.includes('本地歌曲'), '「本地歌曲」是第二套叫法（首页统计标签/排序按钮/⌘K 都叫本地曲库），不许复活');
-  assert.ok(!sb.includes('我的歌单'), '侧栏条目精简为「歌单」（页面内大标题保留「我的歌单」不在此段）');
+  const tb = html.slice(html.indexOf('<div class="topbar">'), html.indexOf('<div class="main">'));
+  const tabs = [...tb.matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]);
+  // D1 定的顺序在 D6 原样搬进顶栏：home 打头，歌单在本地曲库前，下载在工具段。
+  // 集合仍是这 9 个 —— 只换载体（竖栏→顶栏），不增删页面。
+  assert.deepStrictEqual(tabs, ['home', 'playlist', 'local', 'aggregate', 'subscription', 'download', 'converter', 'ai-music', 'assistant'],
+    '条目增删/换序会破坏 switchTab 兜底查询与 ⌘K/快捷键的 data-tab 反查 —— D6 只换载体不增删');
+  for (const t of tabs) {
+    assert.ok(tb.includes(`onclick="switchTab('${t}',this)"`), `${t} 的 onclick 形状被改，切换链路可能断`);
+  }
+  assert.ok(!tb.includes('data-tab="search"'),
+    '搜索不再是导航条目 —— 它是「搜歌」入口的第二个视图，高亮归属走 app.js 的 NAV_ALIAS');
+  assert.ok(tb.includes('发现'), '合并后的入口叫「发现」（播放器语义，替代下载器时代的「搜歌」）');
+  assert.ok(!tb.includes('首页'), '导航条目退役后顶栏不许残留「首页」叫法（发现视图的说法留在 ⌘K 括注里）');
+});
+
+test('顶栏条目叫法统一：本地曲库 / 歌单（与首页统计、⌘K、快捷键浮层同一词汇）', () => {
+  const html = read('index.html');
+  const tb = html.slice(html.indexOf('<div class="topbar">'), html.indexOf('<div class="main">'));
+  assert.ok(tb.includes('本地曲库'), '顶栏本地条目应与全站通用叫法「本地曲库」一致');
+  assert.ok(!tb.includes('本地歌曲'), '「本地歌曲」是第二套叫法（首页统计标签/排序按钮/⌘K 都叫本地曲库），不许复活');
+  assert.ok(!tb.includes('我的歌单'), '顶栏条目精简为「歌单」（页面内大标题保留「我的歌单」不在此段）');
   const sc = read('js', 'shortcuts.js');
   assert.ok(sc.includes('跳到本地曲库'), '快捷键浮层文案跟着统一');
   assert.ok(!sc.includes('跳到本地歌曲'), '浮层旧叫法不许复活');
