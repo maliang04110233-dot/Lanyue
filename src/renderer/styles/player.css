@@ -1445,7 +1445,7 @@ audio { display: none; }
    ══════════════════════════════════════════════════════════════ */
 
 .bottom-bar {
-  --bb-h: 92px;
+  --bb-h: 76px;
   flex-shrink: 0;
   height: var(--bb-h);
   display: flex;
@@ -1457,27 +1457,28 @@ audio { display: none; }
   z-index: var(--z-side);
 }
 
-/* ── 卡片 → 横条：grid 三栏两行重排 ── */
+/* ── D5.2 单行六列（网易云标准排布，两轮「不协调」逼出的正解）：
+   封面 | 歌名/歌手 | 播放控制 | 进度行 | 工具 | 队列
+   每类元素各占一段水平位置，视线一条线读完；不再上下堆叠。 ── */
 .bottom-bar .player-card {
   display: grid;
-  grid-template-columns: 268px minmax(0, 1fr) 268px;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas:
-    "cover meta controls topbar"
-    "cover meta progress queue";
+  grid-template-columns: auto 230px auto minmax(200px, 1fr) auto auto;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "cover meta controls progress topbar queue";
+  align-items: center;
   column-gap: var(--sp-4);
-  padding: var(--sp-2) var(--sp-4);
+  padding: 0 var(--sp-4);
   height: var(--bb-h);
   overflow: visible;
   background: transparent;
 }
-/* 歌词/频谱展开时：行轨道改为 auto，条体自然长高 */
+/* 歌词/频谱展开：主行不动，下方追加整行，条体长高 */
 .bottom-bar .player-card:has(.lyrics-area[style*="block"]) {
+  grid-template-rows: minmax(0, 1fr) auto auto;
   grid-template-areas:
-    "cover meta controls topbar"
-    "cover meta progress queue"
-    "viz   viz  viz     viz"
-    "lyric lyric lyric lyric";
+    "cover meta controls progress topbar queue"
+    "viz   viz  viz      viz     viz    viz"
+    "lyric lyric lyric  lyric   lyric  lyric";
   height: auto;
   padding-bottom: var(--sp-3);
 }
@@ -1526,9 +1527,8 @@ audio { display: none; }
 .bottom-bar .pc-clock-sep { font-variant-numeric: tabular-nums; font-size: var(--fs-xs); color: var(--fg-3); }
 /* 时间挪去歌手行右侧不够位——底部条里时间贴进度条两端更常见，先保行内 */
 
-/* ── 中栏下：进度行 = 时间 0:05 ────●──── 4:06（播放器惯例） ── */
+/* ── 进度行 = 时间 0:05 ────●──── 4:06（单行：垂直居中由 grid 接管） ── */
 .bb-progress {
-  align-self: start;
   width: 100%;
   display: flex; align-items: center; gap: var(--sp-2);
   padding: 0;
@@ -1573,8 +1573,7 @@ audio { display: none; }
 .bb-progress .player-progress-track.dragging .player-progress-thumb,
 .bb-progress .player-progress-track:focus-visible .player-progress-thumb { opacity: 1; }
 
-/* ── 中栏：控制在上、进度在下（网易云惯例，D5.1 协调性修正） ── */
-.bottom-bar .player-controls { align-self: end; }
+/* ── 播放控制（单行：居中由 grid align-items 接管，不再自对齐） ── */
 .bottom-bar .pc-main-row { justify-content: center; gap: var(--sp-3); padding: 0; }
 .bottom-bar .ctrl-btn.play-btn {
   width: 42px;
