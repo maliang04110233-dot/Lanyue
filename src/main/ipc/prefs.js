@@ -35,6 +35,8 @@ const ALLOWED_PREF_KEYS = new Set([
   'qualityPolicyRules',
   // 换源排除平台清单（设置页写，主进程 resolveTrackService 每次解析时读）
   'fallbackDisabledPlatforms',
+  // 自动换源总开关（S1 改版：默认开，设置页可关；fallbackPolicy 每次解析时懒读）
+  'crossSourceAutoFallback',
   // 单平台并发上限 / 单曲失败尝试次数（设置页 GENERAL_PREFS 写，主进程 downloadQueue 读）
   'perSourceConcurrency', 'maxAttempts',
   // 下载完成钩子开关（autoLyric/autoCoverOnDone.js 读，设置页写）

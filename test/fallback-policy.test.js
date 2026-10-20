@@ -151,12 +151,27 @@ test('两次 resolve 之间改清单：第二次即刻生效（缓存不跨调�
 });
 
 // ── 跨源换源总开关（产品决策）──────────────────────
-// 用户诉求：「根据搜索结果播放就是正常播放，没有音乐源就无法正常展示内容，也不用换音乐源」。
-// 决策落在 fallbackPolicy 一处，机制保留在 resolveTrackService —— 想恢复换源改这里即可。
+// 2026-09-22 旧口径：「搜索结果里的歌=它自己平台的音源，拿不到就诚实失败」。
+// 2026-10-20 改版（S1，用户诉求「播放源无效时自动更换」）：默认开跨源换源，
+// 换源成功由 fallbackNotice + 源徽章明示实际来源；设置页可关（prefs 键
+// crossSourceAutoFallback=false）。机制一直在 resolveTrackService，未删一行。
 
-test('crossSourceEnabled：产品口径 = 关闭跨源换源', () => {
-  assert.equal(crossSourceEnabled(), false,
-    '默认不得跨源取流：别家平台的整曲不是这首歌');
+test('crossSourceEnabled：2026-10-20 口径 = 默认开启跨源换源，prefs 显式 false 才关', () => {
+  assert.equal(crossSourceEnabled(), true,
+    '默认开：源无效时自动换源（UI 会明示实际来源，不冒充）');
+  const prefs = require('../src/utils/prefs');
+  // 懒读 prefs：显式 false 才关（用临时 prefs 实例验证读盘路径）
+  const tmpDir = require('node:fs').mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'ypm-prefs-'));
+  try {
+    prefs.init(tmpDir);
+    prefs.set('crossSourceAutoFallback', false);
+    assert.equal(crossSourceEnabled(), false, '设置页关掉后必须立即生效（每次解析重读）');
+    prefs.set('crossSourceAutoFallback', true);
+    assert.equal(crossSourceEnabled(), true, '重新打开也必须立即生效');
+  } finally {
+    prefs.destroy();
+    require('node:fs').rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('生产接线：api/index.js 把总开关注入取流服务（漏注入等于决策失效）', () => {

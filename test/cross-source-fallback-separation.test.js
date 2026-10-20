@@ -36,12 +36,12 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
-// ── 1. 开关仍然关闭（产品口径未变） ───────────────────
+// ── 1. 开关与聚合彼此独立（2026-10-20 S1 改版：开关默认开） ──
 
-test('自动兜底换源仍是关闭状态', () => {
+test('自动兜底换源默认开启（S1 改版），但聚合链仍不读它 —— 两概念分离不变', () => {
   const { crossSourceEnabled } = require('../src/api/services/fallbackPolicy');
-  assert.equal(crossSourceEnabled(), false,
-    '本版不开自动兜底换源；真要打开请走产品决策并同步更新本文件');
+  assert.equal(crossSourceEnabled(), true,
+    '2026-10-20 口径：默认开自动换源（设置页可关）；开关状态与聚合建议无关');
 });
 
 // ── 2. 聚合链不读该开关 ───────────────────────────────
@@ -67,11 +67,12 @@ test('渲染层聚合视图不引用 fallbackEnabled', () => {
 
 // ── 3. 行为层：开关关闭时聚合建议照常产出 ───────────────
 
-test('行为：crossSourceEnabled() 为 false 时，聚合仍选出代表条目并给出建议', () => {
+test('行为：聚合选出代表条目与自动换源开关无关（无论开关开/关）', () => {
   const { crossSourceEnabled } = require('../src/api/services/fallbackPolicy');
   const { aggregateAcrossSources, pickRepresentative } = require('../src/utils/crossSourceAggregate');
 
-  assert.equal(crossSourceEnabled(), false, '前提：自动换源是关的');
+  // 前提钉的是「无关性」而非某个开关态：S1 改版默认开，但聚合行为必须一致
+  assert.equal(typeof crossSourceEnabled(), 'boolean');
   const songs = [
     { id: '1', source: 'netease', title: '晴天', artist: '周杰伦', duration: 269000 },
     { id: '9', source: 'qq', title: '晴天', artist: '周杰伦', duration: 269000 },

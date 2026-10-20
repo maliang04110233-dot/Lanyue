@@ -80,6 +80,27 @@ export async function resetQualityBySource() {
   showToast(t('toast.qualityFollowReset'), 'info');
 }
 
+// ── 自动换源总开关（S1：默认开，关掉即回到「只播本源」旧口径） ──
+// 主进程 fallbackPolicy.crossSourceEnabled 每次解析时懒读该 prefs 键，
+// 改完立即生效无需重启；读不到（未设置）时主进程按默认开处理，
+// 所以这里 getPref 返回 undefined 也要把复选框摆成勾选态。
+
+export async function loadCrossSourceFallback() {
+  const el = document.getElementById('crossSourceAutoFallback');
+  if (!el) return;
+  let v = true;
+  try {
+    const raw = await api.getPref('crossSourceAutoFallback');
+    if (raw === false) v = false;
+  } catch (e) { logger.warn('读取自动换源开关失败:', e.message); }
+  el.checked = v;
+}
+
+export function onCrossSourceFallbackToggle(cb) {
+  // 显式写布尔：主进程判 `!== false`，写 true 与删除键等效（默认开）
+  api.setPref('crossSourceAutoFallback', !!cb.checked);
+}
+
 // ── 换源排除平台 ─────────────────────────────────────────
 
 let _fallbackDisabledTimer = null;

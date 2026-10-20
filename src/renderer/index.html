@@ -868,6 +868,12 @@
             </div>
             <div id="qualityBySourceList" class="quality-map"></div>
 
+            <!-- S1：自动换源总开关（默认开；关掉后回到 2026-09-22 旧口径「只播本源」）
+                 复用设置页现有 setting-check 模式，不造新组件类。 -->
+            <div class="setting-row" style="display:block;">
+              <label class="setting-check"><input type="checkbox" id="crossSourceAutoFallback" checked onchange="onCrossSourceFallbackToggle(this)"><span>播放源无效时自动换源 —— 本源取不到整曲时，自动到其他平台匹配同名曲目续播；换源成功会明示实际来源</span></label>
+            </div>
+
             <div class="setting-row" style="display:block;">
               <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
                 <label class="setting-label">换源排除平台</label>

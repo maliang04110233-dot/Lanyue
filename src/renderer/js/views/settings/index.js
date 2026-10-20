@@ -38,6 +38,8 @@ import {
   loadFallbackDisabled,
   onFallbackDisabledToggle,
   resetFallbackDisabled,
+  loadCrossSourceFallback,
+  onCrossSourceFallbackToggle,
   loadQualityPolicy,
   renderQualityPolicy,
   onPolicyParam,
@@ -114,6 +116,7 @@ function openSettings() {
     loadGeneralSettings(),
     loadQualityBySource(),
     loadFallbackDisabled(),
+    loadCrossSourceFallback(),
     loadQualityPolicy(),
     updateCacheSize(),
     loadDownloadTemplates(),
@@ -374,6 +377,8 @@ window.resetQualityBySource = resetQualityBySource;
 window.loadFallbackDisabled = loadFallbackDisabled;
 window.onFallbackDisabledToggle = onFallbackDisabledToggle;
 window.resetFallbackDisabled = resetFallbackDisabled;
+window.loadCrossSourceFallback = loadCrossSourceFallback;
+window.onCrossSourceFallbackToggle = onCrossSourceFallbackToggle;
 window.loadQualityPolicy = loadQualityPolicy;
 window.renderQualityPolicy = renderQualityPolicy;
 window.onPolicyParam = onPolicyParam;

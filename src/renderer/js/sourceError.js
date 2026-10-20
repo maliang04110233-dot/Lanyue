@@ -109,8 +109,10 @@ function sourceErrorText(t, result, source, fallbackKey) {
  * 大概率碰到 VIP 或下架。UI 据此在行尾挂一个「音源可能不全」的轻提示，提醒用户
  * 别抱太高预期；具体失败原因仍由 sourceErrorText 在播放那一刻给出。
  *
- * 若将来跨源开关（fallbackPolicy.crossSourceEnabled）打开，这套标记会自动失效，
- * 因为换源兜底会消化掉大部分失败 —— 到时把这个数组清空即可。
+ * 2026-10-20（S1）跨源换源已默认开启，本清单**语义随之更新但保留**：
+ * 它现在预告的是「这首大概率会换到别家播」（fallbackNotice 会明示实际来源），
+ * 而不是旧开关时代的「这首大概率播不了」。清单本身仍是这三家——
+ * 网易云/QQ 整曲覆盖好，不需要预警。
  */
 const LOW_YIELD_PLATFORMS = new Set(['soda', 'kugou', 'kuwo']);
 
