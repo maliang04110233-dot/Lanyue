@@ -1463,8 +1463,8 @@ audio { display: none; }
   grid-template-columns: 268px minmax(0, 1fr) 268px;
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas:
-    "cover meta progress topbar"
-    "cover meta controls queue";
+    "cover meta controls topbar"
+    "cover meta progress queue";
   column-gap: var(--sp-4);
   padding: var(--sp-2) var(--sp-4);
   height: var(--bb-h);
@@ -1474,8 +1474,8 @@ audio { display: none; }
 /* 歌词/频谱展开时：行轨道改为 auto，条体自然长高 */
 .bottom-bar .player-card:has(.lyrics-area[style*="block"]) {
   grid-template-areas:
-    "cover meta progress topbar"
-    "cover meta controls queue"
+    "cover meta controls topbar"
+    "cover meta progress queue"
     "viz   viz  viz     viz"
     "lyric lyric lyric lyric";
   height: auto;
@@ -1526,15 +1526,18 @@ audio { display: none; }
 .bottom-bar .pc-clock-sep { font-variant-numeric: tabular-nums; font-size: var(--fs-xs); color: var(--fg-3); }
 /* 时间挪去歌手行右侧不够位——底部条里时间贴进度条两端更常见，先保行内 */
 
-/* ── 中栏上：进度条（从封面里搬出来，独立一行） ── */
+/* ── 中栏下：进度行 = 时间 0:05 ────●──── 4:06（播放器惯例） ── */
 .bb-progress {
-  align-self: end;
+  align-self: start;
   width: 100%;
-  padding: 0 0 2px;
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 0;
 }
+.bb-progress .pc-clock { margin-left: 0; flex-shrink: 0; min-width: 34px; }
+.bb-progress .pc-clock:last-child { text-align: right; }
 .bb-progress .player-progress-track {
+  flex: 1; min-width: 0;
   position: relative;
-  width: 100%;
   height: 5px;
   border-radius: var(--r-xs);
   background: color-mix(in srgb, var(--fg-3) 22%, transparent);
@@ -1570,9 +1573,9 @@ audio { display: none; }
 .bb-progress .player-progress-track.dragging .player-progress-thumb,
 .bb-progress .player-progress-track:focus-visible .player-progress-thumb { opacity: 1; }
 
-/* ── 中栏下：播放控制 ── */
-.bottom-bar .player-controls { align-self: start; }
-.bottom-bar .pc-main-row { justify-content: flex-start; gap: var(--sp-2); padding: 0; }
+/* ── 中栏：控制在上、进度在下（网易云惯例，D5.1 协调性修正） ── */
+.bottom-bar .player-controls { align-self: end; }
+.bottom-bar .pc-main-row { justify-content: center; gap: var(--sp-3); padding: 0; }
 .bottom-bar .ctrl-btn.play-btn {
   width: 42px;
   height: 42px;
@@ -1606,12 +1609,20 @@ audio { display: none; }
   bottom: calc(100% + 8px);
 }
 
-/* ── 右栏下：队列入口条 ── */
+/* ── 右栏下：队列入口（D5.1：去掉重描边，降级为轻量文字按钮） ── */
 .bottom-bar .pc-queue-bar {
   align-self: center;
-  width: 100%;
+  width: auto;
   margin-top: 0;
   justify-content: flex-end;
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg-3);
+}
+.bottom-bar .pc-queue-bar:hover {
+  border-color: transparent;
+  background: var(--elev-1);
+  color: var(--fg-1);
 }
 
 /* ── 队列面板：从竖栏内嵌改为向上浮出 ── */

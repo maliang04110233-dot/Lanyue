@@ -681,13 +681,16 @@
         </div>
       </div>
 
-      <!-- D3：进度条从封面内搬到中栏（底部条布局里它独立占一行） -->
+      <!-- D3：进度条从封面内搬到中栏；D5.1 协调性修正：时间挪到进度条两端
+           （播放器惯例 0:05 ──── 4:06，不留在歌手行末尾） -->
       <div class="bb-progress">
+        <span class="pc-clock"><span id="timeNow">0:00</span></span>
         <div class="player-progress-track" id="playerProgressBar" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div class="player-progress-fill" id="playerProgressFill"></div>
           <div class="player-progress-thumb" id="playerProgressThumb"></div>
           <div class="player-progress-hover-time" id="progressHoverTime"></div>
         </div>
+        <span class="pc-clock"><span id="timeTotal">0:00</span></span>
       </div>
 
       <canvas id="vizCanvas" class="viz-canvas" style="display:none;" height="34" aria-hidden="true" title="实时频谱（📊 按钮开关）"></canvas>
@@ -700,7 +703,6 @@
           <span class="pc-artist" id="playerArtist" data-i18n="player.artist">—</span>
           <span class="player-src-badge" id="playerQualityBadge" style="display:none;" title="本次播放音质"></span>
           <button class="story-btn" id="btnSongStory" title="讲讲这首歌" onclick="toggleSongStory()" aria-label="讲讲这首歌">✨</button>
-          <span class="pc-clock"><span id="timeNow">0:00</span><span class="pc-clock-sep">/</span><span id="timeTotal">0:00</span></span>
         </div>
         <div class="pc-hint" id="sleepCountdown" style="display:none;"></div>
         <div class="song-story-card" id="songStoryCard" style="display:none;">
