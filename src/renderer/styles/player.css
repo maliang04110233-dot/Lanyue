@@ -1429,23 +1429,22 @@ audio { display: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   D3：底部全宽播放条（播放器化重构 · 结构搬迁）
+   D5.3：底部播放条照抄 AlgerMusicPlayer 骨架
+   （逐条依据见 docs/design/PLAYER-BAR-RESEARCH.md，源码实拆自
+    AlgerMusicPlayer/src/renderer/components/player/PlayBar.vue）
    ──────────────────────────────────────────────────────────────
-   播放器从右侧 320px 竖栏（.side-panel）搬到窗口底部全宽条。
-   这是网易云/Alger 的标志性形态——用户判断「这是不是播放器」看的就是它。
-
-   实现方式：DOM 只搬容器 + 进度条出封面；内部子元素顺序不动，
-   用 grid-template-areas 做视觉重排。player.js 的 25 个 DOM 引用
-   全部按 id 查询（getBoundingClientRect 算拖拽），与容器位置无关。
-
-   三栏形态：
-     左 = 封面 + 歌名/歌手/时间      中 = 进度条 + 播放控制
-     右 = 状态/歌词开关/更多 + 队列入口
-   队列面板改为向上弹出的浮层（fixed 在条上方）。
+   三轮「不协调」的根因：此前全凭想象。拆开对标项目后发现它的
+   骨架跟我的 grid 六列是两回事：
+   1. 单行 flex（不是 grid）：封面｜信息定宽｜控制 flex-1 居中｜工具
+   2. 进度线不占列——absolute 贴条顶全宽 4px 细线，thumb 常态隐藏
+   3. 播放键是胶囊（80×48 rounded-full 淡底），不是圆形主色块
+   4. 条上没有独立时间列——时间小灰字贴歌手行末尾
+   揽乐适配：保留音量弹层/更多菜单/歌词内嵌展开（Alger 歌词是
+   全屏页），功能件一个不丢，只换排布骨架。
    ══════════════════════════════════════════════════════════════ */
 
 .bottom-bar {
-  --bb-h: 76px;
+  --bb-h: 80px;
   flex-shrink: 0;
   height: var(--bb-h);
   display: flex;
@@ -1457,49 +1456,49 @@ audio { display: none; }
   z-index: var(--z-side);
 }
 
-/* ── D5.2 单行六列（网易云标准排布，两轮「不协调」逼出的正解）：
-   封面 | 歌名/歌手 | 播放控制 | 进度行 | 工具 | 队列
-   每类元素各占一段水平位置，视线一条线读完；不再上下堆叠。 ── */
+/* ── 单行 flex（Alger .music-play-bar 同款）；DOM 顺序用 order 对齐视觉 ── */
 .bottom-bar .player-card {
-  display: grid;
-  grid-template-columns: auto 230px auto minmax(200px, 1fr) auto auto;
-  grid-template-rows: minmax(0, 1fr);
-  grid-template-areas: "cover meta controls progress topbar queue";
+  display: flex;
   align-items: center;
-  column-gap: var(--sp-4);
-  padding: 0 var(--sp-4);
+  flex-wrap: wrap;      /* 歌词/频谱展开时换行占满整行 */
+  gap: 0 var(--sp-4);
+  padding: 0 var(--sp-5);
   height: var(--bb-h);
   overflow: visible;
   background: transparent;
+  position: relative;   /* 进度线 absolute 贴顶的参照系 */
 }
-/* 歌词/频谱展开：主行不动，下方追加整行，条体长高 */
+.bottom-bar .pc-cover        { order: 1; }
+.bottom-bar .pc-meta         { order: 2; width: 220px; flex-shrink: 0; }
+.bottom-bar .player-controls { order: 3; flex: 1; min-width: 240px; }
+.bottom-bar .pc-topbar       { order: 4; }
+.bottom-bar .pc-queue-bar    { order: 5; }
+/* 进度线：Alger .music-time 同款——不占列，absolute 贴条顶全宽 */
+.bottom-bar .bb-progress {
+  order: 0;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 14px;
+  display: flex; align-items: center;
+  padding: 0;
+}
+/* 歌词/频谱：展开时换行独占整行 */
+.bottom-bar .viz-canvas  { order: 6; width: 100%; flex-shrink: 0; }
+.bottom-bar .lyrics-area { order: 7; width: 100%; max-height: 140px; }
+/* 歌词展开：条体长高（flex-wrap 已让 lyric 换到第二行） */
+.bottom-bar:has(.lyrics-area[style*="block"]) { height: auto; }
 .bottom-bar .player-card:has(.lyrics-area[style*="block"]) {
-  grid-template-rows: minmax(0, 1fr) auto auto;
-  grid-template-areas:
-    "cover meta controls progress topbar queue"
-    "viz   viz  viz      viz     viz    viz"
-    "lyric lyric lyric  lyric   lyric  lyric";
   height: auto;
   padding-bottom: var(--sp-3);
 }
-.bottom-bar .player-card:has(#vizCanvas:not([style*="none"])) .viz-canvas {
-  grid-area: viz;
-}
-.bottom-bar .lyrics-area { grid-area: lyric; max-height: 140px; }
-.bottom-bar .pc-cover    { grid-area: cover; }
-.bottom-bar .pc-meta     { grid-area: meta; }
-.bottom-bar .bb-progress { grid-area: progress; }
-.bottom-bar .player-controls { grid-area: controls; }
-.bottom-bar .pc-topbar   { grid-area: topbar; }
-.bottom-bar .pc-queue-bar { grid-area: queue; }
 
-/* ── 左栏：小封面 + 信息 ── */
+/* ── 封面（Alger .play-bar-img-wrapper：w-14 h-14 rounded-2xl） ── */
 .bottom-bar .pc-cover {
-  width: 64px;
+  width: 56px;
   aspect-ratio: 1 / 1;
-  max-height: 64px;
-  align-self: center;
-  border-radius: var(--r-md);
+  max-height: 56px;
+  flex-shrink: 0;
+  border-radius: var(--r-lg);
   border: 1px solid var(--stroke-1);
   box-shadow: var(--shadow-md);
   transition: box-shadow var(--dur-2) var(--ease-out);
@@ -1510,8 +1509,8 @@ audio { display: none; }
     var(--shadow-md),
     0 0 18px -4px color-mix(in srgb, var(--accent-ui) 45%, transparent);
 }
+/* ── 信息列（Alger .music-content：定宽 200px + ml-4） ── */
 .bottom-bar .pc-meta {
-  align-self: center;
   justify-content: center;
   gap: 2px;
 }
@@ -1522,24 +1521,22 @@ audio { display: none; }
   letter-spacing: .01em;
 }
 .bottom-bar .pc-sub-row { justify-content: flex-start; }
-.bottom-bar .pc-artist { max-width: 46%; font-size: var(--fs-xs); color: var(--fg-2); }
-.bottom-bar .pc-clock,
-.bottom-bar .pc-clock-sep { font-variant-numeric: tabular-nums; font-size: var(--fs-xs); color: var(--fg-3); }
-/* 时间挪去歌手行右侧不够位——底部条里时间贴进度条两端更常见，先保行内 */
-
-/* ── 进度行 = 时间 0:05 ────●──── 4:06（单行：垂直居中由 grid 接管） ── */
-.bb-progress {
-  width: 100%;
-  display: flex; align-items: center; gap: var(--sp-2);
-  padding: 0;
+.bottom-bar .pc-artist { max-width: 55%; font-size: var(--fs-xs); color: var(--fg-2); }
+/* 时间：Alger 条上无独立时间——小灰字贴歌手行末尾（margin-left:auto 行尾） */
+.bottom-bar .pc-clock {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
 }
-.bb-progress .pc-clock { margin-left: 0; flex-shrink: 0; min-width: 34px; }
-.bb-progress .pc-clock:last-child { text-align: right; }
+.bottom-bar .pc-clock-sep { opacity: .45; }
+
+/* ── 进度线（Alger .music-time：absolute 贴条顶、4px 全宽、无圆角、
+      thumb 常态隐藏 hover 才现）。bb-progress 容器见上方骨架段。 ── */
 .bb-progress .player-progress-track {
   flex: 1; min-width: 0;
   position: relative;
-  height: 5px;
-  border-radius: var(--r-xs);
+  height: 4px;
   background: color-mix(in srgb, var(--fg-3) 22%, transparent);
   cursor: pointer;
 }
@@ -1549,9 +1546,7 @@ audio { display: none; }
   left: 0; top: 0; bottom: 0;
   height: auto;
   width: 0%;
-  border-radius: var(--r-xs);
   background: var(--accent-ui);
-  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--accent-ui) 60%, transparent);
   transition: width var(--dur-1) linear;
 }
 .bb-progress .player-progress-track.dragging .player-progress-fill { transition: none; }
@@ -1573,50 +1568,50 @@ audio { display: none; }
 .bb-progress .player-progress-track.dragging .player-progress-thumb,
 .bb-progress .player-progress-track:focus-visible .player-progress-thumb { opacity: 1; }
 
-/* ── 播放控制（单行：居中由 grid align-items 接管，不再自对齐） ── */
-.bottom-bar .pc-main-row { justify-content: center; gap: var(--sp-3); padding: 0; }
+/* ── 播放控制（Alger .music-buttons：flex-1 justify-center；
+      播放键胶囊 w-20 h-12 rounded-full 淡底，不是圆形主色块） ── */
+.bottom-bar .pc-main-row { justify-content: center; gap: var(--sp-4); padding: 0; }
 .bottom-bar .ctrl-btn.play-btn {
-  width: 42px;
-  height: 42px;
-  box-shadow: 0 6px 20px -8px color-mix(in srgb, var(--accent-ui) 60%, transparent);
-  transition: transform var(--dur-1) var(--ease-out),
-              box-shadow var(--dur-2) var(--ease-out);
+  width: 72px;
+  height: 40px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent-ui);
+  box-shadow: none;
+  transition: background var(--dur-1) var(--ease),
+              transform var(--dur-1) var(--ease-out);
 }
 .bottom-bar .ctrl-btn.play-btn:hover {
-  transform: scale(1.06);
-  box-shadow: 0 8px 26px -8px color-mix(in srgb, var(--accent-ui) 75%, transparent);
+  background: color-mix(in srgb, var(--accent-ui) 22%, transparent);
+  transform: scale(1.04);
 }
 .bottom-bar .ctrl-btn.play-btn:active { transform: scale(.97); }
 
-/* ── 右栏上：状态 + 歌词开关 + 更多 ── */
+/* ── 工具区（Alger .audio-button：纯图标行，无状态文本） ── */
 .bottom-bar .pc-topbar {
-  align-self: center;
   justify-content: flex-end;
   padding: 0;
   min-height: 0;
+  flex-shrink: 0;
 }
-.bottom-bar .pc-state {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  letter-spacing: .02em;
-  margin-right: auto;
-}
-.bottom-bar .player-card.playing .pc-state { color: var(--accent-ui); }
+/* 「正在播放/已暂停」文本从条上撤下（Alger 没有这个元素）；
+   DOM 保留——audio-events.js 在写它的 classList/textContent。 */
+.bottom-bar .pc-state { display: none; }
 /* 更多弹层在底部条里向上开 */
 .bottom-bar .pc-more-pop {
   top: auto;
   bottom: calc(100% + 8px);
 }
 
-/* ── 右栏下：队列入口（D5.1：去掉重描边，降级为轻量文字按钮） ── */
+/* ── 队列入口（Alger 队列=右侧图标开抽屉；揽乐保留文字+计数） ── */
 .bottom-bar .pc-queue-bar {
-  align-self: center;
   width: auto;
   margin-top: 0;
   justify-content: flex-end;
   border-color: transparent;
   background: transparent;
   color: var(--fg-3);
+  flex-shrink: 0;
 }
 .bottom-bar .pc-queue-bar:hover {
   border-color: transparent;
