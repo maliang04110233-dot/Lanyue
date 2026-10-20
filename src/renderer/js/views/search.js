@@ -11,7 +11,7 @@ import { dlBadgeHtml, dlStatusFor, dlEnsureHistoryLoaded, addDlChangeListener } 
 import { openSongRowMenu } from '../songMenu.js';
 import { nextSortMode, sortLabel, sortPairs } from '../searchSort.js';
 import { markTerm } from '../highlight.js';
-import { buildFallbackNotice } from '../fallbackNotice.js';
+import { buildFallbackNotice, triggerSourceScan } from '../fallbackNotice.js';
 import { dismissedKeySet, filterDismissedPairs, onDismissChanged } from '../dismissed.js';
 import { skeletonHtml, SKEL_ROWS } from '../skeleton.js';
 import { t } from '../i18n.js';
@@ -799,7 +799,7 @@ async function playSong(idx, queueOverride = null) {
     }
     s._playedQuality = quality;
     const notice = buildFallbackNotice(result, s.source);
-    if (notice) showToast(notice, 'info', 3000);
+    if (notice) { showToast(notice, 'info', 3000); triggerSourceScan(); }
     if (result.matchedSong) {
       s._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
     }

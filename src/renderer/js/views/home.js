@@ -25,7 +25,7 @@ import { openSongRowMenu } from '../songMenu.js';
 import { filterHomeSection } from '../homeFilter.js';
 import { platIdsOf, normalizePlatTab, nextPlatTab, HOME_PLAT_LS_KEY } from '../homePlatTabs.js';
 import { skeletonHtml } from '../skeleton.js';
-import { buildFallbackNotice } from '../fallbackNotice.js';
+import { buildFallbackNotice, triggerSourceScan } from '../fallbackNotice.js';
 import { sourceErrorText } from '../sourceError.js';
 import { PLAY_ALL_LIMIT, planSectionPlay, playAllToastText } from '../homePlayAll.js';
 import { noCoverSvgHtml, svgIcon, fmtDuration, coverThumbHtml } from '../homeFormat.js';
@@ -767,7 +767,7 @@ async function playRecommendSong(song) {
     }
     song._playedQuality = quality;
     const notice = buildFallbackNotice(result, song.source);
-    if (notice) showToast(notice, 'info', 3000);
+    if (notice) { showToast(notice, 'info', 3000); triggerSourceScan(); }
     if (result.matchedSong) {
       song._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
     }

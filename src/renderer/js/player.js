@@ -8,7 +8,7 @@
 import { logger } from './logger.js';
 import { resolveQuality, playedQualityLabel } from './quality.js';
 import { createPrefetchStore, prefetchKeyOf, nextPrefetchIdx, shouldPrefetchNow, prefetchRetryAllowed } from './playPrefetch.js';
-import { buildFallbackNotice } from './fallbackNotice.js';
+import { buildFallbackNotice, triggerSourceScan } from './fallbackNotice.js';
 import { sourceErrorText } from './sourceError.js';
 import {
   addToRecentlyPlayed, updatePlayStatsOnStart, updatePlayStatsOnStop, recordPlay,
@@ -471,7 +471,7 @@ async function playSongByIdx(idx, song) {
     }
     song._playedQuality = quality;
     const notice = buildFallbackNotice(result, song.source);
-    if (notice) showToast(notice, 'info', 3000);
+    if (notice) { showToast(notice, 'info', 3000); triggerSourceScan(); }
     if (result.matchedSong) {
       song._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
       updatePlayerCard(song); // 音质等徽标随实际取流结果刷新

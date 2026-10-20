@@ -12,7 +12,7 @@ import { errBrief } from '../../errBrief.js';
 import { logger } from '../../logger.js';
 import { loadAndPlay } from '../../player.js';
 import { resolveQuality } from '../../quality.js';
-import { buildFallbackNotice } from '../../fallbackNotice.js';
+import { buildFallbackNotice, triggerSourceScan } from '../../fallbackNotice.js';
 import { planSelEnqueue, enqueueSkipSuffix } from '../../plSelBatch.js';
 import { sourceErrorText } from '../../sourceError.js';
 import { plState } from './state.js';
@@ -38,7 +38,7 @@ async function _playFrom(list, idx) {
     }
     song._playedQuality = quality;
     const notice = buildFallbackNotice(result, song.source);
-    if (notice) showToast(notice, 'info', 3000);
+    if (notice) { showToast(notice, 'info', 3000); triggerSourceScan(); }
     if (result.matchedSong) {
       song._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
     }

@@ -135,6 +135,8 @@
      令牌化实现，不需要按主题写分支。 */
   --accent-grad: linear-gradient(135deg, var(--accent-ui) 0%, var(--accent2) 100%);
   --glow-primary: 0 0 20px 4px var(--accent-glow);
+  /* 换源扫描线颜色（S4）：主色 35% 透明，各主题自动跟随 */
+  --scan-color: color-mix(in srgb, var(--accent-ui) 35%, transparent);
 }
 
 /* ── 浅色主题 ─────────────────────────────────────── */

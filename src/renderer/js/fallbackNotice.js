@@ -38,8 +38,29 @@ function buildFallbackNotice(result, ownSource, nameOf) {
   return null;
 }
 
-if (typeof window !== 'undefined') {
-  window.buildFallbackNotice = buildFallbackNotice;
+/**
+ * 换源成功的视觉反馈（S4 · 设计师三层反馈的 L1+L3）：
+ * 底栏封面扫描线（scanning，1.2s 动画）+ 光晕脉冲（pulse，1.5s 回落）。
+ * 纯 DOM class 操作、动画结束自清理 —— 无 toast 文案耦合，五处播放
+ * 入口在 notice 非空时各调一次即可。沉浸页开着时同样命中 .pc-cover
+ * 所在元素不可见，但 class 加了会随动画移除，无残留。
+ * @returns {void}
+ */
+function triggerSourceScan() {
+  if (typeof document === 'undefined') return;
+  const cover = document.querySelector('.pc-cover');
+  if (!cover) return;
+  cover.classList.remove('scanning', 'pulse');
+  // 强制回流以便重复换源时动画能重放（连续两首都换源的连点场景）
+  void cover.offsetWidth;
+  cover.classList.add('scanning', 'pulse');
+  setTimeout(() => cover.classList.remove('scanning'), 1300);
+  setTimeout(() => cover.classList.remove('pulse'), 1600);
 }
 
-export { buildFallbackNotice };
+if (typeof window !== 'undefined') {
+  window.buildFallbackNotice = buildFallbackNotice;
+  window.triggerSourceScan = triggerSourceScan;
+}
+
+export { buildFallbackNotice, triggerSourceScan };

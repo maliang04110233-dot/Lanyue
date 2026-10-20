@@ -1503,6 +1503,27 @@ audio { display: none; }
   box-shadow: var(--shadow-md);
   transition: box-shadow var(--dur-2) var(--ease-out);
 }
+/* S4 换源反馈：扫描线（1.2s 从左到右）+ 成功光晕脉冲（1.5s 回落）。
+   类由 fallbackNotice.triggerSourceScan 在换源 toast 时挂/摘。 */
+.bottom-bar .pc-cover.scanning::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background:
+    linear-gradient(90deg, transparent 0%, var(--scan-color) 46%, var(--accent-ui) 50%, var(--scan-color) 54%, transparent 100%);
+  animation: source-scan 1.2s var(--ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes source-scan {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(200%); opacity: 0; }
+}
+.bottom-bar .pc-cover.pulse {
+  box-shadow: var(--shadow-md), var(--glow-primary);
+}
 /* 播放中封面呼吸光 —— 底部条上的「活着」信号 */
 .bottom-bar .player-card.playing .pc-cover {
   box-shadow:

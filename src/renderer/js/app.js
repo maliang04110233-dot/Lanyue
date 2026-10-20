@@ -16,7 +16,7 @@ import { mockApi } from './mockApi.js';
 import './state.js';
 import './toast.js';
 import './utils.js';
-import { buildFallbackNotice } from './fallbackNotice.js';
+import { buildFallbackNotice, triggerSourceScan } from './fallbackNotice.js';
 import { pickQueueCopyRows, queueCopyToastText } from './queueCopy.js';
 import { toTrackLines } from './songListText.js';
 import { listAccessHint, term } from './listAccess.js';
@@ -613,7 +613,7 @@ async function playPlaylistModalSong(idx) {
       return;
     }
     const notice = buildFallbackNotice(result, song.source);
-    if (notice) showToast(notice, 'info', 3000);
+    if (notice) { showToast(notice, 'info', 3000); triggerSourceScan(); }
     if (result.matchedSong) {
       song._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
     }
