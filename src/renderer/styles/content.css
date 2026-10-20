@@ -84,12 +84,18 @@
   height: 100%; overflow-y: auto; padding-right: var(--sp-1);
 }
 
-/* 首页顶部快捷搜索条 */
+/* 首页顶部快捷搜索条
+   D5 播放器化打磨：hero 是发现页的门面——加大留白、输入框升格为
+   「主角级」44px、搜索按钮带主色光晕。只动视觉不动 DOM。 */
 .home-hero {
-  width: 100%; margin-top: var(--sp-1); flex-shrink: 0;
-  background: var(--elev-1);
-  border: 1px solid var(--stroke-1); border-radius: var(--r-lg);
-  padding: var(--sp-3) var(--sp-4); position: relative; overflow: hidden;
+  width: 100%; margin-top: var(--sp-2); flex-shrink: 0;
+  background:
+    radial-gradient(120% 140% at 85% -20%,
+      color-mix(in srgb, var(--accent-ui) 9%, transparent) 0%,
+      transparent 55%),
+    var(--elev-1);
+  border: 1px solid var(--stroke-1); border-radius: var(--r-xl);
+  padding: var(--sp-5) var(--sp-5) var(--sp-4); position: relative; overflow: hidden;
 }
 .home-hero::before {
   content: ''; position: absolute; right: -60px; top: -80px;
@@ -99,8 +105,8 @@
 }
 .home-search-row { display: flex; gap: var(--sp-2); position: relative; z-index: 1; }
 .home-search-input {
-  flex: 1; height: 38px; padding: 0 var(--sp-4);
-  border-radius: var(--r-md); border: 1px solid var(--stroke-1);
+  flex: 1; height: 44px; padding: 0 var(--sp-4);
+  border-radius: var(--r-full); border: 1px solid var(--stroke-1);
   background: var(--bg-deep); color: var(--fg-1);
   font-size: var(--fs-md); font-family: inherit; outline: none;
   transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
@@ -108,19 +114,22 @@
 .home-search-input::placeholder { color: var(--fg-3); }
 .home-search-input:focus {
   border-color: var(--accent-ui);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft),
+              0 8px 28px -14px color-mix(in srgb, var(--accent-ui) 55%, transparent);
 }
 .home-search-btn {
-  height: 38px; padding: 0 var(--sp-5); border-radius: var(--r-md);
+  height: 44px; padding: 0 var(--sp-5); border-radius: var(--r-full);
   border: 1px solid var(--accent-ui); background: var(--accent-ui); color: var(--on-accent);
   font-size: var(--fs-md); font-weight: var(--fw-semi); font-family: inherit;
   cursor: pointer; white-space: nowrap;
-  transition: filter var(--dur-1) var(--ease);
+  box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--accent-ui) 65%, transparent);
+  transition: filter var(--dur-1) var(--ease), transform var(--dur-1) var(--ease-out);
 }
-.home-search-btn:hover { filter: brightness(1.15); }
+.home-search-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.home-search-btn:active { transform: translateY(0); }
 .home-hero-tags {
   display: flex; flex-wrap: wrap; gap: var(--sp-2);
-  margin-top: var(--sp-3); position: relative; z-index: 1;
+  margin-top: var(--sp-4); position: relative; z-index: 1;
 }
 
 /* 热门搜索区 */
@@ -944,11 +953,22 @@
 
 /* 首页统计卡：横向紧凑排布（图标在左，数字/标签在右）。
    96px → ~68px。改版目标是「一屏内看到多平台内容」，
-   概览区省下的每一像素都直接换算成榜单的可见行数。 */
+   概览区省下的每一像素都直接换算成榜单的可见行数。
+   D5：图标垫一层主色软底，卡片 hover 光晕跟上 hero 的调性。 */
 .home-stats .stat-card {
   flex-direction: row; align-items: center; gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md);
+}
+.home-stats .stat-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+}
+.home-stats .stat-card:hover {
+  box-shadow: var(--shadow-md),
+              0 0 0 1px color-mix(in srgb, var(--accent-ui) 18%, transparent);
 }
 .home-stats .stat-num { line-height: var(--lh-tight); }
 .stat-body { min-width: 0; display: flex; flex-direction: column; }
