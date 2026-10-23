@@ -62,11 +62,13 @@
 npm install          # 首次
 npm run dev          # 开发模式（含 DevTools）
 
-npm run lint         # ESLint：src/ + test/
-npm test             # node:test，全部离线（2741 用例，约 30~50s）
+npm run lint         # ESLint：src/ + test/ + scripts/ci-doctor.cjs
+npm test             # node:test，全部离线（约 350 文件 / 3.4k 用例，约 55s；以 # tests 实跑为准）
 npm run test:coverage# 带覆盖率
 npm run bench        # 性能基准（有基线对比）
-npm run verify       # 全链路闸门：lint + test + dead-deps + icons + build + asar 冒烟
+npm run verify       # 全链路闸门（七项串联，唯一权威）：
+                     # lint → test → check:dead-deps → check:attack-surface
+                     # → check:icons → build → smoke:asar
 ```
 
 **提交前**：至少跑 `npm run lint && npm test`。改动落在 `src/main`、`src/utils`、`src/api`
@@ -74,6 +76,13 @@ npm run verify       # 全链路闸门：lint + test + dead-deps + icons + build
 
 **提交信息**：祈使句 + 范围，如 `fix(queue): 取消后不再写历史`、`docs: 补架构全景`。
 正文写「为什么」，不写「改了什么」——后者看 diff 就知道。
+
+**要交付一个需求（而不只是改一段代码）**：走 [`docs/process/`](docs/process/README.md) 的流程规范。
+选路看索引，档位判定看 `DEMAND.md`（L1/L2/L3 三档 + Q1–Q8 判定表），交接与门禁看
+`COLLABORATION.md`、`DELIVERY.md`，编码与验收细则看 `ENGINEERING.md`、`QA.md`。
+
+> 本文件的五条铁律是**编码纪律**（代码长什么样），`docs/process/` 是**流转纪律**（事情怎么走完）。
+> 两者不重叠、不互替：铁律不过，代码不能合；流程不过，需求不能签收。
 
 ---
 

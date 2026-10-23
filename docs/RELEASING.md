@@ -4,10 +4,27 @@
 
 ---
 
-## 一、首次接入远端（当前缺口）
+## 一、远端状态（2026-10-23 已核实）
 
-仓库现在只有**本地** 3 个提交，没有远端 —— 意味着 `.github/workflows/ci.yml` 与
-`release.yml` **一次都没跑过**。第一次接远端时按顺序做：
+> 本节曾写作「只有本地 3 个提交，没有远端」，那是更早的事实。现已接入，实测状态如下：
+
+| 项 | 实测值 |
+|---|---|
+| 远端 | `origin` = `https://github.com/maliang04110233-dot/Lanyue.git`（与 `build/config.cjs` 的 publish 段一致） |
+| 远端默认分支 | `main` |
+| 本地分支 | `master`、`backup/local-1.0.36`（均指向 `a462edc`）、`release/1.0.36`（当前，跟踪 `origin/main`，**ahead 21**） |
+| CI 反馈 | `.github/workflows/` 已就位，但是否真正产出过结果需在仓库 Actions 页核对——**本地流程不以 CI 为前提** |
+
+**分支名不一致是既有事实**（本地 `master` vs 远端 `main`）。推送时显式指定跟踪分支，不要依赖默认：
+
+```bash
+git push -u origin release/1.0.36:main      # 明确「本地分支 → 远端分支」
+```
+
+> 为什么不再用 `git push -u origin master`：远端没有 `master`，那样推会新建一个平行分支，
+> 于是同一份历史出现两个「主线」，后续所有 tag 与 PR 的基线都会分叉。
+
+### 首次接入时的原始步骤（留档，已执行过，勿重复执行）
 
 ```bash
 # 1. 加远端（仓库名与 build/config.cjs 的 publish 段一致，改名会让
@@ -24,11 +41,13 @@ git push -u origin master
 > **为什么强调「不要浅推」**：tag 指向的是具体提交，浅克隆拿不到完整对象图时，
 > `git push --tags` 会失败，而发布流程的一切都建立在 tag 上。
 
-如果远端是空仓库且你想保持默认分支叫 `main`：
+远端默认分支已是 `main`；本地 `master` 是历史遗留名字，二者不是同一分支。统一口径：
+**以 `origin/main` 为唯一主线**，本地提交用「本地分支 → 远端 main」的显式映射推送，
+不要再 `git branch -M`（重命名已跟踪分支会让 21 个既有提交的 upstream 记录失效）。
 
 ```bash
-git branch -M main
-git push -u origin main
+git fetch origin
+git log --oneline HEAD..origin/main    # 先看远端有没有你不知道的提交
 ```
 
 ---
@@ -64,9 +83,9 @@ node scripts/version-bump.js            # patch；也可手改 package.json 后
 $EDITOR CHANGELOG.md
 
 # 3. 提交 + 打 tag（tag 版本必须等于 package.json version，workflow 会硬校验）
-git add -A && git commit -m "release: v1.0.36"
-git tag -a v1.0.36 -m "v1.0.36"
-git push origin master --follow-tags
+git add -A && git commit -m "release: v1.0.37"
+git tag -a v1.0.37 -m "v1.0.37"
+git push origin HEAD:main --follow-tags      # 本地当前分支 → origin/main，带 tag
 ```
 
 流水线随后会：校验 tag ↔ package.json ↔ package-lock 三方一致 → 检查 CHANGELOG 条目
