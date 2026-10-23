@@ -151,7 +151,7 @@ function showStatsModal(html) {
     <div class="stats-panel">
       <div class="stats-header">
         <span>📊 曲库统计</span>
-        <button onclick="document.getElementById('statsModal').remove()">✕</button>
+        <button onclick="document.getElementById('statsModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="stats-body">${html}</div>
     </div>
@@ -281,7 +281,7 @@ function showDuplicateModal(html) {
     <div class="stats-panel dup-panel">
       <div class="stats-header">
         <span>🔍 重复歌曲检测</span>
-        <button onclick="document.getElementById('dupModal').remove()">✕</button>
+        <button onclick="document.getElementById('dupModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="stats-body">${html}</div>
     </div>

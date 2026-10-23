@@ -115,7 +115,7 @@ function _renderManager() {
   panel.innerHTML = `
     <div class="edit-header">
       <span class="edit-title">🚫 已屏蔽管理 · ${_list.length} 首</span>
-      <button class="edit-close" id="dismClose">✕</button>
+      <button class="edit-close" id="dismClose" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div class="edit-body" id="dismBody"></div>`;
   const body = panel.querySelector('#dismBody');

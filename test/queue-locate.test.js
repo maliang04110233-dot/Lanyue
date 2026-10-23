@@ -61,6 +61,6 @@ test('接线齐备：app.js 导入+自动展开+data-pqidx 闪烁+bridge；面�
   assert.match(APP_JS, /if \(!_pqVisible\) window\.togglePlayQueue\(\);/);
   assert.match(APP_JS, /#pqList \.pq-item\[data-pqidx="\$\{idx\}"\]/);
   assert.match(APP_JS, /window\.locatePlayingInQueue = locatePlayingInQueue;/);
-  assert.match(HTML, /onclick="locatePlayingInQueue\(\)"[^>]*>🎯 定位<\/button>/);
+  assert.match(HTML, /onclick="locatePlayingInQueue\(\)"[^>]*>定位<\/button>/);
   assert.match(PALETTE, /id: 'pq-locate'[\s\S]*?_call\('locatePlayingInQueue'\)/);
 });

@@ -261,7 +261,7 @@ export function showShortcutsHelp() {
     <div class="shortcuts-panel">
       <div class="shortcuts-header">
         <span>⌨️ 快捷键</span>
-        <button onclick="document.getElementById('shortcutsHelp').remove()">✕</button>
+        <button onclick="document.getElementById('shortcutsHelp').remove()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="shortcuts-body">
         <div class="shortcut-group">

@@ -1,0 +1,2005 @@
+/* ══════════════════════════════════════════════════════════════════
+   ui.css · v2 组件层（极夜玻璃 Plus）
+   ──────────────────────────────────────────────────────────────────
+   这一层是「重构后的组件语言」，与 content.css / player.css 里的旧
+   样式**并存**，不改名、不删除。迁移方式是**叠加类名**：
+
+       <div class="stat-card ui-card">        ← 旧类保留（JS 依赖它）
+       <button class="btn ui-btn ui-btn--ghost">
+
+   好处：任何一处迁移都可以单独回滚（把 ui-* 删掉即恢复原样），
+   且不会因为改一个全站作用域的选择器而误伤其他页面。
+
+   命名约定
+     .ui-btn / .ui-input / .ui-card / .ui-row / .ui-chip / .ui-badge
+     .ui-toolbar / .ui-empty / .ui-skel / .ui-seg / .ui-switch
+     修饰符一律 --：.ui-btn--primary / --ghost / --danger / --sm / --lg
+
+   三条铁律（写在 base.css 顶部，这里是执行细则）
+     1 主色配额：同屏 --accent-ui 着色元素 ≤ 3 类。第四类出现时，
+       应该降级为 --fg-1 + 描边表达。
+     2 发光配额：--glow-primary 只允许出现在「播放中封面」与
+       「换源扫描线」两处，其余一律用 --shadow-* 与描边。
+     3 表面单源：所有面由 --bg-card 与 --text 混色派生（--surface-*），
+       禁止再写死 #hex。写死会在切 light 主题时露馅。
+
+   引入顺序：必须排在 converter.css 之后（同特异度后者胜），
+   已写在 index.html 的最后一个 <link>。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 1 卡片 / 容器 ────────────────────────────────────────────────
+   玻璃感来自三件事：比底稍亮的表面 + 1px 冷描边 + 顶部 1px 高光
+   （--rim）。少了 rim 就只是「一块稍亮的色块」，这是很多深色界面
+   显得平的直接原因。 */
+.ui-card {
+  position: relative;
+  background: var(--surface-1);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--rim);
+  transition: border-color var(--dur-2) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              transform var(--dur-2) var(--ease-out);
+}
+.ui-card--interactive { cursor: pointer; }
+.ui-card--interactive:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-2);
+}
+.ui-card--interactive:active { transform: scale(.994); }
+.ui-card--glass {
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+.ui-card--flat { background: transparent; border-color: var(--stroke-0); box-shadow: none; }
+
+/* ── 2 按钮 ──────────────────────────────────────────────────────
+   四档层级，按「破坏性」和「重要性」各占一轴：
+     primary  实心主色，一屏最多一个（如「开始下载」）
+     ghost    描边，次要动作（如「选择目录」）
+     quiet    无边框，只有悬停时浮起（如工具栏图标按钮）
+     danger   实心红，只给删除/清空
+   高度 32/36/40 三档走 8pt 网格的半档。 */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: 34px;
+  padding: 0 var(--sp-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-1);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-med);
+  line-height: 1;
+  letter-spacing: var(--track-cjk);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease),
+              transform var(--dur-0) var(--ease);
+}
+.ui-btn:active { transform: scale(.97); }
+.ui-btn:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.ui-btn[disabled], .ui-btn.is-disabled {
+  opacity: .42;
+  pointer-events: none;
+}
+/* 图标与文字之间的视觉缝隙，靠 svg 内置对齐，不用额外 margin */
+.ui-btn > svg { width: 16px; height: 16px; flex: none; }
+
+.ui-btn--primary {
+  background: var(--accent-ui);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+.ui-btn--primary:hover { filter: brightness(1.08); }
+
+.ui-btn--ghost {
+  border-color: var(--stroke-2);
+  color: var(--fg-1);
+  background: var(--surface-1);
+}
+.ui-btn--ghost:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-3);
+}
+
+.ui-btn--quiet { color: var(--fg-2); }
+.ui-btn--quiet:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+
+.ui-btn--danger {
+  background: var(--c-danger);
+  color: var(--on-accent);
+}
+
+/* 尺寸修饰符 */
+.ui-btn--sm { height: 28px; padding: 0 var(--sp-3); font-size: var(--fs-sm); border-radius: var(--r-xs); }
+.ui-btn--lg { height: 40px; padding: 0 var(--sp-5); font-size: var(--fs-lg); border-radius: var(--r-md); }
+.ui-btn--icon { width: 34px; padding: 0; }
+.ui-btn--icon.ui-btn--sm { width: 28px; }
+
+/* ── 3 输入框 ────────────────────────────────────────────────────
+   深色界面里输入框最容易「消失」：底色与卡片太接近。解法是
+   输入框比所在面**更暗**（往 --bg-input 走），再配 1px 描边。
+   聚焦时只用描边变主色 + 极淡光晕，不做粗 outline。 */
+.ui-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--sp-3);
+  background: var(--bg-input);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-sm);
+  color: var(--fg-1);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  letter-spacing: var(--track-cjk);
+  transition: border-color var(--dur-2) var(--ease),
+              box-shadow var(--dur-2) var(--ease);
+}
+.ui-input::placeholder { color: var(--fg-3); }
+.ui-input:hover { border-color: var(--stroke-2); }
+.ui-input:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ── 4 列表行 ────────────────────────────────────────────────────
+   「当前播放行」用 2px 左侧条而不是整行高亮：整行变色 + 发光是
+   旧界面的主要噪音源，会把注意力从内容拽到容器上。 */
+.ui-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 52px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  position: relative;
+  transition: background-color var(--dur-1) var(--ease);
+}
+.ui-row:hover { background: var(--surface-2); }
+.ui-row.is-active { background: var(--surface-2); }
+.ui-row.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  border-radius: var(--r-full);
+  background: var(--accent-ui);
+}
+.ui-row__main { flex: 1; min-width: 0; }
+.ui-row__title {
+  font-size: var(--fs-md);
+  color: var(--fg-1);
+  letter-spacing: var(--track-cjk);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-row__sub {
+  font-size: var(--fs-sm);
+  color: var(--fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-row.is-active .ui-row__title { color: var(--accent-ui); }
+
+/* ── 5 Chip / Badge ──────────────────────────────────────────────
+   chip 是可点的筛选标签，badge 是纯展示的状态标记。分开是因为
+   badge 不该有 hover 反馈 —— 给了就会诱导误点。 */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 28px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease);
+}
+.ui-chip:hover { border-color: var(--stroke-2); color: var(--fg-1); }
+.ui-chip.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ui);
+}
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  background: var(--surface-3);
+  color: var(--fg-2);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semi);
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.ui-badge--ok { background: color-mix(in srgb, var(--c-ok) 16%, transparent); color: var(--c-ok); }
+.ui-badge--warn { background: color-mix(in srgb, var(--c-warn) 16%, transparent); color: var(--c-warn); }
+.ui-badge--danger { background: color-mix(in srgb, var(--c-danger) 16%, transparent); color: var(--c-danger); }
+.ui-badge--info { background: color-mix(in srgb, var(--c-info) 16%, transparent); color: var(--c-info); }
+.ui-badge--accent { background: var(--accent-soft); color: var(--accent-ui); }
+
+/* ── 6 工具栏 ────────────────────────────────────────────────────
+   页面顶部操作条：左标题 + 右动作。吸顶时加一层毛玻璃，避免
+   滚动内容从下方透过时文字互相打架。 */
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 56px;
+  padding: var(--sp-2) 0;
+}
+.ui-toolbar__title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semi);
+  color: var(--fg-1);
+  letter-spacing: var(--track-tight);
+}
+.ui-toolbar__spacer { flex: 1; }
+.ui-toolbar--sticky {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--surface-veil);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid var(--stroke-0);
+}
+
+/* ── 7 空态 ──────────────────────────────────────────────────────
+   图标用 1.5px 线性描边、40% 不透明度，比满色的巨型 emoji 安静得多。
+   注意 content.css:65 已有一份 .empty-state，这里的 .ui-empty 是
+   新类名，不与它冲突。 */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-16) var(--sp-6);
+  color: var(--fg-3);
+  text-align: center;
+}
+.ui-empty__icon {
+  width: 44px; height: 44px;
+  opacity: .4;
+  stroke-width: 1.5;
+}
+.ui-empty__title {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-med);
+  color: var(--fg-2);
+}
+.ui-empty__desc { font-size: var(--fs-sm); max-width: 34ch; line-height: var(--lh-base); }
+
+/* ── 8 骨架屏 ────────────────────────────────────────────────────
+   用表面色扫光而不是灰块：灰块在深色主题下会变成「亮块」，反而
+   比真实内容更抢眼。 */
+.ui-skel {
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  position: relative;
+  overflow: hidden;
+}
+.ui-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--stroke-1), transparent);
+  transform: translateX(-100%);
+  animation: ui-skel-sweep 1.4s var(--ease) infinite;
+}
+@keyframes ui-skel-sweep {
+  to { transform: translateX(100%); }
+}
+
+/* ── 9 分段控件 / 开关 ───────────────────────────────────────────
+   分段控件的滑块用背景位移表达，不重新布局 DOM。 */
+.ui-seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--bg-input);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-sm);
+}
+.ui-seg > button {
+  height: 26px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--fg-3);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease);
+}
+.ui-seg > button:hover { color: var(--fg-1); }
+.ui-seg > button.is-active {
+  background: var(--surface-3);
+  color: var(--fg-1);
+}
+
+.ui-switch {
+  position: relative;
+  width: 36px; height: 20px;
+  flex: none;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  cursor: pointer;
+  transition: background-color var(--dur-2) var(--ease);
+}
+.ui-switch:hover { background: var(--stroke-3); }
+.ui-switch:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.ui-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: var(--r-full);
+  background: var(--fg-2);
+  transition: transform var(--dur-2) var(--ease-spring),
+              background-color var(--dur-2) var(--ease);
+}
+.ui-switch[aria-checked="true"], .ui-switch.is-on { background: var(--accent-ui); }
+.ui-switch[aria-checked="true"]::after,
+.ui-switch.is-on::after {
+  transform: translateX(16px);
+  background: var(--on-accent);
+}
+
+/* ── 10 分区标题 ─────────────────────────────────────────────────
+   小标题 + 右侧「查看全部」。字距收紧、字号降一档，靠留白分组，
+   不靠分割线 —— 分割线多了界面就碎。 */
+.ui-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin: var(--sp-8) 0 var(--sp-4);
+}
+.ui-section-head__title {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semi);
+  color: var(--fg-1);
+  letter-spacing: var(--track-tight);
+}
+.ui-section-head__more {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--fg-3);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease);
+}
+.ui-section-head__more:hover { color: var(--accent-ui); }
+
+/* ── 11 图标上下文适配 ──────────────────────────────────────────
+   icons.css 里的 [data-ico]::before 默认是 inline-block + 右侧 .35em。
+   有几个容器需要另一种排法：命令面板的图标列是定宽 22px 的居中格。 */
+.cmdk-icon[data-ico] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+.cmdk-icon[data-ico]::before { margin: 0; }
+/* 统计卡 / 空态里的图标按容器字号走，颜色降一档避免抢标题 */
+.stat-icon[data-ico],
+.empty-icon[data-ico] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-3);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   阶段 3 · 视图皮肤层（3a：控件与列表行）
+   ──────────────────────────────────────────────────────────────────
+   这一节**不新增 DOM、不改任何 JS**，只用既有类名在本文件（最后加载）
+   覆写视觉。理由：
+
+   · 12 个视图的 HTML 都是 innerHTML 字符串拼贴，改类名要动 8000+ 行
+     模板串，且 40 个 UI 测试用正则逐字约束 `class="…"`。收益全在视觉，
+     风险全在结构 —— 不划算。
+   · 类名本身已经跨视图复用（empty-state 4 处、song-row 2 处、
+     action-btn 3 处、tab 3 处），覆写一次即可统一多个页面。
+
+   本节的统一原则（整份重设计的核心）：
+     1. **去边框化**：原设计把 `--neon-blue-dim` 当万能边框色，导致页面上
+        每个方块都围一圈蓝边（队列项、网格卡、订阅卡、AI 卡、歌曲行…）。
+        密集的彩色细框是「廉价感」最大的单一来源。改为：默认几乎无边框，
+        靠背景明度差分层，只在 hover/active 时提亮边界。
+     2. **悬停只换底色**，不换边框色、不加内发光。三重反馈叠在一起
+        等于没有反馈。
+     3. **播放中用左侧 2px 条**，不用整行铺色。整行高亮会把列表变成
+        一排色块，眼睛无处停。
+     4. 字号/间距/圆角/动效全部走令牌，消除 12.5px、13.5px、11.5px
+        这类半像素档（它们在高 DPI 屏上会被亚像素渲染糊掉）。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 3a-1 段落控件（.tab / .filter-tab / .page-btn）───────────────
+   原来 active 态是 `linear-gradient(135deg, cyan, blue)` 实心渐变 +
+   深色文字 —— 这是 2015 年「赛博风」的做法，也是页面里最亮的一块，
+   抢走了本该属于播放键和主行动的注意力。
+
+   新做法：选中 = 主色淡底（12%）+ 主色文字 + 1px 主色描边。三个通道
+   同时变化，但亮度只抬一点点，在深色界面里足够清晰又不刺眼。
+   未来感来自「精确」而不是「发光」。 */
+.tab {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--stroke-1);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  letter-spacing: var(--track-cjk);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.tab:hover {
+  border-color: var(--stroke-2);
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.tab:active { transform: scale(.98); }
+.tab:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.tab.active,
+.tab.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ui);
+  font-weight: var(--fw-med);
+  box-shadow: none;
+}
+
+/* 下载页的子页签与本地工具栏的筛选胶囊同族。统一到同一外形，
+   让「分段选择」在全站只出现一种长相。 */
+.filter-tab {
+  padding: 5px 12px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--stroke-1);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.filter-tab:hover { border-color: var(--stroke-2); color: var(--fg-1); }
+.filter-tab:active { transform: scale(.98); }
+.filter-tab:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.filter-tab.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ui);
+}
+
+/* 分页：active 原来写死 `color: white`（→ 浅色主题下白字白底不可读）。
+   改成 --on-accent，让每个主题自己决定主色上的前景色。 */
+.page-btn {
+  min-width: 28px;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--stroke-1);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.page-btn:hover { background: var(--surface-2); border-color: var(--stroke-2); color: var(--fg-1); }
+.page-btn:active { transform: scale(.97); }
+.page-btn:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.page-btn.active {
+  background: var(--accent-ui);
+  border-color: var(--accent-ui);
+  color: var(--on-accent);
+  font-weight: var(--fw-med);
+}
+.page-btn:disabled { opacity: .32; cursor: default; transform: none; }
+
+/* ── 3a-2 输入框 ─────────────────────────────────────────────────
+   搜索框原来 9px 上下内边距 + 14px 字号，与工具栏 6px 高的胶囊按钮
+   差了一倍，整条工具栏高度参差。统一到 34px 高。 */
+.search-input {
+  padding: 7px 40px 7px 13px;
+  background: var(--surface-1);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-sm);
+  color: var(--fg-1);
+  font-size: var(--fs-body);
+  transition: border-color var(--dur-2) var(--ease),
+              box-shadow var(--dur-2) var(--ease),
+              background-color var(--dur-2) var(--ease);
+}
+.search-input::placeholder { color: var(--fg-3); opacity: 1; }
+.search-input:hover { border-color: var(--stroke-2); }
+.search-input:focus {
+  border-color: var(--accent-line);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* 搜索键原来是渐变实心方块：一个 30px 的色块贴在输入框里，比输入框本身更抢眼。
+   改成「输入框内的图标动作」——无底色，hover 才浮现。 */
+.search-btn {
+  width: 26px; height: 26px;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--fg-3);
+  font-size: var(--fs-md);
+  transition: background-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.search-btn:hover {
+  transform: translateY(-50%);
+  background: var(--accent-soft);
+  color: var(--accent-ui);
+  box-shadow: none;
+}
+.search-btn:active { transform: translateY(-50%) scale(.94); }
+
+.quality-select {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--stroke-1);
+  background: var(--surface-1);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: border-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.quality-select:hover { border-color: var(--stroke-2); color: var(--fg-1); }
+
+/* ── 3a-3 歌曲行（search / playlist 共用）───────────────────────────
+   原 hover：背景 + 边框变蓝。边框变色让整行像被描了一次边，
+   鼠标扫过列表时边缘不断闪烁。改为只换底色。 */
+.song-row {
+  gap: var(--sp-3);
+  padding: 7px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-2) var(--ease);
+}
+.song-row:hover { background: var(--surface-2); border-color: transparent; }
+/* 播放中：整行 accent-soft 会把列表变成一排色块。改为左侧 2px 主色条 +
+   极淡底色（6%），既定位得到，又不打断浏览节奏。 */
+.song-row.playing {
+  background: color-mix(in srgb, var(--accent-ui) 6%, transparent);
+  border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--accent-ui);
+}
+.song-row.playing .song-title { color: var(--accent-ui); }
+
+.song-cover,
+.song-cover-ph {
+  width: 40px; height: 40px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--stroke-0);
+  background: var(--surface-0);
+}
+.song-cover-ph { color: var(--fg-3); font-size: var(--fs-lg); }
+
+.song-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  color: var(--fg-1);
+  margin-bottom: 2px;
+  letter-spacing: var(--track-cjk);
+}
+.song-meta { font-size: var(--fs-xs); color: var(--fg-3); }
+.song-duration {
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行尾动作：原来每个按钮都带 1px 蓝框，一行 4 个按钮就是 4 个框。
+   改为默认无框、灰字，hover 才现底色 —— 不操作时它们应该消失。 */
+.action-btn {
+  width: 28px; height: 28px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-3);
+  font-size: var(--fs-md);
+  transition: background-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease);
+}
+.action-btn:hover {
+  background: var(--surface-3);
+  border-color: var(--stroke-1);
+  color: var(--fg-1);
+}
+.action-btn:active { transform: scale(.94); }
+.action-btn:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+/* 下载是行内的主行动，给它唯一的主色描边——全行只允许一个强调点。 */
+.action-btn.download-btn {
+  color: var(--accent-ui);
+  border-color: var(--accent-line);
+}
+.action-btn.download-btn:hover {
+  background: var(--accent-ui);
+  border-color: var(--accent-ui);
+  color: var(--on-accent);
+}
+
+/* ── 3a-4 本地曲库行 ────────────────────────────────────────────
+   原 hover 同时做四件事：换底色 + 蓝边框 + 内发光 + 标题变青色。
+   这里只留底色与标题提亮。 */
+.local-row {
+  gap: var(--sp-3);
+  padding: 7px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-2) var(--ease);
+}
+.local-row:hover {
+  background: var(--surface-2);
+  border-color: transparent;
+  box-shadow: none;
+}
+.local-row:hover .local-row-title { color: var(--fg-1); }
+.local-row.is-playing,
+.local-row.playing {
+  background: color-mix(in srgb, var(--accent-ui) 6%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent-ui);
+}
+.local-row.is-playing .local-row-title,
+.local-row.playing .local-row-title { color: var(--accent-ui); }
+.local-row-cover,
+.local-row-cover-ph {
+  border-radius: var(--r-sm);
+  border: 1px solid var(--stroke-0);
+}
+
+/* ── 3a-5 首页热门榜行 / 跨源聚合行 ──────────────────────────────── */
+.top-song-row {
+  gap: var(--sp-2);
+  padding: 5px 8px;
+  border-radius: var(--r-sm);
+  transition: background-color var(--dur-2) var(--ease);
+}
+.top-song-row:hover { background: var(--surface-2); border-color: transparent; }
+.top-song-rank { font-size: var(--fs-xs); color: var(--fg-3); }
+/* 前三名只用暖色区分，不加背景——rank 是次要信息，不该比歌名更亮。 */
+.top-song-rank.top3 { color: var(--c-warn); }
+
+.agg-row {
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  transition: background-color var(--dur-2) var(--ease);
+}
+.agg-row:hover { background: var(--surface-2); }
+
+/* ── 3a-6 小按钮（.btn-sm 全站 5 个视图在用）────────────────────── */
+.btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--stroke-1);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.btn-sm:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-2);
+  color: var(--fg-1);
+}
+.btn-sm:active { transform: scale(.97); }
+.btn-sm:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+
+/* ══════════════════════════════════════════════════════════════════
+   阶段 3 · 视图皮肤层（3b：卡片、空态、队列、徽标）
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 3b-1 卡片家族统一 ─────────────────────────────────────────────
+   涉及 5 个视图的 6 种卡片。原来它们各不相同：
+     .plat-block   elev-1 + stroke-1 + r-lg
+     .ai-card      elev-2 + accent-soft（12% 主色边框）+ r-lg
+     .sub-card     bg-card + neon-blue-dim（蓝边）+ r-md
+     .grid-cell    bg-deep + neon-blue-dim（蓝边）+ r-md
+     .queue-item   bg-deep + neon-blue-dim（蓝边）+ r-md
+   蓝边/彩边密度是「页面花」的根因。
+
+   统一为：surface-1 底 + stroke-1 描边 + rim 顶部 1px 高光 + r-lg。
+   rim 是玻璃拟态的关键——没有它，深色卡片只是一块稍亮的矩形；
+   有它，卡片才有「一片玻璃浮在背景上」的厚度感。 */
+.plat-block,
+.ai-card,
+.sub-card,
+.grid-cell {
+  background: var(--surface-1);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--rim);
+  transition: border-color var(--dur-2) var(--ease),
+              box-shadow var(--dur-2) var(--ease),
+              transform var(--dur-2) var(--ease);
+}
+
+/* 悬停：边框提一档 + 阴影浮起。不再换边框颜色（那会引入第二个色相）。 */
+.plat-block:hover,
+.sub-card:hover,
+.grid-cell:hover {
+  border-color: var(--stroke-2);
+  box-shadow: var(--rim), var(--shadow-md);
+}
+.grid-cell:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--rim), var(--shadow-md);
+}
+.ai-card:hover { border-color: var(--stroke-2); }
+
+/* AI 卡内所有卡片自带 12% 主色边框，一屏里 4 张卡就是 4 圈青边。
+   只保留「主卡」的强调：AI 创作页最外层那张，其余退为常规卡片。 */
+.ai-card .ai-card {
+  background: var(--surface-2);
+  border-color: var(--stroke-1);
+  border-radius: var(--r-md);
+  box-shadow: none;
+}
+
+.sub-card { padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3); }
+.sub-card-unread { border-color: var(--accent-line); }
+.sub-name { font-size: var(--fs-sm); color: var(--fg-1); letter-spacing: var(--track-cjk); }
+
+.grid-cell { overflow: hidden; border-radius: var(--r-md); }
+.grid-cover { border-radius: 0; background: var(--surface-0); }
+.grid-title { font-size: var(--fs-xs); font-weight: var(--fw-med); color: var(--fg-1); }
+.grid-info { padding: var(--sp-1) var(--sp-2) var(--sp-2); }
+
+/* 播放浮层：原来只是一个半透明遮罩 + 32px 三角。改成主色实心胶囊，
+   这是「点这张卡会发生什么」的唯一提示，值得给一次强调。
+
+   这里刻意用纯 CSS 三角而不是 mask 图标：icons.css 的图标由
+   `[data-ico="x"]` 作用域选择器下发，本元素没有该属性就拿不到 --ico；
+   为一处浮层去改 JS 模板或新起 :root 变量都不值得（前者碰 DOM 契约，
+   后者会被令牌门禁当成第 7 套主题）。纯 CSS 三角零依赖、零维护。 */
+.grid-play-overlay {
+  background: color-mix(in srgb, var(--bg-deep) 58%, transparent);
+  transition: opacity var(--dur-2) var(--ease);
+}
+.grid-play-overlay::before,
+.grid-play-overlay::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+}
+.grid-play-overlay::before {
+  width: 40px; height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: var(--r-full);
+  background: var(--accent-ui);
+  box-shadow: var(--glow-primary);
+}
+.grid-play-overlay::after {
+  width: 0; height: 0;
+  margin: -7px 0 0 -5px;
+  border-style: solid;
+  border-width: 7px 0 7px 11px;
+  border-color: transparent transparent transparent var(--on-accent);
+}
+
+/* 首页歌单卡：封面圆角跟卡片同族，hover 只做轻微上浮（原 -2px 太弹）。 */
+.playlist-cover-wrap {
+  border-radius: var(--r-md);
+  border: 1px solid var(--stroke-1);
+  background: var(--surface-0);
+}
+.playlist-card:hover { transform: translateY(-1px); }
+.playlist-name { font-size: var(--fs-sm); color: var(--fg-1); letter-spacing: var(--track-cjk); }
+.playlist-source { font-size: var(--fs-2xs); color: var(--fg-3); }
+/* 封面上的播放量/播放键：原来用纯白遮罩，在浅色主题下几乎看不见。
+   改用主色底 + on-accent 前景。 */
+.playlist-playcount {
+  font-size: var(--fs-2xs);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--bg-deep) 62%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--fg-1);
+  font-variant-numeric: tabular-nums;
+}
+.playlist-hover-play {
+  background: var(--accent-ui);
+  color: var(--on-accent);
+  border-radius: var(--r-full);
+  box-shadow: var(--glow-primary);
+}
+
+/* ── 3b-2 下载队列 ──────────────────────────────────────────────
+   队列项原来带蓝框 + bg-deep 底：深底 + 亮框 = 「凹槽」观感，一屏 20 条
+   像 20 个抽屉。改为 surface-1（比页面亮一档）+ 无框。 */
+.queue-item {
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease);
+}
+.queue-item:hover { background: var(--surface-2); border-color: var(--stroke-1); }
+.queue-cover { width: 34px; height: 34px; border-radius: var(--r-xs); border-color: var(--stroke-0); }
+.queue-title { font-size: var(--fs-sm); color: var(--fg-1); }
+.queue-dl-meta { font-size: var(--fs-xs); color: var(--fg-3); }
+
+/* 进度条：2px 细线比 6px 圆条更「精密」，也更不占视觉重量。 */
+.progress-bar-wrap,
+.conv-progress {
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--stroke-1);
+  overflow: hidden;
+}
+.progress-bar {
+  border-radius: var(--r-full);
+  background: var(--accent-ui);
+  transition: width var(--dur-3) var(--ease-out);
+}
+.conv-progress-bar {
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--accent-ui);
+  transition: width var(--dur-3) var(--ease-out);
+}
+
+/* 队列详情面板：原用深底 + 边框，与队列项抢层级。改为纯分隔线。 */
+.queue-detail-panel {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--stroke-0);
+  padding-top: var(--sp-2);
+}
+.queue-detail-label { color: var(--fg-3); font-size: var(--fs-xs); }
+.queue-detail-value { color: var(--fg-2); font-size: var(--fs-xs); }
+
+/* 队列空态：原来是 icon + text + hint + actions 四段平铺，
+   这里让它跟全站空态长一致。 */
+.queue-empty-icon,
+.conv-queue-empty-icon { color: var(--fg-3); opacity: .55; }
+.queue-empty-text,
+.conv-queue-empty-hint { color: var(--fg-2); font-size: var(--fs-body); }
+.queue-empty-hint,
+.conv-queue-empty-hint { color: var(--fg-3); font-size: var(--fs-sm); }
+
+/* ── 3b-3 空态（local / search / converter / index 共用）────────────
+   .empty-icon 原来是 52px —— 那是给 emoji 定的尺寸（emoji 自带字形留白，
+   52px 的 emoji 视觉上只有 34px 左右）。阶段 2 把图标换成 mask 之后，
+   52px 就是实打实的 52px 线性图标，比标题大 4 倍。
+
+   40px + 0.42 透明度：在深色界面里形成「一个安静的水印」，
+   不抢标题，又足以让人知道这页不是加载失败。 */
+.empty-state {
+  gap: 0;
+  padding: var(--sp-10) var(--sp-4);
+  justify-content: center;
+}
+.empty-icon {
+  font-size: 40px;
+  opacity: .42;
+  margin-bottom: var(--sp-3);
+  color: var(--fg-2);
+  line-height: 1;
+}
+.empty-icon[data-ico] { color: var(--fg-3); }
+.empty-text {
+  font-size: var(--fs-body);
+  color: var(--fg-2);
+  font-weight: var(--fw-med);
+  letter-spacing: var(--track-cjk);
+  margin-bottom: var(--sp-1);
+}
+.empty-hint {
+  font-size: var(--fs-sm);
+  color: var(--fg-3);
+  line-height: var(--lh-base);
+  max-width: 40ch;
+  text-align: center;
+}
+
+/* ── 3b-4 徽标与标签 ────────────────────────────────────────────
+   全站的「小标签」原先是三套外形：sub-kind 用圆角矩形、source-badge 用
+   极小字号 + 平台色、fail-tag 用 currentColor 边框。统一为胶囊 + 统一字号，
+   平台色仍由 --badge-* 变量注入（平台契约不变）。 */
+.source-badge {
+  font-size: var(--fs-2xs);
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  font-weight: var(--fw-med);
+  letter-spacing: 0;
+  border-width: 1px;
+  border-style: solid;
+}
+.sub-kind {
+  font-size: var(--fs-2xs);
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  color: var(--fg-2);
+  letter-spacing: var(--track-cjk);
+}
+.fail-tag,
+.source-hint {
+  border-radius: var(--r-full);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-med);
+}
+.album-link {
+  color: var(--fg-3);
+  border-bottom: 1px dashed var(--stroke-2);
+  transition: color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.album-link:hover { color: var(--accent-ui); border-bottom-color: var(--accent-line); }
+
+/* ── 3b-5 AI 助手气泡 ──────────────────────────────────────────
+   头像原来是 135° 青蓝渐变：在全站唯一使用渐变圆的地方，且渐变方向与
+   其他所有元素无关，纯粹是装饰。改为主色淡底 + 主色描边，简洁且
+   与「AI 入口右上角 4px 紫点」形成同一套语言。 */
+.asst-avatar {
+  width: 26px; height: 26px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-ui);
+  font-size: var(--fs-xs);
+}
+.asst-avatar-user {
+  background: var(--surface-3);
+  border-color: var(--stroke-2);
+  color: var(--fg-2);
+}
+.asst-quick-chip {
+  border-radius: var(--r-full);
+  border: 1px solid var(--stroke-1);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.asst-quick-chip:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-line);
+  color: var(--fg-1);
+}
+.asst-quick-chip:active { transform: scale(.97); }
+.asst-quick-chip:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.asst-bubble-meta,
+.asst-bubble-time,
+.asst-copy { font-size: var(--fs-2xs); color: var(--fg-3); }
+
+/* ══════════════════════════════════════════════════════════════════
+   阶段 3 · 视图皮肤层（3c：首页 hero、平台切换、AI 创作页）
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 3c-1 首页 hero ─────────────────────────────────────────────
+   这里原本叠了三重发光：radial-gradient 背景 + 240px 圆形光斑伪元素 +
+   搜索键 8px 偏移彩色阴影。三者都朝同一个方向使劲，结果是「亮」但
+   不「亮得有理由」——用户的眼睛不知道看哪里。
+
+   新做法：**只保留一处光**。hero 背景退为一整块玻璃（surface-1 + rim），
+   光斑缩到 120px 且透明度砍半，搜索键改为「无阴影 + hover 提亮」。
+   未来感来自「黑得干净、亮得精准」，而不是到处雾蒙蒙。 */
+.home-hero {
+  margin-top: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-xl);
+  box-shadow: var(--rim);
+  padding: var(--sp-5);
+}
+.home-hero::before {
+  content: '';
+  position: absolute; right: -40px; top: -60px;
+  width: 180px; height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--accent-ui) 7%, transparent) 0%,
+    transparent 70%);
+  pointer-events: none;
+}
+.home-search-input {
+  height: 42px;
+  background: var(--surface-0);
+  border-color: var(--stroke-1);
+  font-size: var(--fs-body);
+  transition: border-color var(--dur-2) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              box-shadow var(--dur-2) var(--ease);
+}
+.home-search-input:hover { border-color: var(--stroke-2); }
+.home-search-input:focus {
+  border-color: var(--accent-line);
+  background: var(--surface-1);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.home-search-btn {
+  height: 42px;
+  padding: 0 var(--sp-5);
+  font-weight: var(--fw-med);
+  box-shadow: none;
+  transition: filter var(--dur-2) var(--ease), transform var(--dur-0) var(--ease);
+}
+.home-search-btn:hover { filter: brightness(1.1); transform: none; }
+.home-search-btn:active { transform: scale(.98); }
+
+/* 热门搜索标签：与全站 chip 同族（原来 5px 上下的裸值 + 蓝色 hover）。 */
+.home-hero-tags .tab,
+.home-hero-tags .chip,
+.home-tag {
+  font-size: var(--fs-sm);
+  padding: 5px 11px;
+  border-radius: var(--r-full);
+}
+
+/* ── 3c-2 平台切换胶囊（首页每个平台卡片的横向 rail）────────────────
+   原 .plat-chip：bg-deep 底 + stroke-1 边 + fg-3 字，选中态用主色实心。
+   一屏 8 个平台就是 8 个深底描边方块，像一排药片。
+
+   改为：透明底 + 无边框（靠文字本身），选中才给淡底。
+   这是典型的「默认安静、状态时才说话」。 */
+.plat-chip {
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  transition: background-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease);
+}
+.plat-chip:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
+  border-color: var(--stroke-1);
+}
+.plat-chip:active { transform: scale(.97); }
+.plat-chip:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.plat-chip.active,
+.plat-chip.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ui);
+}
+
+/* 平台色点：保留（它是区分平台的唯一视觉线索），但压到 6px。 */
+.plat-dot {
+  width: 6px; height: 6px;
+  border-radius: var(--r-full);
+}
+.plat-block-name {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  color: var(--fg-1);
+  letter-spacing: var(--track-cjk);
+}
+.plat-block-state { font-size: var(--fs-2xs); color: var(--fg-3); }
+.plat-block-head { gap: var(--sp-2); }
+
+/* ── 3c-3 首页统计卡 ──────────────────────────────────────────
+   原来每张卡一个糖果色（🎼 紫 / ⬇ 蓝 / ⏱ 绿 / 🔥 橙）。四色并列时
+   反而没有重点 —— 而且这四种颜色与品牌主色无关，是 emoji 自带色。
+
+   阶段 2 已把 emoji 换成单色 SVG，这里让图标统一走「主色淡染」：
+   同一个主色、不同透明度，靠图形区分而不是靠色相区分。 */
+.stat-card {
+  background: var(--surface-1);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--rim);
+  transition: border-color var(--dur-2) var(--ease),
+              transform var(--dur-2) var(--ease);
+}
+.stat-card:hover { border-color: var(--stroke-2); transform: translateY(-1px); }
+.stat-icon {
+  color: var(--accent-ui);
+  opacity: .85;
+}
+.stat-icon[data-ico] { color: var(--accent-ui); }
+.stat-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--track-tight);
+}
+.stat-label { font-size: var(--fs-2xs); color: var(--fg-3); letter-spacing: var(--track-cjk); }
+
+/* ── 3c-4 本地曲库网格卡 ──────────────────────────────────────── */
+.grid-info { gap: 0; }
+.grid-artist { font-size: var(--fs-2xs); color: var(--fg-3); }
+
+/* ── 3c-5 AI 创作页 ────────────────────────────────────────────
+   这页 82 个类名、5 个面板，是噪音最集中的地方：每个面板 12% 主色边框、
+   每个字段一行 label、主按钮 6 个都是实心主色。
+   皮肤的处置原则：卡片统一（见 3b），主按钮全页只留「生成」一个，
+   其余降为描边或纯文字。 */
+.ai-card {
+  padding: var(--sp-4);
+}
+.ai-card-header { margin-bottom: var(--sp-3); gap: var(--sp-2); }
+.ai-card-icon { color: var(--accent-ui); opacity: .8; }
+.ai-card-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  color: var(--fg-1);
+  letter-spacing: var(--track-cjk);
+}
+
+/* 输入类：与全站输入框同规格（surface-0 底 + stroke-1 边）。 */
+.ai-input,
+.ai-textarea-lg,
+.ai-select {
+  background: var(--surface-0);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-sm);
+  color: var(--fg-1);
+  font-size: var(--fs-sm);
+  transition: border-color var(--dur-2) var(--ease),
+              box-shadow var(--dur-2) var(--ease);
+}
+.ai-input:hover,
+.ai-textarea-lg:hover,
+.ai-select:hover { border-color: var(--stroke-2); }
+.ai-input:focus,
+.ai-textarea-lg:focus,
+.ai-select:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ai-field-row { gap: var(--sp-2); }
+
+/* 动作按钮：全页 8 个 ai-btn-action 原都带主色底的弱化版。
+   降为「描边按钮」——它们是并列选项，不是主行动。 */
+.ai-btn-action {
+  background: transparent;
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.ai-btn-action:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-2);
+  color: var(--fg-1);
+}
+.ai-btn-action:active { transform: scale(.98); }
+.ai-btn-action:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.ai-btn-action.is-active,
+.ai-btn-action.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ui);
+}
+
+/* 主按钮：全页唯一的主色实心元素。 */
+.ai-btn-primary {
+  background: var(--accent-ui);
+  border: 1px solid var(--accent-ui);
+  border-radius: var(--r-sm);
+  color: var(--on-accent);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  box-shadow: none;
+  transition: filter var(--dur-2) var(--ease), transform var(--dur-0) var(--ease);
+}
+.ai-btn-primary:hover { filter: brightness(1.1); }
+.ai-btn-primary:active { transform: scale(.98); }
+.ai-btn-primary:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.ai-btn-primary[disabled],
+.ai-btn-primary.is-disabled { opacity: .4; filter: grayscale(.4); cursor: default; }
+
+.ai-btn-text {
+  background: transparent;
+  border: none;
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  transition: color var(--dur-2) var(--ease);
+}
+.ai-btn-text:hover { color: var(--accent-ui); }
+.ai-btn-text:active { opacity: .7; }
+.ai-btn-text:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+
+/* AI 页签：与全站段控同一外形。 */
+.ai-tab {
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.ai-tab:hover { background: var(--surface-2); color: var(--fg-1); }
+.ai-tab:active { transform: scale(.98); }
+.ai-tab:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.ai-tab.active,
+.ai-tab.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-ui);
+}
+
+.ai-empty-icon { color: var(--fg-3); opacity: .5; font-size: 32px; }
+.ai-empty-title { font-size: var(--fs-body); color: var(--fg-2); font-weight: var(--fw-med); }
+.ai-prompt-label,
+.ai-preview-label { font-size: var(--fs-2xs); color: var(--fg-3); letter-spacing: var(--track-cjk); }
+.ai-preview-bar {
+  background: var(--surface-2);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-sm);
+}
+
+/* ── 3c-6 订阅页 / 转换页的共用小件 ─────────────────────────────── */
+.sub-card-actions { gap: var(--sp-1); }
+.converter-song-title,
+.conv-queue-name { font-size: var(--fs-sm); color: var(--fg-1); }
+.converter-song-sub,
+.conv-queue-meta { font-size: var(--fs-xs); color: var(--fg-3); }
+.conv-queue-remove,
+.conv-queue-check { color: var(--fg-3); }
+.conv-error { color: var(--c-danger); font-size: var(--fs-xs); }
+.converter-btn-add {
+  border: 1px dashed var(--stroke-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: border-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.converter-btn-add:hover { border-color: var(--accent-line); color: var(--accent-ui); }
+.converter-btn-add:active { opacity: .8; }
+.converter-btn-add:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+
+/* ── 3c-7 特异性补丁 ────────────────────────────────────────────
+   下面这几条不是「设计」，是**必须**：原样式表里存在若干后代选择器，
+   特异性 (0,2,0) 高于本文件里的单类覆写 (0,1,0)，会静默压过新皮肤——
+   表现为「大部分列表变了，只有本地曲库工具栏没变」这种半截效果。
+
+   CSS 的坑在于这种失败**不报错**，只能靠比对特异性发现。这里把每一处
+   受影响的上下文显式重写，特异性对齐到 (0,2,0)/(0,3,0)。 */
+.local-toolbar .search-input { padding: 7px 13px; }
+.dl-subtabs .filter-tab { padding: 5px 12px; font-size: var(--fs-sm); }
+.local-album-wall .grid-title { font-size: var(--fs-xs); }
+
+/* 首页统计卡的悬停原来叠了一圈 18% 主色「光环」（box-shadow 第三层）。
+   在新语言里，悬停只用阴影浮起表达，不加色环。 */
+.home-stats .stat-card:hover {
+  border-color: var(--stroke-2);
+  box-shadow: var(--rim), var(--shadow-md);
+}
+
+/* ── 3c-8 选中态与播放态必须长得不一样 ────────────────────────────
+   两者原来都被写成「整行 accent-soft + 内发光」，用户分不清某行是
+   「我在批量勾选它」还是「它正在播放」。
+
+   新约定（全站一致）：
+     · 播放中 = 左侧 2px 主色条 + 6% 底色   ← 自动发生，不可交互
+     · 已选中 = 1px 主色描边 + 12% 底色     ← 用户操作的结果，可撤销
+   形状不同（条 vs 框），一眼分得开。 */
+.local-row.selected,
+.queue-item.selected {
+  background: color-mix(in srgb, var(--accent-ui) 12%, transparent);
+  border-color: var(--accent-line);
+  box-shadow: none;
+}
+.local-row.selected .local-row-title { color: var(--fg-1); }
+
+/* ── 3c-9 底栏播放键 ───────────────────────────────────────────
+   原样式用 `--accent-grad`（青 #00e5ff → 紫 #7c3aed）。这是全站唯一
+   一处跨色相渐变：从冷青滑到紫，中间必然经过一段发灰的过渡带，在深色
+   背景上看起来像「褪色的彩虹」。而且它与「AI 入口用辅色紫点」的语义
+   撞车——紫色在别处代表 AI。
+
+   改回纯主色实心：整块颜色只有一种，靠尺寸（72×40 胶囊）+ 位置（正中）
+   + 唯一的彩色阴影来表达「这是主操作」。强调来自排他性，不是来自渐变。
+   悬停用 brightness 提亮而不是加光晕，避免底栏在鼠标划过时闪一下。 */
+.bottom-bar .ctrl-btn.play-btn {
+  background: var(--accent-ui);
+  color: var(--on-accent);
+  box-shadow: 0 4px 16px -8px color-mix(in srgb, var(--accent-ui) 70%, transparent);
+  transition: box-shadow var(--dur-2) var(--ease-out),
+              filter var(--dur-2) var(--ease),
+              transform var(--dur-1) var(--ease-spring);
+}
+.bottom-bar .ctrl-btn.play-btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.04);
+  box-shadow: 0 6px 22px -8px color-mix(in srgb, var(--accent-ui) 85%, transparent);
+}
+.bottom-bar .ctrl-btn.play-btn:active { transform: scale(.96); }
+
+/* 队列计数徽标：0 表示「还没有下一首」，不是需要被强调的信息。
+   原来 18px 实底圆角块带数字，在空队列时是底栏最亮的一小块。
+   压成「无底色 + 弱化字」，有内容时 JS 会带 data-count，再给它底色。 */
+.pc-queue-count {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--fg-3);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-med);
+}
+.pc-queue-count[data-count]:not([data-count="0"]) {
+  background: var(--surface-3);
+  color: var(--fg-2);
+}
+.pc-queue-chev { color: var(--fg-3); font-size: var(--fs-2xs); }
+.pc-queue-bar:hover .pc-queue-chev { color: var(--accent-ui); }
+
+/* 热词标签：与全站 chip 同字号（原 12.5px 是半像素档）。 */
+.hot-tag {
+  padding: 5px 12px;
+  border-radius: var(--r-full);
+  background: var(--surface-1);
+  border-color: var(--stroke-1);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.hot-tag:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-2);
+  color: var(--fg-1);
+}
+/* trending 的暖色是语义（上升趋势），保留色相，只把 14% 底压到 10%
+   并去掉描边——四个金框并排会形成一条「警戒线」。 */
+.hot-tag.trending {
+  background: color-mix(in srgb, var(--c-warn) 10%, transparent);
+  border-color: transparent;
+  color: var(--c-warn);
+}
+.hot-tag.trending:hover {
+  background: color-mix(in srgb, var(--c-warn) 18%, transparent);
+  border-color: color-mix(in srgb, var(--c-warn) 30%, transparent);
+}
+
+/* ── 3c-10 榜单「播放全部 / 查看完整榜单」─────────────────────────
+   这两个按钮共用 `.list-more-btn`，原来是同一种「全宽虚线条」。
+   但它们的语义完全不同：
+
+     · 播放全部   = 一个动作（主行动），虚线在视觉语言里表示「可添加的空位」，
+                    语义错位；而且它出现在列表**顶部**，一条横贯全宽的亮线
+                    比下面 10 行歌更抢眼。
+     · 查看完整榜单 = 展开更多（次要动作），全宽虚线条在这里是对的。
+
+   用 :first-child 区分：listHtml() 的拼接顺序固定是「播放全部 → 行 → 更多」，
+   所以顶部那条一定是播放全部。改成小胶囊主色按钮，靠左。 */
+.home-sec--list > .list-more-btn:first-child {
+  width: auto;
+  align-self: flex-start;
+  margin-bottom: var(--sp-2);
+  padding: 4px 12px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--accent-line);
+  border-style: solid;
+  background: var(--accent-soft);
+  color: var(--accent-ui);
+  font-weight: var(--fw-med);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease);
+}
+.home-sec--list > .list-more-btn:first-child:hover {
+  background: color-mix(in srgb, var(--accent-ui) 20%, transparent);
+  border-color: var(--accent-ui);
+}
+.home-sec--list > .list-more-btn:first-child:active { transform: scale(.98); }
+/* 底部的「查看完整榜单」：去掉虚线（虚线的「空位」语义在深色界面里太吵），
+   改为极淡底 + 无框，hover 才浮现边界。 */
+.list-more-btn {
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  color: var(--fg-3);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.list-more-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-1);
+  color: var(--fg-1);
+}
+
+/* ── 3c-11 榜单行 ───────────────────────────────────────────────
+   行内信息层级：序号(弱) → 封面(不抢) → 标题(主) → 歌手·专辑(次) →
+   时长(弱，等宽数字) → 操作(默认不可见)。 */
+.top-song-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  color: var(--fg-1);
+  letter-spacing: var(--track-cjk);
+}
+.top-song-artist { font-size: var(--fs-xs); color: var(--fg-3); }
+.top-song-dur {
+  font-size: var(--fs-xs);
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+/* 行尾 4 个按钮：默认只留 30% 透明度，鼠标进到这一行才浮现。
+   常显时 10 行 × 4 个按钮 = 40 个图标，会把「歌名」这个主角淹掉。 */
+.top-song-row .action-btn { opacity: .3; transition: opacity var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease); }
+.top-song-row:hover .action-btn,
+.top-song-row:focus-within .action-btn { opacity: 1; }
+/* 无封面占位：与行高对齐的暗色块，让列表有稳定的左边缘。 */
+.top-song-cover,
+.top-song-cover-ph { border-radius: var(--r-xs); background: var(--surface-2); border-color: transparent; }
+
+/* ── 3c-12 `.btn-primary`：一个从未被定义过的类 ─────────────────────
+   排查歌单页右上角那个「纯白色方块」时发现的：index.html:490 的
+   「新建歌单」用的是 class="btn-primary"，而这个类**在全仓 6 个 CSS
+   文件里一条定义都没有**（只有 .batch-btn-primary / .ai-btn-primary /
+   .conv-btn-primary 三个变体）。
+
+   后果：按钮拿 UA 默认的灰白底 + 继承来的浅色文字 = 白底白字，
+   文字完全不可见。同一个类还被 AI 助手页的发送按钮使用
+   （content.css:2073 用 `:has()` 给它写禁用态透明度，说明有人以为它
+   是有样式的）。这是原项目就存在的缺陷，与本次改版无关。
+
+   补一条主按钮定义，与 .ui-btn--primary 同规格，尺寸对齐工具栏里的 .tab。 */
+.btn-primary {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--accent-ui);
+  background: var(--accent-ui);
+  color: var(--on-accent);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  letter-spacing: var(--track-cjk);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter var(--dur-2) var(--ease),
+              transform var(--dur-0) var(--ease);
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:active { transform: scale(.98); }
+.btn-primary:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.btn-primary:disabled,
+.btn-primary.is-disabled { opacity: .45; filter: grayscale(.3); cursor: default; transform: none; }
+
+/* ── 3c-13 空态居中 ─────────────────────────────────────────────
+   `.queue-empty` 原本是个普通块：一句「暂无下载任务」贴在内容区顶部，
+   下面 600px 全是黑的。空态是用户会停留的界面（新装、清空队列后），
+   它应该落在视觉重心上，而不是像一行报错。
+
+   注意这个类有 3 种形态：纯文字（筛选无结果）、queue-empty-guide
+   （首次引导，含图标+按钮）、分组标题。只调整纵向节奏，不动内部结构。 */
+.queue-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 200px;
+  padding: var(--sp-8) var(--sp-4);
+  text-align: center;
+  color: var(--fg-3);
+  font-size: var(--fs-body);
+}
+.queue-empty-guide { gap: var(--sp-3); }
+.queue-empty-icon {
+  color: var(--fg-3);
+  opacity: .45;
+  font-size: 36px;
+  line-height: 1;
+}
+.queue-empty-text {
+  color: var(--fg-2);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-med);
+  letter-spacing: var(--track-cjk);
+}
+.queue-empty-hint { color: var(--fg-3); font-size: var(--fs-sm); }
+.queue-empty-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-1); }
+/* 空态里的引导按钮：与 .btn-sm 同规格，成对出现时宽度对齐。 */
+.queue-empty-actions .setting-btn {
+  padding: 6px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--stroke-2);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  transition: background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.queue-empty-actions .setting-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-line);
+  color: var(--fg-1);
+}
+.queue-empty-actions .setting-btn:active { transform: scale(.97); }
+.queue-empty-actions .setting-btn:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+
+/* ══════════════════════════════════════════════════════════════════
+   4 弹层家族统一皮（41 个弹层，实际只有 9 个家族）
+   ──────────────────────────────────────────────────────────────────
+   41 个浮层散落 26 个文件，但皮肤只有 9 套：
+     playlist-modal ×9   edit ×10   stats ×5   ai ×2   settings ×1
+     welcome ×1   shortcuts ×1   confirm ×1   cmdk ×1（命令面板）
+
+   换皮前它们各写一套：
+     · 遮罩模糊 blur(4px) / blur(8px) / blur(10px) 三种
+     · 面板边框 --neon-blue-dim（蓝边）/ --accent-line（主色边）/ --border 三种
+     · 入场动效 5 个 keyframes，从 .15s ease 到 .28s cubic-bezier 都有
+     · 关闭键 hover 三种：红色实底 / 粉色实底 / 主题红
+   这些差异没有一个是有意的 —— 只是「谁先写谁定规矩」留下的化石。
+
+   为什么不改 DOM：41 个弹层的 data-modal 契约逐枚被 modal-registry
+   对账，尺寸被 overlay-size-contract 逐条钉住；换皮肤只碰颜色、圆角、
+   阴影、动效这类「改错也只是难看，不会挂」的维度。
+
+   ⚠️ 宽度一律不动。9 个家族的宽度差异是内容驱动的（520 的歌曲列表 /
+   880 的设置 / 440 的确认框），统一成一样宽会立刻产生新的溢出问题。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 4-1 遮罩：一件事件，一种表达 ────────────────────────────────
+   72% 深底 + 10px 模糊，比原来的 4px 更能把底下的卡片流压下去 ——
+   弹层要读起来像「浮在界面之上」，而不是「叠在界面之上」。 */
+.playlist-modal-overlay,
+.edit-overlay,
+.stats-overlay,
+.ai-overlay,
+.settings-overlay,
+.welcome-overlay,
+.shortcuts-overlay,
+.confirm-dialog-overlay {
+  background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  animation: ui-overlay-in var(--dur-2) var(--ease-out);
+}
+
+@keyframes ui-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* 面板入场：位移 10px + 0.985 缩放。位移再大就会「从远处飞来」，
+   0.42s 更适合这种「落到眼前」的动作。 */
+@keyframes ui-panel-in {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── 4-2 面板外壳 ────────────────────────────────────────────────
+   1px 描边用 --stroke-1（文字色 9% 混合）而不是蓝色：蓝边在全站
+   每个方块上都出现，是「廉价感」的结构性来源，弹层尤其明显。
+   --rim 是顶部 1px 高光，玻璃面板靠这一条而不是靠发光立起来。 */
+.playlist-modal,
+.edit-panel,
+.stats-panel,
+.ai-modal,
+.settings-panel,
+.welcome-panel,
+.shortcuts-panel,
+.confirm-dialog,
+.cmdk-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-xl), var(--rim);
+  animation: ui-panel-in var(--dur-3) var(--ease-emph);
+}
+
+/* ── 4-3 头部与标题 ────────────────────────────────────────────────
+   标题从「主色文字」改回 --fg-1：主色是给动作和状态的，不是给标题的。
+   6 个家族的头部原本 5 种 padding（14/16/18/20/28），统一到 sp-4 竖向、
+   sp-5 横向 —— 视觉上「所有弹层的标题都长在同一个高度」。 */
+.playlist-modal-header,
+.edit-header,
+.stats-header,
+.ai-modal-header,
+.settings-header,
+.shortcuts-header {
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--stroke-0);
+  background: none;
+  flex-shrink: 0;
+}
+
+/* .stats-header / .ai-modal-header 本身就是「标题容器」（字写在容器上），
+   所以字号规则要落到它们身上；另外 4 个的标题是独立子元素。 */
+.playlist-modal-title,
+.edit-title,
+.settings-title,
+.shortcuts-header,
+.stats-header,
+.ai-modal-header {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semi);
+  color: var(--fg-1);
+  letter-spacing: var(--track-cjk);
+}
+
+/* 设置面板的标题更大一级（它是全屏级弹层，不是对话框） */
+.settings-title { font-size: var(--fs-lg); font-weight: var(--fw-bold); }
+
+/* ── 4-4 关闭键：28px 方形，hover 中性 ───────────────────────────
+   原来 hover 是「红色实底 + 白字」（edit）、「粉色实底」（shortcuts）、
+   「深红底」（stats）三种。关闭不是破坏性操作，红色留给「确认删除」。
+   图标由 [data-ico="x"] 的 mask 画，字号决定图标大小。 */
+.playlist-modal-close,
+.edit-close,
+.stats-header button,
+.ai-modal-header button,
+.settings-close,
+.shortcuts-header button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-3);
+  font-size: var(--fs-lg);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease);
+}
+.playlist-modal-close:hover,
+.edit-close:hover,
+.stats-header button:hover,
+.ai-modal-header button:hover,
+.settings-close:hover,
+.shortcuts-header button:hover {
+  background: var(--surface-3);
+  border-color: transparent;
+  color: var(--fg-1);
+}
+.playlist-modal-close:focus-visible,
+.edit-close:focus-visible,
+.stats-header button:focus-visible,
+.ai-modal-header button:focus-visible,
+.settings-close:focus-visible,
+.shortcuts-header button:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-focus);
+}
+
+/* ── 4-5 内容区：滚动条与过卷 ──────────────────────────────────
+   41 个弹层里 12 个有内部滚动。默认滚动条在深色面板上是一条亮灰，
+   比正文还抢眼；统一成 6px 的窄条，thumb 用描边色。 */
+.playlist-modal-body,
+.edit-body,
+.stats-body,
+.ai-modal-body,
+.shortcuts-body,
+.settings-content {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stroke-3) transparent;
+}
+.playlist-modal-body::-webkit-scrollbar,
+.edit-body::-webkit-scrollbar,
+.stats-body::-webkit-scrollbar,
+.ai-modal-body::-webkit-scrollbar,
+.shortcuts-body::-webkit-scrollbar,
+.settings-content::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.playlist-modal-body::-webkit-scrollbar-track,
+.edit-body::-webkit-scrollbar-track,
+.stats-body::-webkit-scrollbar-track,
+.ai-modal-body::-webkit-scrollbar-track,
+.shortcuts-body::-webkit-scrollbar-track,
+.settings-content::-webkit-scrollbar-track { background: transparent; }
+.playlist-modal-body::-webkit-scrollbar-thumb,
+.edit-body::-webkit-scrollbar-thumb,
+.stats-body::-webkit-scrollbar-thumb,
+.ai-modal-body::-webkit-scrollbar-thumb,
+.shortcuts-body::-webkit-scrollbar-thumb,
+.settings-content::-webkit-scrollbar-thumb {
+  background: var(--stroke-3);
+  border-radius: var(--r-full);
+}
+.playlist-modal-body::-webkit-scrollbar-thumb:hover,
+.edit-body::-webkit-scrollbar-thumb:hover,
+.stats-body::-webkit-scrollbar-thumb:hover,
+.ai-modal-body::-webkit-scrollbar-thumb:hover,
+.shortcuts-body::-webkit-scrollbar-thumb:hover,
+.settings-content::-webkit-scrollbar-thumb:hover { background: var(--fg-3); }
+
+/* ── 4-6 设置弹层内部（占全部弹层面积的 60%）───────────────────
+   设置是唯一一个「有内容」的弹层：左侧导航 + 右侧表单。外壳换皮后
+   里面还是旧语言（蓝边卡片、青底青字按钮、elev-1 底色），会出现
+   「新框装旧货」的割裂。这里把它的 6 个构件对齐到同一套纪律。
+
+   ⚠️ 顺序敏感：这一段必须写在下面的「底部动作区与按钮」之前。
+   .setting-btn 与 .confirm-dialog-ok 同为单类选择器，谁在后面谁赢 ——
+   确认框的主按钮同时挂着这两个类，顺序写反会把实心主按钮变回透明。 */
+.settings-nav {
+  background: transparent;
+  border-right: 1px solid var(--stroke-0);
+}
+.settings-nav-item {
+  color: var(--fg-2);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease);
+}
+.settings-nav-item:hover { background: var(--surface-2); color: var(--fg-1); }
+/* 选中态：填充块 + 左侧 2px 主色条。原来是「青底 + 青字 + 青边」三件套，
+   整个界面唯一发光的方块，比正文还抢眼。 */
+.settings-nav-item.active {
+  background: var(--surface-3);
+  color: var(--fg-1);
+  border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--accent-ui);
+}
+.settings-nav-item.active .nav-icon { color: var(--accent-ui); opacity: 1; }
+.settings-nav-label { color: var(--fg-3); opacity: 1; }
+
+.settings-section-title {
+  color: var(--fg-2);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--track-cjk);
+}
+.settings-section-title::before {
+  width: 3px; height: 12px;
+  background: var(--accent-ui);
+}
+
+.settings-card {
+  background: var(--surface-2);
+  border: 1px solid var(--stroke-0);
+  border-radius: var(--r-lg);
+}
+.settings-card--danger {
+  border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
+}
+.setting-row + .setting-row { border-top: 1px solid var(--stroke-0); }
+.setting-label { color: var(--fg-1); }
+.setting-hint { color: var(--fg-3); opacity: 1; }
+.setting-path { color: var(--fg-1); }
+.setting-inline-status { color: var(--fg-3); }
+
+/* 表单控件：输入框在深色面板上应该「凹进去」，用比卡片更深的底色，
+   而不是同样亮度的 elev-1。焦点环走 --glow-focus（1px 实线 + 4px 光晕），
+   和全站其它可聚焦元件同一套。 */
+.setting-select,
+.setting-input {
+  background: var(--surface-0);
+  border: 1px solid var(--stroke-2);
+  color: var(--fg-1);
+  border-radius: var(--r-sm);
+  transition: border-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
+}
+.setting-select:hover,
+.setting-input:hover { border-color: var(--stroke-3); }
+.setting-select:focus,
+.setting-input:focus {
+  border-color: var(--accent-ui);
+  box-shadow: var(--glow-focus);
+}
+
+/* 设置里的三种按钮：普通 / 危险 / 主操作。默认中性描边，
+   危险色只在真正危险的动作上出现。 */
+.setting-btn {
+  border: 1px solid var(--stroke-2);
+  background: transparent;
+  color: var(--fg-2);
+  border-radius: var(--r-sm);
+  transition: background-color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease),
+              transform var(--dur-0) var(--ease);
+}
+.setting-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-3);
+  color: var(--fg-1);
+}
+.setting-btn:active { transform: scale(.98); }
+.setting-btn:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+/* 上面这条单类规则会盖掉 overlays.css 里的 .setting-btn--danger（同在
+   ui.css 之前），所以危险态必须在这里重新声明一次。 */
+.setting-btn--danger {
+  border-color: color-mix(in srgb, var(--c-danger) 34%, transparent);
+  color: var(--c-danger);
+  background: transparent;
+}
+.setting-btn--danger:hover {
+  border-color: var(--c-danger);
+  color: var(--c-danger);
+  background: color-mix(in srgb, var(--c-danger) 12%, transparent);
+}
+.settings-warn { color: var(--c-warn); }
+
+/* 账号卡片：这是设置页唯一「有主操作」的地方，三个平台的登录键纵向
+   排开，是这一屏的视觉重心。
+   原来写死 --neon-cyan（固定青），不跟随主题 —— 浅色主题下就是
+   「浅青底 + 青字」的低对比按钮。改用 --accent-* 家族后各主题自动适配。 */
+.account-name { color: var(--fg-1); }
+.account-status { color: var(--fg-3); }
+.account-primary-btn {
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-ui);
+  border-radius: var(--r-md);
+  transition: background-color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease),
+              transform var(--dur-0) var(--ease);
+}
+.account-primary-btn:hover {
+  background: color-mix(in srgb, var(--accent-ui) 20%, transparent);
+  border-color: var(--accent-ui);
+  box-shadow: none;
+}
+.account-primary-btn:active { transform: scale(.985); }
+.account-primary-btn:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.account-advanced { border-top: 1px solid var(--stroke-0); }
+.account-advanced > summary { color: var(--fg-3); }
+.account-advanced[open] > summary { color: var(--fg-1); }
+.cookie-textarea {
+  background: var(--surface-0);
+  border: 1px solid var(--stroke-2);
+  color: var(--fg-1);
+}
+.cookie-textarea:focus {
+  border-color: var(--accent-ui);
+  box-shadow: var(--glow-focus);
+}
+
+/* ── 4-7 底部动作区与按钮 ──────────────────────────────────────
+   弹层里的主按钮原来有两套实现（.edit-btn-save 走 --accent，
+   .confirm-dialog-ok 走 --neon-cyan + 写死 #000），浅色主题下
+   前者用白字压在主色上对比度不足。统一到 --accent-ui / --on-accent。 */
+.edit-footer,
+.playlist-modal-footer {
+  border-top: 1px solid var(--stroke-0);
+  background: none;
+  flex-shrink: 0;
+}
+
+.edit-btn-save,
+.confirm-dialog-ok {
+  background: var(--accent-ui);
+  color: var(--on-accent);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-weight: var(--fw-semi);
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease),
+              transform var(--dur-0) var(--ease);
+}
+.edit-btn-save:hover,
+.confirm-dialog-ok:hover { background: var(--accent-ui); filter: brightness(1.1); }
+.edit-btn-save:active,
+.confirm-dialog-ok:active { transform: scale(.98); }
+.edit-btn-save:focus-visible,
+.confirm-dialog-ok:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+.edit-btn-save:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+
+.edit-btn-cancel,
+.confirm-dialog-cancel {
+  background: transparent;
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-md);
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease);
+}
+.edit-btn-cancel:hover,
+.confirm-dialog-cancel:hover {
+  background: var(--surface-2);
+  border-color: var(--stroke-3);
+  color: var(--fg-1);
+}
+.edit-btn-cancel:active,
+.confirm-dialog-cancel:active { transform: scale(.98); }
+.edit-btn-cancel:focus-visible,
+.confirm-dialog-cancel:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+
+/* 危险操作（.confirm-dialog.danger）保持红色主按钮 —— 这是全站唯一
+   允许整块变色的按钮，因为它代表不可逆。 */
+.confirm-dialog.danger .confirm-dialog-ok {
+  background: var(--c-danger);
+  color: var(--on-accent);
+}
+.confirm-dialog.danger .confirm-dialog-ok:hover {
+  background: var(--c-danger);
+  filter: brightness(1.1);
+}
+
+/* ── 4-8 首启引导浮层 ──────────────────────────────────────────
+   它不是对话框，是一屏「说明书」，所以保留 padding 型布局，只把
+   卡片从「蓝边方块」改成「明度分层 + 描边」。 */
+.welcome-card {
+  background: var(--surface-2);
+  border: 1px solid var(--stroke-0);
+  border-radius: var(--r-lg);
+}
+.welcome-title { font-weight: var(--fw-bold); letter-spacing: var(--track-cjk); color: var(--fg-1); }
+.welcome-sub { color: var(--fg-3); }
+/* 卡片图标从 emoji 换成 data-ico 后需要显式给尺寸：一屏三个 22px 彩色
+   emoji 是首启动界面最跳的三块色斑，现在统一成描边图标。 */
+.welcome-card-icon {
+  color: var(--fg-2);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.welcome-hint { color: var(--fg-3); }
+
+/* ── 4-9 命令面板（Ctrl+K）────────────────────────────────────
+   它没有面板头部，只有输入行 + 列表 + 提示行，靠分隔线分段。 */
+.cmdk-input {
+  font-size: var(--fs-body);
+  border-bottom: 1px solid var(--stroke-1);
+  padding: var(--sp-4) var(--sp-5);
+}
+.cmdk-hint {
+  border-top: 1px solid var(--stroke-0);
+  color: var(--fg-3);
+}
+
+/* ── 12 无障碍兜底 ───────────────────────────────────────────────
+   既有样式在阶段 6 统一补，这里先保证 v2 组件不会让前庭敏感用户
+   难受。 */
+@media (prefers-reduced-motion: reduce) {
+  .ui-card, .ui-btn, .ui-input, .ui-row, .ui-chip,
+  .ui-switch, .ui-switch::after, .ui-seg > button,
+  .ui-section-head__more {
+    transition-duration: .01ms !important;
+  }
+  .ui-skel::after { animation: none; }
+  /* 弹层入场位移是前庭敏感用户最难受的一类动效：位移+缩放会在视野里
+     制造「整个界面在动」的错觉。压成纯透明度变化。 */
+  .playlist-modal-overlay, .edit-overlay, .stats-overlay, .ai-overlay,
+  .settings-overlay, .welcome-overlay, .shortcuts-overlay,
+  .confirm-dialog-overlay { animation-duration: .01ms !important; }
+  .playlist-modal, .edit-panel, .stats-panel, .ai-modal, .settings-panel,
+  .welcome-panel, .shortcuts-panel, .confirm-dialog, .cmdk-panel {
+    animation: ui-overlay-in .01ms !important;
+  }
+}

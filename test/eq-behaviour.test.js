@@ -66,7 +66,7 @@ test('eq.js: eqFilters 存在填充点（EQ 已接入音频图，回退即红）
   );
 });
 
-test('eq.js: 音频图创建点全仓唯一 —— 只在 playback/engine.js', () => {
+test('eq.js: 音频图创建点全仓唯一 —— 只在 playback/audioPool.js', () => {
   const pattern = /\.(createBiquadFilter|createMediaElementSource|createGain)\s*\(/;
   const offenders = [];
   const walk = (dir) => {
@@ -85,10 +85,15 @@ test('eq.js: 音频图创建点全仓唯一 —— 只在 playback/engine.js', (
   // 若这条转红且 offenders 里出现 eq.js，说明有人把建图逻辑又搬回去了 ——
   // 那会与引擎抢同一个 #audioPlayer，第二次 createMediaElementSource 抛
   // InvalidStateError，而静默 catch 会让 EQ 无声失效。
+  //
+  // 2026-10-21：建图职责从 engine.js 进一步下沉到 playback/audioPool.js ——
+  // 交叉淡入淡出需要**两个**音频实例，而 createMediaElementSource 对同一元素
+  // 只能调用一次，所以图必须按元素缓存。放在 audioPool 里由它统一持有，
+  // 引擎只委托。这条钉的是「全仓唯一」，不是「在哪个文件」。
   assert.deepEqual(
     offenders,
-    ['src/renderer/js/playback/engine.js'],
-    '音频图创建点必须全仓唯一（playback/engine.js）；多出任何文件都是第二套劫持 #audioPlayer 的图'
+    ['src/renderer/js/playback/audioPool.js'],
+    '音频图创建点必须全仓唯一（playback/audioPool.js）；多出任何文件都是第二套劫持 #audioPlayer 的图'
   );
 });
 

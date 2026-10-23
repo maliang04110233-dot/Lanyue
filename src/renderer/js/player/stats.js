@@ -312,7 +312,7 @@ function showReportModal(html) {
         <span>📊 听歌报告</span>
         <span style="display:flex;gap:6px;">
           <button onclick="copyPlayReportText()" title="复制报告为纯文本，发群聊直接贴">📋</button>
-          <button onclick="document.getElementById('reportModal').remove()">✕</button>
+          <button onclick="document.getElementById('reportModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button>
         </span>
       </div>
       <div class="stats-body">${html}</div>

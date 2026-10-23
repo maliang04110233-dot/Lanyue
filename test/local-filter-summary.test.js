@@ -42,8 +42,8 @@ test('顺序按 CHIP_AXIS_IDS 走，不按入参顺序（两处对不齐眼睛�
 test('名单外的轴不报：fav 有高亮、sort 不是筛选、脏 id 不是轴', async () => {
   const { activeFilterChips } = await import(`${M}?v=${Math.random()}`);
   const chips = activeFilterChips([
-    axis('fav', true, (m) => (m ? '♥ 仅收藏' : '♥ 收藏')),
-    axis('sort', 'title', () => '↕ 标题'),
+    axis('fav', true, (m) => (m ? '仅收藏' : '收藏')),
+    axis('sort', 'title', () => '标题'),
     axis('', 'flac'),
     null,
     undefined,
@@ -54,8 +54,8 @@ test('名单外的轴不报：fav 有高亮、sort 不是筛选、脏 id 不是�
 
 test('chip 文案就是轴表原文（不另立词表），label 给空串视为没筛', async () => {
   const { activeFilterChips } = await import(`${M}?v=${Math.random()}`);
-  const chips = activeFilterChips([axis('qual', 'verified', () => '🧪 真无损'), axis('fmt', 'flac', () => '   ')]);
-  assert.deepStrictEqual(chips, [{ id: 'qual', text: '🧪 真无损' }], '空白文案不该成为一枚光杆 chip');
+  const chips = activeFilterChips([axis('qual', 'verified', () => '真无损'), axis('fmt', 'flac', () => '   ')]);
+  assert.deepStrictEqual(chips, [{ id: 'qual', text: '真无损' }], '空白文案不该成为一枚光杆 chip');
 });
 
 test('登记名单是显式决定：改折叠范围必须在这里留下痕迹', async () => {
@@ -67,13 +67,13 @@ test('filterChipsHtml：一枚 chip 一个 ✕ + 单清回调；名单外的 chi
   const { filterChipsHtml } = await import(`${M}?v=${Math.random()}`);
   assert.strictEqual(filterChipsHtml([]), '');
   assert.strictEqual(filterChipsHtml(undefined), '');
-  const html = filterChipsHtml([{ id: 'qual', text: '🧪 真无损' }, { id: 'meta', text: '🏷 缺封面' }]);
+  const html = filterChipsHtml([{ id: 'qual', text: '真无损' }, { id: 'meta', text: '缺封面' }]);
   assert.strictEqual((html.match(/class="filter-chip"/g) || []).length, 2);
   assert.strictEqual((html.match(/filter-chip-x">✕/g) || []).length, 2);
   assert.match(html, /onclick="resetLocalFilterAxis\('qual'\)"/);
   assert.match(html, /onclick="resetLocalFilterAxis\('meta'\)"/);
   // 名单外的 id 就算被调用方塞进来也不给出口（单清只能清折叠进菜单的轴）
-  assert.strictEqual(filterChipsHtml([{ id: 'sort', text: '↕ 标题' }]), '');
+  assert.strictEqual(filterChipsHtml([{ id: 'sort', text: '标题' }]), '');
 });
 
 test('innerHTML 出口必须转义（不赌上游永远是白名单值）', async () => {
@@ -90,8 +90,8 @@ test('innerHTML 出口必须转义（不赌上游永远是白名单值）', asyn
 
 test('自检：本文件的判据对"把 fav/sort 也算成筛选"确实会红（不是恒真）', async () => {
   const { activeFilterChips, CHIP_AXIS_IDS } = await import(`${M}?v=${Math.random()}`);
-  const favActive = axis('fav', true, () => '♥ 仅收藏');
-  assert.ok(favActive.label(favActive.mode) === '♥ 仅收藏', '这条轴确实"亮着"');
+  const favActive = axis('fav', true, () => '仅收藏');
+  assert.ok(favActive.label(favActive.mode) === '仅收藏', '这条轴确实"亮着"');
   assert.ok(!CHIP_AXIS_IDS.includes('fav'), '判据只认这份名单——名单一加 fav，上面那条测就红');
   assert.deepStrictEqual(activeFilterChips([favActive]), [], 'fav 现在确实不进 chip');
 });

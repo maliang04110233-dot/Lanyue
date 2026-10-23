@@ -70,6 +70,6 @@ test('playlist.js 接线：去重走 mergeSongLists(pl.songs,[])，有 busy 守�
 });
 
 test('index.html 按钮与命令面板入口齐备', () => {
-  assert.match(HTML, /onclick="dedupeCurrentPlaylist\(\)">🧹 清重复<\/button>/);
+  assert.match(HTML, /onclick="dedupeCurrentPlaylist\(\)"[^>]*>清重复<\/button>/);
   assert.match(PALETTE, /id: 'pl-dedupe'[\s\S]*?_call\('dedupeCurrentPlaylist'\)/);
 });

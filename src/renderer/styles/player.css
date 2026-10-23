@@ -1444,7 +1444,9 @@ audio { display: none; }
    ══════════════════════════════════════════════════════════════ */
 
 .bottom-bar {
-  --bb-h: 80px;
+  /* v2：高度与左右内边距统一到 :root 的 --bb-h / 内容轴线。
+     原先此处局部写死 80px，导致 base.css 的 --bb-h 形同虚设，
+     歌词展开时 calc(var(--bb-h) + 10px) 也无法跟随。 */
   flex-shrink: 0;
   height: var(--bb-h);
   display: flex;
@@ -1462,7 +1464,8 @@ audio { display: none; }
   align-items: center;
   flex-wrap: wrap;      /* 歌词/频谱展开时换行占满整行 */
   gap: 0 var(--sp-4);
-  padding: 0 var(--sp-5);
+  /* 与顶栏/内容区同一条轴线：底栏的封面左边缘与大屏内容左边缘对齐 */
+  padding: 0 max(var(--gutter), calc((100% - var(--content-max)) / 2));
   height: var(--bb-h);
   overflow: visible;
   background: transparent;
@@ -1494,9 +1497,11 @@ audio { display: none; }
 
 /* ── 封面（Alger .play-bar-img-wrapper：w-14 h-14 rounded-2xl） ── */
 .bottom-bar .pc-cover {
-  width: 56px;
+  /* v2：56 → 60。底栏长高到 84px 后 56px 封面显得偏小，
+     60px 与 84px 的比例（0.71）接近黄金比，视觉重量刚好压住左侧。 */
+  width: 60px;
   aspect-ratio: 1 / 1;
-  max-height: 56px;
+  max-height: 60px;
   flex-shrink: 0;
   border-radius: var(--r-lg);
   border: 1px solid var(--stroke-1);

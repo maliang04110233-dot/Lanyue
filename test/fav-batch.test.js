@@ -101,7 +101,7 @@ test('接线钉：favBatch 形状、search/favorites/HTML/面板落位、旧单�
   assert.match(SEARCH_JS, /async function batchFavorite\(\) \{/);
   assert.match(SEARCH_JS, /window\.batchFavorite = batchFavorite;/);
   assert.ok(SEARCH_JS.includes("showToast('请先勾选要收藏的歌曲', 'warn')"));
-  assert.match(HTML, /<button class="batch-btn" onclick="batchFavorite\(\)"[^>]*>♥ 收藏<\/button>/);
+  assert.match(HTML, /<button class="batch-btn" onclick="batchFavorite\(\)"[^>]*>收藏<\/button>/);
   assert.match(PALETTE_JS, /id: 'sr-batchfav'[\s\S]{0,220}?_call\('batchFavorite'\)/);
   // silent 是加参不是改道：单曲调用点保持单参
   assert.match(FAV_JS, /export async function toggleFavoriteByKey\(key, silent\) \{/);

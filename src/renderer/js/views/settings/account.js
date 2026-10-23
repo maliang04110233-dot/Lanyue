@@ -87,7 +87,7 @@ function _accountCardHtml(p) {
       '<span class="account-dot" id="' + escAttr(p.id) + 'Dot"></span>' +
     '</div>' +
     '<button class="account-primary-btn" id="' + escAttr(p.id) + 'LoginBtn"' +
-      ' onclick="openLoginWindowUI(' + arg + ', this)">🔑 一键登录</button>' +
+      ' data-ico="user" onclick="openLoginWindowUI(' + arg + ', this)">一键登录</button>' +
     '<details class="account-advanced">' +
       '<summary>高级（手动粘贴 Cookie）</summary>' +
       '<div class="settings-hint-box">' + hint + '</div>' +
@@ -155,7 +155,8 @@ export async function loadAccountCardStatus(platform) {
   dom.card.classList.toggle('is-login', isLoggedIn);
   dom.card.classList.remove('is-error');
   if (dom.loginBtn) {
-    dom.loginBtn.textContent = isLoggedIn ? '🔄 重新登录' : '🔑 一键登录';
+    dom.loginBtn.setAttribute('data-ico', isLoggedIn ? 'refresh' : 'user');
+    dom.loginBtn.textContent = isLoggedIn ? '重新登录' : '一键登录';
   }
 }
 
@@ -367,9 +368,13 @@ export async function openLoginWindowUI(platformId, btn) {
   }
   const platform = _accountPlatforms.cookie.find(p => p.id === platformId);
   const name = platform?.shortName || platform?.name || platformName(platformId) || platformId;
-  const originalText = btn ? btn.textContent : '🔑 一键登录';
+  const originalText = btn ? btn.textContent : '一键登录';
 
-  if (btn) { btn.disabled = true; btn.textContent = '🔄 打开登录窗口...'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.setAttribute('data-ico', 'refresh');
+    btn.textContent = '打开登录窗口...';
+  }
   showToast(t('toast.loginOpening', { name }), 'info');
 
   try {

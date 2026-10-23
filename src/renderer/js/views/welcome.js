@@ -28,10 +28,12 @@ let _overlay = null;
 let _keyHandler = null;
 let _opener = null;
 
+// 图标走 data-ico（与全站同一套 24px 线性图标），不再用 emoji ——
+// 首启动是用户看到的第一屏，彩色 emoji 与深色玻璃界面天然违和。
 function welcomeCard(icon, title, desc, btn) {
   return `
     <div class="welcome-card">
-      <div class="welcome-card-icon">${icon}</div>
+      <div class="welcome-card-icon" data-ico="${icon}" data-ico-only></div>
       <div class="welcome-card-body">
         <div class="welcome-card-title">${title}</div>
         <div class="welcome-card-desc">${desc}</div>
@@ -57,19 +59,19 @@ function showWelcome() {
   _overlay.setAttribute('data-modal', '');
   _overlay.innerHTML = `
     <div class="welcome-panel">
-      <div class="welcome-title">🎧 欢迎使用 揽乐</div>
+      <div class="welcome-title">欢迎使用 揽乐</div>
       <div class="welcome-sub">三步上手，下载无损音乐</div>
-      ${welcomeCard('📋', '复制或拖入链接，自动识别',
+      ${welcomeCard('link', '复制或拖入链接，自动识别',
         '把各音乐平台的歌曲、歌单、专辑链接复制出来（或直接拖进窗口），应用会自动弹出识别条，一键加入队列。')}
-      ${welcomeCard('🔐', '登录账号，解锁高音质',
+      ${welcomeCard('user', '登录账号，解锁高音质',
         '部分平台的高音质 / 无损需扫码登录解锁；免登录可直接下载的平台在「设置 → 平台账号」里标出。',
-        '<button class="btn welcome-btn" data-welcome="goto:accounts">去登录</button>')}
-      ${welcomeCard('📂', '下载目录与命名规则',
+        '<button class="btn btn-ghost welcome-btn" data-welcome="goto:accounts">去登录</button>')}
+      ${welcomeCard('folder', '下载目录与命名规则',
         '默认保存到「音乐/MusicDownloader」，可修改目录、文件命名模板、并发数与限速。',
-        '<button class="btn welcome-btn" data-welcome="goto:download">去设置</button>')}
-      <div class="welcome-hint">💡 小技巧：菜单里的「聚焦搜索」快捷键随时唤起搜索；下载队列支持 ⏫ 置顶和 ⬆⬇ 调整顺序。</div>
+        '<button class="btn btn-ghost welcome-btn" data-welcome="goto:download">去设置</button>')}
+      <div class="welcome-hint">小技巧：菜单里的「聚焦搜索」快捷键随时唤起搜索；下载队列支持置顶与调整顺序。</div>
       <div class="welcome-actions">
-        <button class="btn ghost" data-welcome="later">稍后再说</button>
+        <button class="btn btn-ghost" data-welcome="later">稍后再说</button>
         <button class="btn primary" data-welcome="start">开始使用</button>
       </div>
     </div>`;

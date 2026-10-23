@@ -8,11 +8,18 @@
  */
 
 // ── Toast 类型映射 ───────────────────────────────────
+// 2026-10-23：移除 icon 字段（info 的 ℹ️ / success 的 ✅ / warn 的 ⚠️ / error 的 ❌）。
+// 那四个字段**从未被任何代码读取** —— 状态一直是由 base.css 里
+// `.toast-info/.toast-success/.toast-warn/.toast-error` 那 3px 语义色条
+// （border-left-color 引用 --c-ok / --c-warn / --c-danger）表达的。
+// 留着死数据只会误导后来的人以为 toast 带 emoji 前缀。状态该由颜色表达，
+// 不该由字符表达：emoji 在 Windows / macOS / Linux 三端渲染粗细不一，
+// 而且与深色未来感界面天然违和。
 const TYPE_CONFIG = {
-  info:    { icon: 'ℹ️',  duration: 3000, className: 'toast-info' },
-  success: { icon: '✅',  duration: 3000, className: 'toast-success' },
-  warn:    { icon: '⚠️',  duration: 4000, className: 'toast-warn' },
-  error:   { icon: '❌',  duration: 5000, className: 'toast-error' },
+  info:    { duration: 3000, className: 'toast-info' },
+  success: { duration: 3000, className: 'toast-success' },
+  warn:    { duration: 4000, className: 'toast-warn' },
+  error:   { duration: 5000, className: 'toast-error' },
 };
 
 /**

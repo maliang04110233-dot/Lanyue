@@ -71,10 +71,10 @@ test('探测失败当「未测」处理（不让失败行混进 verified），�
 
 test('文案：每个 mode 一句话，未知 mode 回落全部（按钮文字来自函数，不散落字面量）', async () => {
   const { qualModeLabel, QUALITY_MODES } = await fresh();
-  assert.equal(qualModeLabel('all'), '🧪 音质');
-  assert.equal(qualModeLabel('unprobed'), '🧪 待验');
-  assert.equal(qualModeLabel('weird'), '🧪 音质');
-  for (const m of QUALITY_MODES) assert.ok(qualModeLabel(m).startsWith('🧪 '), m);
+  assert.equal(qualModeLabel('all'), '音质');
+  assert.equal(qualModeLabel('unprobed'), '待验');
+  assert.equal(qualModeLabel('weird'), '音质');
+  for (const m of QUALITY_MODES) assert.ok(qualModeLabel(m).startsWith(''), m);
 });
 
 test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + 面板项，纯函数模块零 DOM', () => {

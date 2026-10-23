@@ -109,7 +109,7 @@ function _overlay() {
     <div class="edit-panel" style="width:400px;">
       <div class="edit-header">
         <span class="edit-title" id="afterQueueCdTitle">🏁 队列已完成</span>
-        <button class="edit-close" onclick="cancelAfterQueueCountdown()">✕</button>
+        <button class="edit-close" onclick="cancelAfterQueueCountdown()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="edit-body">
         <div class="batch-import-status" id="afterQueueCdText"></div>

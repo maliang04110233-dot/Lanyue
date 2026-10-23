@@ -164,10 +164,16 @@ const resolveTrack = createResolveTrackService({
  *
  * @param {object} song 完整歌曲对象：{ id, source, title, artist, duration, _altSource? }
  * @param {string} quality
+ * @param {object} [options] 单次调用的行为覆盖（不改全局设置）
+ * @param {boolean} [options.allowToggleSource] 覆盖跨源换源总开关。
+ *        缺省 ⇒ 读全局 prefs（现有行为，零回归）。
+ * @param {(event:{type:'toggled',from:string,to:string})=>void} [options.onToggleSource]
+ *        换源回调：只在真正发生切换时调用。
+ * @param {boolean} [options.isRefresh] 跳过 `_altSource` 记忆，强制重新解析。
  * @returns {Promise<{url,ext,...}|{error,code,...}>}
  */
-async function getDownloadUrlSmart(song, quality) {
-  return resolveTrack.resolve(song, quality);
+async function getDownloadUrlSmart(song, quality, options) {
+  return resolveTrack.resolve(song, quality, options);
 }
 
 // 源健康度快照（设置页探针展示用）

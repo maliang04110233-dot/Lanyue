@@ -62,7 +62,7 @@ const CHANNELS = {
   // ── 下载（invoke） ────────────────────────────────
   // id/source 的最终合法性判定仍留在 handler（safeId/safeToken，错误文案是产品约定）
   'get-download-url':       { invoke: MAIN, args: [['id', t.any()], ['source', t.any()], ['quality', t.enum(['lossless', 'hq', 'standard'], 'standard')]] },
-  'get-download-url-smart': { invoke: MAIN, args: [['song', t.any()], ['quality', t.str(16)]] },
+  'get-download-url-smart': { invoke: MAIN, args: [['song', t.any()], ['quality', t.str(16)], ['options', t.obj()]] },
   'add-to-queue':           { invoke: MAIN, args: [['song', t.obj()]] },
   'cancel-download':        { invoke: MAIN, args: [['taskId', t.any()]] },
   'retry-download':         { invoke: MAIN, args: [['taskId', t.any()]] },

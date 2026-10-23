@@ -172,11 +172,11 @@ test('折叠范围三处同源：菜单档位项 == CHIP_AXIS_IDS == 轴表 btnI
   }
 });
 
-test('♥ 收藏留在常驻区：一键开关不许被折进菜单（折叠范围的例外要说清）', () => {
+test('收藏留在常驻区：一键开关不许被折进菜单（折叠范围的例外要说清）', () => {
   const bar = toolbarHtml();
   const resident = residentButtons(bar);
-  assert.ok(resident.some((b) => /id="localFavBtn"/.test(b.attrs)), '♥ 收藏该是常驻 .tab 按钮');
-  assert.ok(!menuItems(bar).some((it) => it.id === 'localFavBtn'), '♥ 收藏折进菜单就丢了单键切换');
+  assert.ok(resident.some((b) => /id="localFavBtn"/.test(b.attrs)), '收藏该是常驻 .tab 按钮');
+  assert.ok(!menuItems(bar).some((it) => it.id === 'localFavBtn'), '收藏折进菜单就丢了单键切换');
   // 触发器就位：菜单一关，用户唯一的入口就是它
   assert.match(bar, /id="localFilterBtn"[^>]*onclick="toggleTbDropdown\(event, 'localFilterMenu'\)"/);
 });
@@ -223,9 +223,9 @@ test('CSS 兜底：窄窗口换行而不是把按钮压成逐字竖排', () => {
 test('自检：本文件的判据对"退回旧写法"确实会红（不是恒真）', async () => {
   const { qual } = await freshLabels();
   // ① 文案退回轴名前缀 ⇒ all 态字样钉必须失配
-  assert.notStrictEqual(qual('all'), '🧪 音质: 全部', '判据应当只认精简后的字样');
+  assert.notStrictEqual(qual('all'), '音质: 全部', '判据应当只认精简后的字样');
   // ② 常驻标签退回长文案 ⇒ 封顶钉必须命中
-  const verbose = '🧪 音质: 仅待验（无损容器未实测）';
+  const verbose = '音质: 仅待验（无损容器未实测）';
   assert.ok(textLen(verbose) > 4, '长度封顶应当抓到这处倒退');
   // ③ 动作项漏掉 closeTbMenus ⇒ 收菜单钉必须命中
   const leaky = 'showFolderGroups()';

@@ -148,7 +148,7 @@ test('接线钉：window 桥、导出面、工具栏控件、命令面板项齐�
     assert.match(DL_JS, new RegExp(`window\\.${fn} = ${fn};`), `${fn} 未挂 window`);
     assert.ok(DL_JS.includes(`  ${fn},`), `${fn} 未进 ES Module 导出面`);
   }
-  assert.match(HTML, /id="dlGroupBtn"[^>]*onclick="toggleDlGroupMode\(\)">🧩 分组: <span id="dlGroupLabel">关<\/span>/);
+  assert.match(HTML, /id="dlGroupBtn"[^>]*onclick="toggleDlGroupMode\(\)"[^>]*>分组: <span id="dlGroupLabel">关<\/span>/);
   assert.match(HTML, /id="dlPlatformChip" style="display:none"[^>]*onclick="clearDlPlatformFilter\(\)"/);
   assert.match(PALETTE, /id: 'dl-group'[\s\S]{0,220}_goto\('download'\); _call\('toggleDlGroupMode'\)/);
   assert.match(PALETTE, /id: 'dl-platclear'[\s\S]{0,220}_call\('clearDlPlatformFilter'\)/);

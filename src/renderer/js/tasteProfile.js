@@ -39,7 +39,7 @@ function _openProfileModal(profile, meta) {
         <span>🎯 ${t('settings.stats.profileTitle')}</span>
         <span style="display:flex;gap:6px;align-items:center;">
           ${cachedTag}
-          <button onclick="document.getElementById('tasteProfileModal').remove()">✕</button>
+          <button onclick="document.getElementById('tasteProfileModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button>
         </span>
       </div>
       <div class="stats-body">

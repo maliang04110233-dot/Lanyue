@@ -47,7 +47,7 @@ test('接线钉：视图函数/实时重拉/桥/HTML 按钮/palette 全部就位
   assert.match(PL_JS, /api\.saveUserPlaylist\(dupPlaylistPayload\(pl, newName\)\)/, '副本载荷直发既有通道');
   assert.match(PL_JS, /plState\._plDupBusy = false;/, '防重入闩');
   assert.match(PL_JS, /window\.duplicateCurrentPlaylist = duplicateCurrentPlaylist;/);
-  assert.match(HTML, /onclick="duplicateCurrentPlaylist\(\)">📋 副本/);
+  assert.match(HTML, /onclick="duplicateCurrentPlaylist\(\)"[^>]*>副本/);
   assert.match(PALETTE_JS, /\{ id: 'pl-dup'/);
   assert.match(PALETTE_JS, /_call\('duplicateCurrentPlaylist'\)/);
 });

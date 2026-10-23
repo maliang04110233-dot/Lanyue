@@ -8,13 +8,13 @@
 const LOCAL_SORT_MODES = ['default', 'title', 'artist', 'duration-desc', 'size-desc', 'plays-desc', 'mtime-desc'];
 
 const LABELS = {
-  default: '↕ 默认序',
-  title: '↕ 标题',
-  artist: '↕ 歌手',
-  'duration-desc': '↕ 时长 ↓',
-  'size-desc': '↕ 大小 ↓',
-  'plays-desc': '↕ 播放 🔥',
-  'mtime-desc': '↕ 最近添加',
+  default: '默认序',
+  title: '标题',
+  artist: '歌手',
+  'duration-desc': '时长 ↓',
+  'size-desc': '大小 ↓',
+  'plays-desc': '播放',
+  'mtime-desc': '最近添加',
 };
 
 function nextLocalSortMode(mode) {

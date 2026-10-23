@@ -179,7 +179,9 @@ function _renderDiag(task, d, ctx) {
   title.textContent = '🆘 失败诊断';
   const close = document.createElement('button');
   close.className = 'edit-close';
-  close.textContent = '✕';
+  close.setAttribute('data-ico', 'x');
+  close.setAttribute('data-ico-only', '');
+  close.setAttribute('aria-label', '关闭');
   close.addEventListener('click', _closeDiag);
   header.appendChild(title);
   header.appendChild(close);
@@ -333,7 +335,9 @@ function _renderFailReport(groups, origin) {
     + (origin === 'history' ? ' · 来自下载历史' : '');
   const close = document.createElement('button');
   close.className = 'edit-close';
-  close.textContent = '✕';
+  close.setAttribute('data-ico', 'x');
+  close.setAttribute('data-ico-only', '');
+  close.setAttribute('aria-label', '关闭');
   close.addEventListener('click', _closeFailReport);
   header.appendChild(title);
   header.appendChild(close);

@@ -24,7 +24,7 @@
   // 全局错误捕获：onclick 调用未定义函数时弹 toast 而不是静默
   window.addEventListener('error', (e) => {
     if (typeof showToast === 'function') {
-      showToast('❌ JS 错误: ' + (e.message || e), 'error', 8000);
+      showToast('JS 错误: ' + (e.message || e), 'error', 8000);
     } else {
       console.error('[global error]', e);
     }
@@ -32,7 +32,7 @@
   window.addEventListener('unhandledrejection', (e) => {
     const msg = e.reason && (e.reason.message || e.reason) || '未知错误';
     if (typeof showToast === 'function') {
-      showToast('❌ 异步错误: ' + msg, 'error', 8000);
+      showToast('异步错误: ' + msg, 'error', 8000);
     }
   });
 </script>
@@ -42,6 +42,8 @@
 <link rel="stylesheet" href="styles/overlays.css">
 <link rel="stylesheet" href="styles/player.css">
 <link rel="stylesheet" href="styles/converter.css">
+<link rel="stylesheet" href="styles/ui.css">
+<link rel="stylesheet" href="styles/icons.css">
 <!-- 霓虹 SVG 渐变：给环形进度条用 -->
 <svg width="0" height="0" style="position:absolute">
   <defs>
@@ -81,9 +83,9 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
     <div class="winctrls">
-      <button onclick="api.windowMinimize()" title="最小化" aria-label="最小化">─</button>
-      <button onclick="api.windowMaximize()" title="最大化" aria-label="最大化">□</button>
-      <button class="close" onclick="api.windowClose()" title="关闭" aria-label="关闭">✕</button>
+      <button onclick="api.windowMinimize()" title="最小化" aria-label="最小化"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 6h8"/></svg></button>
+      <button onclick="api.windowMaximize()" title="最大化" aria-label="最大化"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="2.5" y="2.5" width="7" height="7" rx="1.2"/></svg></button>
+      <button class="close" onclick="api.windowClose()" title="关闭" aria-label="关闭"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
     </div>
   </div>
 </div>
@@ -104,7 +106,7 @@
           <input class="home-search-input" id="homeSearchInput"
             placeholder="搜索歌曲、歌手、专辑…（支持直接粘贴各平台歌曲/歌单/专辑链接）"
             onkeydown="if(event.key==='Enter')homeHeroSearch(this.value)">
-          <button class="home-search-btn" onclick="homeHeroSearch(document.getElementById('homeSearchInput').value)">🔍 搜索</button>
+          <button class="home-search-btn" onclick="homeHeroSearch(document.getElementById('homeSearchInput').value)" data-ico="search">搜索</button>
         </div>
         <div class="home-hero-tags" id="homeHeroTags"></div>
       </div>
@@ -112,28 +114,28 @@
       <!-- 统计概览卡片 -->
       <div class="home-stats" id="homeStatsRow">
         <div class="stat-card" tabindex="0" role="button" onclick="switchTab('local')" title="本地曲库">
-          <div class="stat-icon">🎼</div>
+          <div class="stat-icon" data-ico="music-list" data-ico-only></div>
           <div class="stat-body">
             <div class="stat-num" id="statLibCount">—</div>
             <div class="stat-label">本地曲库</div>
           </div>
         </div>
         <div class="stat-card" tabindex="0" role="button" onclick="switchTab('download')" title="下载完成数">
-          <div class="stat-icon">⬇️</div>
+          <div class="stat-icon" data-ico="download" data-ico-only></div>
           <div class="stat-body">
             <div class="stat-num" id="statDoneCount">—</div>
             <div class="stat-label">已下载</div>
           </div>
         </div>
         <div class="stat-card" tabindex="0" role="button" onclick="switchTab('download')" title="总播放时长">
-          <div class="stat-icon">⏱️</div>
+          <div class="stat-icon" data-ico="clock" data-ico-only></div>
           <div class="stat-body">
             <div class="stat-num" id="statPlayTime">—</div>
             <div class="stat-label">累计收听</div>
           </div>
         </div>
         <div class="stat-card" tabindex="0" role="button" onclick="switchTab('download')" title="最常播放的歌">
-          <div class="stat-icon">🔥</div>
+          <div class="stat-icon" data-ico="flame" data-ico-only></div>
           <div class="stat-body">
             <div class="stat-num stat-most" id="statMostPlayed">—</div>
             <div class="stat-label">最常播放</div>
@@ -143,13 +145,13 @@
 
       <!-- 最近播放 -->
       <div class="hot-section" id="recentlyPlayedSection" style="display:none;">
-        <div class="hot-section-title">⏱️ 最近播放 <button class="section-clear-btn" onclick="clearRecentlyPlayed()" data-i18n="home.clear">清空</button></div>
+        <div class="hot-section-title" data-ico="clock">最近播放 <button class="section-clear-btn" onclick="clearRecentlyPlayed()" data-i18n="home.clear">清空</button></div>
         <div class="recent-list" id="recentlyPlayedList"></div>
       </div>
 
       <!-- 首页榜单即时过滤：只影响渲染，不清数据（会话级） -->
       <div style="display:flex;justify-content:flex-end;margin:6px 0;">
-        <input class="search-input" id="homeFilterInput" placeholder="🔍 过滤本页榜单（歌名/歌手/歌单名）..." style="width:250px;">
+        <input class="search-input" id="homeFilterInput" placeholder="过滤本页榜单（歌名/歌手/歌单名）..." style="width:250px;">
       </div>
 
       <!-- 平台 tab 条：互斥切换，一次只显示一个平台（←/→ 循环） -->
@@ -173,28 +175,28 @@
               <option value="all" data-i18n="search.all">全部</option>
             </select>
             <div class="search-type-tabs">
-                          <button class="tab active" data-type="song" onclick="switchSearchType('song',this)" data-i18n="search.single">🎵 单曲</button>
-                          <button class="tab" data-type="album" onclick="switchSearchType('album',this)" data-i18n="search.album">💿 专辑</button>
-                          <button class="tab" data-type="singer" onclick="switchSearchType('singer',this)" data-i18n="search.singer">🎤 歌手</button>
+                          <button class="tab active" data-type="song" onclick="switchSearchType('song',this)" data-i18n="search.single" data-ico="music">单曲</button>
+                          <button class="tab" data-type="album" onclick="switchSearchType('album',this)" data-i18n="search.album" data-ico="disc">专辑</button>
+                          <button class="tab" data-type="singer" onclick="switchSearchType('singer',this)" data-i18n="search.singer" data-ico="mic">歌手</button>
                         </div>
                         <div class="search-input-wrap">
               <input class="search-input" id="searchInput" placeholder="搜索歌曲、歌手、专辑...（支持直接粘贴各平台歌曲/歌单/专辑链接）"
                 onkeydown="searchInputKey(event)" oninput="debounceSearch()" onfocus="showSearchHistory()" onblur="hideSearchHistory()">
-              <button class="search-btn" onclick="doSearch()">🔍</button>
-              <button class="search-btn" data-feature="ai" onclick="doNaturalSearch()" title="AI 搜索：用一句话描述想听的歌（需在 AI 音乐配置 API Key）">✨</button>
+              <button class="search-btn" onclick="doSearch()" data-ico="search" data-ico-only></button>
+              <button class="search-btn" data-feature="ai" onclick="doNaturalSearch()" title="AI 搜索：用一句话描述想听的歌（需在 AI 音乐配置 API Key）" data-ico="sparkle" data-ico-only></button>
             </div>
             <select class="quality-select" id="qualitySelect">
               <option value="standard" data-i18n="search.quality.standard">标准 128k</option>
               <option value="hq" data-i18n="search.quality.hq">高品质 320k</option>
               <option value="lossless" data-i18n="search.quality.lossless">无损 FLAC</option>
             </select>
-            <button class="tab" id="playAllBtn" title="将本页单曲搜索结果全部加入播放队列，从第一首开始播放" onclick="playSearchAll()">▶ 播放全部</button>
-            <button class="tab tab-neon" id="searchSelectBtn" onclick="enterSearchBatchMode()" data-i18n="local.select">☑ 选择</button>
-            <button class="tab" id="hideDlToggle" title="隐藏下载状态为「已下载」的结果行" onclick="toggleHideDownloaded()">🙈 隐藏已下载</button>
-            <button class="tab" id="searchSortBtn" title="切换搜索结果排序：默认 / 时长 / 来源" onclick="cycleSearchSort()">↕ 默认序</button>
-            <button class="tab" id="batchImportBtn" title="粘贴多行分享链接，解析后一次全部加入下载队列" onclick="openBatchImport()">📥 批量导入</button>
-            <button class="tab" id="nameBatchBtn" title="粘贴多行「歌手 - 歌名」清单，逐行搜索匹配后预览入队" onclick="openNameBatch()">🎤 按歌名导入</button>
-            <button class="tab" id="scheduledBtn" title="挂起分享链接，到设定时间自动解析入队（夜间错峰下载；错过时点开机即补跑）" onclick="openScheduledPanel()">⏰ 定时<span id="scheduledBadge"></span></button>
+            <button class="tab" id="playAllBtn" title="将本页单曲搜索结果全部加入播放队列，从第一首开始播放" onclick="playSearchAll()" data-ico="play">播放全部</button>
+            <button class="tab tab-neon" id="searchSelectBtn" onclick="enterSearchBatchMode()" data-i18n="local.select" data-ico="check-square">选择</button>
+            <button class="tab" id="hideDlToggle" title="隐藏下载状态为「已下载」的结果行" onclick="toggleHideDownloaded()" data-ico="eye-off">隐藏已下载</button>
+            <button class="tab" id="searchSortBtn" title="切换搜索结果排序：默认 / 时长 / 来源" onclick="cycleSearchSort()" data-ico="sort">默认序</button>
+            <button class="tab" id="batchImportBtn" title="粘贴多行分享链接，解析后一次全部加入下载队列" onclick="openBatchImport()" data-ico="import">批量导入</button>
+            <button class="tab" id="nameBatchBtn" title="粘贴多行「歌手 - 歌名」清单，逐行搜索匹配后预览入队" onclick="openNameBatch()" data-ico="mic">按歌名导入</button>
+            <button class="tab" id="scheduledBtn" title="挂起分享链接，到设定时间自动解析入队（夜间错峰下载；错过时点开机即补跑）" onclick="openScheduledPanel()" data-ico="clock">定时<span id="scheduledBadge"></span></button>
             <!-- 搜索历史下拉 -->
             <div class="search-history" id="searchHistory" style="display:none;"></div>
           </div>
@@ -206,7 +208,7 @@
             <div style="flex:1;display:flex;flex-direction:column;gap:8px;overflow:hidden;">
               <div class="song-list" id="songList">
                 <div class="empty-state" id="welcomeScreen">
-                  <div class="empty-icon">🎵</div>
+                  <div class="empty-icon" data-ico="music" data-ico-only></div>
                   <div class="empty-text" data-i18n="search.welcome.text">输入关键词开始搜索</div>
                   <div class="empty-hint" data-i18n="search.welcome.hint">支持歌名、歌手、专辑，多平台同时检索</div>
                 </div>
@@ -219,12 +221,12 @@
                   <span data-i18n="search.selectAll">全选</span>
                 </label>
                 <span class="batch-info" id="batchInfo">已选 0 首</span>
-                <button class="batch-btn batch-btn-primary" onclick="batchDownload()" data-i18n="search.batchDownload">⬇ 加入下载队列</button>
-                <button class="batch-btn" onclick="batchPlay()" data-i18n="search.batchPlay">▶ 批量播放</button>
-                <button class="batch-btn" onclick="batchAddToQueue()" title="把勾选歌曲追加到播放队列，不打断当前播放">➕ 加队列</button>
-                <button class="batch-btn" onclick="batchAddToPlaylist()" title="把勾选歌曲批量加入用户歌单">🎼 加歌单</button>
-                <button class="batch-btn" onclick="batchFavorite()" title="把勾选歌曲一键收藏（已在收藏夹的自动跳过）">♥ 收藏</button>
-                <button class="batch-btn" onclick="exitSearchBatchMode()" style="margin-left:auto;" data-i18n="search.batchCancel">✕ 取消选择</button>
+                <button class="batch-btn batch-btn-primary" onclick="batchDownload()" data-i18n="search.batchDownload" data-ico="download">加入下载队列</button>
+                <button class="batch-btn" onclick="batchPlay()" data-i18n="search.batchPlay" data-ico="play">批量播放</button>
+                <button class="batch-btn" onclick="batchAddToQueue()" title="把勾选歌曲追加到播放队列，不打断当前播放" data-ico="plus">加队列</button>
+                <button class="batch-btn" onclick="batchAddToPlaylist()" title="把勾选歌曲批量加入用户歌单" data-ico="music-list">加歌单</button>
+                <button class="batch-btn" onclick="batchFavorite()" title="把勾选歌曲一键收藏（已在收藏夹的自动跳过）" data-ico="heart">收藏</button>
+                <button class="batch-btn" onclick="exitSearchBatchMode()" style="margin-left:auto;" data-i18n="search.batchCancel" data-ico="x">取消选择</button>
               </div>
               <!-- 批量操作进度条 -->
               <div class="batch-progress-wrap" id="batchProgressWrap" style="display:none;">
@@ -243,50 +245,50 @@
                   <!-- 本地库页面 -->
               <div id="localPage" class="local-page">
           <div class="local-toolbar">
-                      <button class="tab" onclick="scanLocalDir()" data-i18n="local.scanDir">📂 扫描目录</button>
-                      <button class="tab tab-neon" onclick="batchAutoMeta()" style="background:linear-gradient(135deg,var(--neon-cyan),var(--neon-blue));color:#fff;border:none;" data-i18n="local.batchAutoMeta">⚡ 一键补全</button>
-                      <button class="tab tab-neon" id="localSelectBtn" onclick="enterLocalSelectionMode()" data-i18n="local.select">☑ 选择</button>
-            <button class="tab tab-neon" id="localViewToggleBtn" onclick="toggleLocalView()" data-i18n="local.grid">▦ 网格</button>
-                      <button class="tab" id="localFavBtn" onclick="toggleLocalFavOnly()" title="只看已收藏的本地歌（行右键 ♥ 收藏）">♥ 收藏</button>
+                      <button class="tab" onclick="scanLocalDir()" data-i18n="local.scanDir" data-ico="folder-open">扫描目录</button>
+                      <button class="tab tab-neon" onclick="batchAutoMeta()" style="background:linear-gradient(135deg,var(--neon-cyan),var(--neon-blue));color:#fff;border:none;" data-i18n="local.batchAutoMeta" data-ico="zap">一键补全</button>
+                      <button class="tab tab-neon" id="localSelectBtn" onclick="enterLocalSelectionMode()" data-i18n="local.select" data-ico="check-square">选择</button>
+            <button class="tab tab-neon" id="localViewToggleBtn" onclick="toggleLocalView()" data-i18n="local.grid" data-ico="grid">网格</button>
+                      <button class="tab" id="localFavBtn" onclick="toggleLocalFavOnly()" title="只看已收藏的本地歌（行右键 收藏）" data-ico="heart">收藏</button>
                       <div class="tb-dropdown">
-                        <button class="tab" id="localFilterBtn" onclick="toggleTbDropdown(event, 'localFilterMenu')" title="三条过滤轴收在一处：点一次走一档、菜单不关可以连着点；正在筛的那几档会显示在工具栏下方一行，点它就单项清掉">🔽 筛选 ▾</button>
+                        <button class="tab" id="localFilterBtn" onclick="toggleTbDropdown(event, 'localFilterMenu')" title="三条过滤轴收在一处：点一次走一档、菜单不关可以连着点；正在筛的那几档会显示在工具栏下方一行，点它就单项清掉" data-ico="chevron-down">筛选 </button>
                         <div class="tb-menu" id="localFilterMenu" hidden>
                           <div class="tb-menu-label">叠加筛选 · 高亮=正在筛 · 生效项见工具栏下方</div>
-                          <button class="tb-menu-item" id="localFmtBtn" onclick="cycleLocalFmt()" title="按文件格式过滤：只在曲库实际存在的格式间循环">🎞 格式</button>
-                          <button class="tb-menu-item" id="localQualBtn" onclick="cycleLocalQual()" title="按音质过滤视图：全部 / 仅标称无损 / 仅实测真无损 / 仅存疑或伪无损 / 仅待验（无损容器未实测）。与收藏、关键词叠加">🧪 音质</button>
-                          <button class="tb-menu-item" id="localMetaBtn" onclick="cycleLocalMeta()" title="按元数据完整度过滤：全部 / 缺封面 / 缺专辑 / 缺歌手或标题 / 缺内嵌歌词。与收藏、关键词叠加">🏷 完整度</button>
-                          <button class="tb-menu-item" onclick="clearLocalFilters();closeTbMenus()" title="三条轴全部回到不过滤（♥ 收藏与关键词不动）">✕ 清空筛选</button>
+                          <button class="tb-menu-item" id="localFmtBtn" onclick="cycleLocalFmt()" title="按文件格式过滤：只在曲库实际存在的格式间循环" data-ico="film">格式</button>
+                          <button class="tb-menu-item" id="localQualBtn" onclick="cycleLocalQual()" title="按音质过滤视图：全部 / 仅标称无损 / 仅实测真无损 / 仅存疑或伪无损 / 仅待验（无损容器未实测）。与收藏、关键词叠加" data-ico="flask">音质</button>
+                          <button class="tb-menu-item" id="localMetaBtn" onclick="cycleLocalMeta()" title="按元数据完整度过滤：全部 / 缺封面 / 缺专辑 / 缺歌手或标题 / 缺内嵌歌词。与收藏、关键词叠加" data-ico="tag">完整度</button>
+                          <button class="tb-menu-item" onclick="clearLocalFilters();closeTbMenus()" title="三条轴全部回到不过滤（收藏与关键词不动）" data-ico="x">清空筛选</button>
                         </div>
                       </div>
                       <div class="search-input-wrap">
                         <input class="search-input" id="localFilter" placeholder="过滤本地歌曲..."
                           oninput="filterLocalSongs()" onkeydown="if(event.key==='Enter')filterLocalSongs()">
                       </div>
-                      <button class="tab" id="localSortBtn" title="切换本地曲库排序：默认 / 标题 / 歌手 / 时长 / 大小 / 播放次数 / 最近添加" onclick="cycleLocalSort()">↕ 默认序</button>
+                      <button class="tab" id="localSortBtn" title="切换本地曲库排序：默认 / 标题 / 歌手 / 时长 / 大小 / 播放次数 / 最近添加" onclick="cycleLocalSort()" data-ico="sort">默认序</button>
                       <div class="tb-dropdown">
-                        <button class="tab" onclick="toggleTbDropdown(event, 'localGroupMenu')">🗂 分组 ▾</button>
+                        <button class="tab" onclick="toggleTbDropdown(event, 'localGroupMenu')" data-ico="folder-tree">分组 </button>
                         <div class="tb-menu" id="localGroupMenu" hidden>
-                          <button class="tb-menu-item" onclick="showArtistGroups();closeTbMenus()" title="按歌手统计本地曲库（数量/体积），点击歌手即过滤">🎤 歌手分组</button>
-                          <button class="tb-menu-item" onclick="showAlbumGroups();closeTbMenus()" title="按专辑统计本地曲库（数量/体积），点击专辑即过滤">💿 专辑分组</button>
-                          <button class="tb-menu-item" onclick="showFolderGroups();closeTbMenus()" title="按所在文件夹聚合本地曲库（数量/体积），点击文件夹只看它——关键词过滤不到的路径维度">🗂 文件夹分组</button>
+                          <button class="tb-menu-item" onclick="showArtistGroups();closeTbMenus()" title="按歌手统计本地曲库（数量/体积），点击歌手即过滤" data-ico="mic">歌手分组</button>
+                          <button class="tb-menu-item" onclick="showAlbumGroups();closeTbMenus()" title="按专辑统计本地曲库（数量/体积），点击专辑即过滤" data-ico="disc">专辑分组</button>
+                          <button class="tb-menu-item" onclick="showFolderGroups();closeTbMenus()" title="按所在文件夹聚合本地曲库（数量/体积），点击文件夹只看它——关键词过滤不到的路径维度" data-ico="folder-tree">文件夹分组</button>
                         </div>
                       </div>
                       <div class="tb-dropdown">
-                        <button class="tab" onclick="toggleTbDropdown(event, 'localToolsMenu')">🧰 工具 ▾</button>
+                        <button class="tab" onclick="toggleTbDropdown(event, 'localToolsMenu')" data-ico="toolbox">工具 </button>
                         <div class="tb-menu" id="localToolsMenu" hidden>
                           <div class="tb-menu-label">批量工具</div>
-                          <button class="tb-menu-item" onclick="batchFetchCovers();closeTbMenus()" data-i18n="local.batchCover" title="为缺封面的歌批量拉取专辑封面">🖼️ 批量补封面</button>
-                          <button class="tb-menu-item" onclick="batchFetchLyrics();closeTbMenus()" data-i18n="local.batchLyric">🎵 批量补歌词</button>
-                          <button class="tb-menu-item" onclick="convertSelectedAudio();closeTbMenus()" data-i18n="local.convert">🔄 转码</button>
+                          <button class="tb-menu-item" onclick="batchFetchCovers();closeTbMenus()" data-i18n="local.batchCover" title="为缺封面的歌批量拉取专辑封面" data-ico="image">批量补封面</button>
+                          <button class="tb-menu-item" onclick="batchFetchLyrics();closeTbMenus()" data-i18n="local.batchLyric" data-ico="music">批量补歌词</button>
+                          <button class="tb-menu-item" onclick="convertSelectedAudio();closeTbMenus()" data-i18n="local.convert" data-ico="refresh">转码</button>
                           <div class="tb-menu-label">曲库体检</div>
-                          <button class="tb-menu-item" onclick="showLibraryStats();closeTbMenus()" data-i18n="local.stats">📊 统计</button>
-                          <button class="tb-menu-item" onclick="detectDuplicateSongs();closeTbMenus()" data-i18n="local.dedup">🔍 查重</button>
-                          <button class="tb-menu-item" onclick="detectContentDuplicates();closeTbMenus()" data-i18n="local.dedupContent" title="按文件字节哈希查找内容完全相同的副本（改名/换目录也能抓到）">🧬 内容查重</button>
-                          <button class="tb-menu-item" onclick="batchProbeQuality();closeTbMenus()">🔬 音质扫描</button>
+                          <button class="tb-menu-item" onclick="showLibraryStats();closeTbMenus()" data-i18n="local.stats" data-ico="chart">统计</button>
+                          <button class="tb-menu-item" onclick="detectDuplicateSongs();closeTbMenus()" data-i18n="local.dedup" data-ico="search">查重</button>
+                          <button class="tb-menu-item" onclick="detectContentDuplicates();closeTbMenus()" data-i18n="local.dedupContent" title="按文件字节哈希查找内容完全相同的副本（改名/换目录也能抓到）" data-ico="dna">内容查重</button>
+                          <button class="tb-menu-item" onclick="batchProbeQuality();closeTbMenus()" data-ico="microscope">音质扫描</button>
                           <div class="tb-menu-label">播放与分享</div>
-                          <button class="tb-menu-item" onclick="locatePlayingLocal();closeTbMenus()" title="滚动到正在播放的歌并闪烁标记">🎯 定位播放</button>
+                          <button class="tb-menu-item" onclick="locatePlayingLocal();closeTbMenus()" title="滚动到正在播放的歌并闪烁标记" data-ico="target">定位播放</button>
                           <button class="tb-menu-item" onclick="exportLocalM3u();closeTbMenus()" title="把当前过滤/排序视图导出为 m3u 歌单文件（选择模式下勾选优先）">⤴ 导出m3u</button>
-                          <button class="tb-menu-item" onclick="copyLocalListText();closeTbMenus()" title="把当前过滤视图复制成一行一首的文本清单（歌名 - 歌手），发群聊直接贴">📋 复制曲单</button>
+                          <button class="tb-menu-item" onclick="copyLocalListText();closeTbMenus()" title="把当前过滤视图复制成一行一首的文本清单（歌名 - 歌手），发群聊直接贴" data-ico="list">复制曲单</button>
                         </div>
                       </div>
                       <span class="local-info" id="localInfo" data-i18n="local.notScanned">未扫描</span>
@@ -300,8 +302,8 @@
                       <button class="tab" onclick="deselectAllLocal()" data-i18n="local.deselectAll">取消全选</button>
                       <div style="flex:1"></div>
                       <button class="tab" onclick="exportLocalM3u()" title="导出为 m3u 歌单文件（勾选优先，未勾选导出当前过滤视图）">⤴ 导出m3u</button>
-                      <button class="tab tab-neon" onclick="openBatchEdit()" data-i18n="local.batchEdit">✏️ 批量编辑</button>
-                      <button class="tab tab-neon" onclick="openBatchRename()" data-i18n="local.batchRename">📝 批量重命名</button>
+                      <button class="tab tab-neon" onclick="openBatchEdit()" data-i18n="local.batchEdit" data-ico="pencil">批量编辑</button>
+                      <button class="tab tab-neon" onclick="openBatchRename()" data-i18n="local.batchRename" data-ico="note">批量重命名</button>
                       <button class="tab" onclick="exitLocalSelectionMode()" data-i18n="local.done">完成</button>
                     </div>
           <div id="localBatchProgressWrap" class="batch-progress-wrap" style="display:none">
@@ -314,7 +316,7 @@
             <div id="probeProgressBar" class="batch-progress-bar"></div>
             <button class="tab" onclick="cancelProbeScan()" style="flex-shrink:0;padding:3px 10px;font-size:11px">取消</button>
           </div>
-          <button class="tab" id="localAlbumFilterChip" style="display:none" onclick="clearAlbumFilter()" title="清除专辑过滤">💿 <span id="localAlbumFilterLabel"></span> ✕</button>
+          <button class="tab" id="localAlbumFilterChip" style="display:none" onclick="clearAlbumFilter()" title="清除专辑过滤" data-ico="disc" data-ico-only><span id="localAlbumFilterLabel"></span></button>
           <div class="local-list" id="localList"></div>
                     <div class="local-grid" id="localGrid" style="display:none"></div>
                     <div class="local-grid local-album-wall" id="localAlbumWall" style="display:none"></div>
@@ -324,17 +326,17 @@
         <div id="downloadPage" class="download-page" style="display:none;flex-direction:column;gap:12px;padding:4px 0;height:100%;min-height:0;overflow:hidden;">
           <!-- 队列 / 历史 子页面切换 -->
           <div class="dl-subtabs" style="display:flex;gap:4px;flex-shrink:0;">
-            <button class="filter-tab active" id="dlSubTabQueue" onclick="switchDlSubTab('queue')" data-i18n="download.subTabQueue">⬇ 下载队列</button>
-            <button class="filter-tab" id="dlSubTabHistory" onclick="switchDlSubTab('history')" data-i18n="download.subTabHistory">📜 下载历史</button>
+            <button class="filter-tab active" id="dlSubTabQueue" onclick="switchDlSubTab('queue')" data-i18n="download.subTabQueue" data-ico="download">下载队列</button>
+            <button class="filter-tab" id="dlSubTabHistory" onclick="switchDlSubTab('history')" data-i18n="download.subTabHistory" data-ico="history">下载历史</button>
           </div>
 
           <!-- 子页 1：下载队列 -->
           <div id="dlQueuePane" style="display:flex;flex-direction:column;gap:12px;flex:1 1 0;min-height:0;">
           <div class="download-header" style="display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;">
-            <div style="font-size:16px;font-weight:600;" data-i18n="download.title">⬇ 下载队列</div>
+            <div style="font-size:16px;font-weight:600;" data-i18n="download.title" data-ico="download">下载队列</div>
             <span class="panel-badge" id="queueBadge">0</span>
             <button class="tab" id="queuePauseBtn" title="暂停后不再启动新任务，在途任务继续完成" onclick="toggleQueuePause()"><svg class="row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> 暂停</button>
-            <button class="tab" id="afterQueueBtn" title="下载队列全部结束后自动执行的动作（关机/睡眠有 60 秒可取消倒计时）" aria-haspopup="true" onclick="openAfterQueueMenu()">🏁 完成后: <span id="afterQueueLabel">无</span></button>
+            <button class="tab" id="afterQueueBtn" title="下载队列全部结束后自动执行的动作（关机/睡眠有 60 秒可取消倒计时）" aria-haspopup="true" onclick="openAfterQueueMenu()" data-ico="flag">完成后: <span id="afterQueueLabel">无</span></button>
             <!-- 状态筛选标签 -->
             <div class="filter-tabs" id="downloadFilterTabs">
               <button class="filter-tab active" onclick="setDownloadFilter('all')" data-i18n="search.all">全部</button>
@@ -342,18 +344,18 @@
               <button class="filter-tab" onclick="setDownloadFilter('done')" data-i18n="download.filterDone">已完成</button>
               <button class="filter-tab" onclick="setDownloadFilter('error')" data-i18n="download.filterError">失败</button>
             </div>
-            <input id="queueFilterInput" class="queue-filter-input" type="text" placeholder="🔍 过滤任务" autocomplete="off" oninput="setQueueKeyword()" title="按歌名/歌手关键词过滤队列（可与状态筛选叠加）">
-            <button class="tab" id="dlGroupBtn" title="按来源平台分组显示队列：组头带进行中/完成/失败计数，可折叠、可只看某平台" onclick="toggleDlGroupMode()">🧩 分组: <span id="dlGroupLabel">关</span></button>
+            <input id="queueFilterInput" class="queue-filter-input" type="text" placeholder="过滤任务" autocomplete="off" oninput="setQueueKeyword()" title="按歌名/歌手关键词过滤队列（可与状态筛选叠加）">
+            <button class="tab" id="dlGroupBtn" title="按来源平台分组显示队列：组头带进行中/完成/失败计数，可折叠、可只看某平台" onclick="toggleDlGroupMode()" data-ico="puzzle">分组: <span id="dlGroupLabel">关</span></button>
             <button class="tab" id="dlPlatformChip" style="display:none" title="当前只在看单个平台的下载任务，点击取消" onclick="clearDlPlatformFilter()"></button>
             <span class="queue-dl-meta" id="queueSummaryBar" style="display:none;margin-left:10px;white-space:nowrap;" title="队列实时总览：下载中/排队/总速度/预计剩余"></span>
             <div style="flex:1"></div>
-            <button class="tab tab-neon" id="dlSelectBtn" onclick="enterDlSelectionMode()">☑ 选择</button>
-            <button class="tab" onclick="clearFinishedDownloads()" data-i18n="download.clearDone">🗑 清空已完成</button>
-            <button class="tab" onclick="clearAllDownloads()" data-i18n="download.clearAll">🗑 清空全部</button>
-            <button class="tab tab-neon" onclick="retryAllFailed()" data-i18n="download.retryFailed">🔄 重试所有失败</button>
-            <button class="tab" onclick="openFailureReport()" title="按原因聚合失败任务并给出建议">🩹 诊断报告</button>
-            <button class="tab" onclick="openSaveDir()" data-i18n="download.openDir">📂 打开目录</button>
-            <button class="tab tab-neon" onclick="exportCurrentPlaylist()" data-i18n="download.exportList">📤 导出列表</button>
+            <button class="tab tab-neon" id="dlSelectBtn" onclick="enterDlSelectionMode()" data-ico="check-square">选择</button>
+            <button class="tab" onclick="clearFinishedDownloads()" data-i18n="download.clearDone" data-ico="trash">清空已完成</button>
+            <button class="tab" onclick="clearAllDownloads()" data-i18n="download.clearAll" data-ico="trash">清空全部</button>
+            <button class="tab tab-neon" onclick="retryAllFailed()" data-i18n="download.retryFailed" data-ico="refresh">重试所有失败</button>
+            <button class="tab" onclick="openFailureReport()" title="按原因聚合失败任务并给出建议" data-ico="bandage">诊断报告</button>
+            <button class="tab" onclick="openSaveDir()" data-i18n="download.openDir" data-ico="folder-open">打开目录</button>
+            <button class="tab tab-neon" onclick="exportCurrentPlaylist()" data-i18n="download.exportList" data-ico="export">导出列表</button>
           </div>
           <!-- 网络状态横幅：只在断网时出现，文字与条数由 download.js 走词典填 -->
           <div id="netBanner" class="net-banner" role="status" aria-live="polite" hidden></div>
@@ -363,8 +365,8 @@
             <button class="tab" onclick="selectAllDl()">全选</button>
             <button class="tab" onclick="deselectAllDl()" data-i18n="local.deselectAll">取消全选</button>
             <div style="flex:1"></div>
-            <button class="tab" onclick="batchRetryDl()" data-i18n="download.batchRetry">🔄 批量重试</button>
-            <button class="tab" onclick="batchRemoveDl()" data-i18n="download.batchRemove">🗑 批量删除</button>
+            <button class="tab" onclick="batchRetryDl()" data-i18n="download.batchRetry" data-ico="refresh">批量重试</button>
+            <button class="tab" onclick="batchRemoveDl()" data-i18n="download.batchRemove" data-ico="trash">批量删除</button>
             <button class="tab" onclick="exitDlSelectionMode()" data-i18n="local.done">完成</button>
           </div>
           <div id="queueList" class="queue-list" style="flex:1 1 0;overflow-y:auto;min-height:0;max-height:none;">
@@ -375,7 +377,7 @@
           <!-- 子页 2：下载历史 -->
           <div id="historyPage" class="dl-history-pane" style="display:none;flex-direction:column;gap:12px;flex:1 1 0;min-height:0;">
             <div class="history-header" style="display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap;">
-              <div style="font-size:16px;font-weight:600;" data-i18n="history.title">📜 下载历史</div>
+              <div style="font-size:16px;font-weight:600;" data-i18n="history.title" data-ico="history">下载历史</div>
               <div class="search-input-wrap" style="max-width:250px;">
                 <input class="search-input" id="historyFilter" placeholder="搜索历史..."
                   oninput="filterHistory()" onkeydown="if(event.key==='Enter')filterHistory()">
@@ -385,11 +387,11 @@
               <span class="panel-badge" id="historyInfo" data-i18n="history.loading">加载中...</span>
               <div style="flex:1"></div>
               <button class="tab" onclick="exportHistoryM3u()" title="把本页已完成下载导出为 m3u 播放列表">⤴ 导出m3u</button>
-              <button class="tab" id="historyRetryBtn" onclick="retryFailedFromHistory()" title="把所有失败记录重新入队（尊重当前关键词/来源筛选，最多 200 条）">🔁 重试失败项</button>
-              <button class="tab" id="historyCleanBtn" onclick="cleanDeadHistory()" title="删除「文件已不在磁盘上」的成功记录（只清记录，不动任何文件；最多核对 2000 条）">🧹 清理失效</button>
-              <button class="tab" id="historyRedlBtn" onclick="redownloadDeadHistory()" title="把这些歌重新加入下载队列（历史记录先留着，下成后自动更新路径）" hidden>⬇ 重下失效</button>
-              <button class="tab" onclick="showTrendPanel()" title="近 14 天按天统计">📊 趋势</button>
-              <button class="tab" onclick="clearAllHistory()" data-i18n="history.clearAll">🗑 清空历史</button>
+              <button class="tab" id="historyRetryBtn" onclick="retryFailedFromHistory()" title="把所有失败记录重新入队（尊重当前关键词/来源筛选，最多 200 条）" data-ico="repeat">重试失败项</button>
+              <button class="tab" id="historyCleanBtn" onclick="cleanDeadHistory()" title="删除「文件已不在磁盘上」的成功记录（只清记录，不动任何文件；最多核对 2000 条）" data-ico="dedupe">清理失效</button>
+              <button class="tab" id="historyRedlBtn" onclick="redownloadDeadHistory()" title="把这些歌重新加入下载队列（历史记录先留着，下成后自动更新路径）" hidden data-ico="download">重下失效</button>
+              <button class="tab" onclick="showTrendPanel()" title="近 14 天按天统计" data-ico="chart">趋势</button>
+              <button class="tab" onclick="clearAllHistory()" data-i18n="history.clearAll" data-ico="trash">清空历史</button>
             </div>
             <div id="historyList" class="history-list" style="flex:1;overflow-y:auto;min-height:0;">
               <div class="loading"><div class="spinner"></div> 加载中...</div>
@@ -404,10 +406,10 @@
     <!-- AI 音乐页面 -->
     <div id="aiMusicPage" style="display:none;flex-direction:column;height:100%;padding:16px;">
       <div class="ai-header">
-        <div class="ai-title" data-i18n="aiMusic.title">🤖 AI 音乐创作</div>
+        <div class="ai-title" data-i18n="aiMusic.title" data-ico="robot">AI 音乐创作</div>
         <div class="ai-tabs">
-          <button class="ai-tab active" data-tab="create" onclick="switchAiTab('create')" data-i18n="aiMusic.tabCreate">✨ 创作</button>
-          <button class="ai-tab" data-tab="history" onclick="switchAiTab('history')" data-i18n="aiMusic.tabHistory">📜 历史</button>
+          <button class="ai-tab active" data-tab="create" onclick="switchAiTab('create')" data-i18n="aiMusic.tabCreate" data-ico="sparkle">创作</button>
+          <button class="ai-tab" data-tab="history" onclick="switchAiTab('history')" data-i18n="aiMusic.tabHistory" data-ico="history">历史</button>
         </div>
       </div>
       <div id="aiMusicContent" class="ai-content"></div>
@@ -416,7 +418,7 @@
     <!-- 格式转换页面 -->
     <div id="converterPage" class="converter-page">
       <div class="conv-header">
-        <span class="conv-header-icon">🔄</span>
+        <span class="conv-header-icon" data-ico="refresh" data-ico-only></span>
         <div>
           <div class="conv-header-title" data-i18n="converter.title">音频格式转换</div>
           <div class="conv-header-sub" data-i18n="converter.subtitle">搜索本地歌曲，一键批量转换格式</div>
@@ -425,9 +427,9 @@
 
       <!-- 搜索栏 + 扫描按钮 -->
       <div class="conv-toolbar">
-        <input type="text" id="converterSearch" class="conv-search" placeholder="🔍 搜索歌曲...">
-        <button onclick="window._converterScan()" class="conv-btn conv-btn-blue" data-i18n="converter.scan">📂 扫描</button>
-        <button onclick="window._converterSearch()" class="conv-btn conv-btn-cyan" data-i18n="converter.search">🔍 搜索</button>
+        <input type="text" id="converterSearch" class="conv-search" placeholder="搜索歌曲...">
+        <button onclick="window._converterScan()" class="conv-btn conv-btn-blue" data-i18n="converter.scan" data-ico="folder-open">扫描</button>
+        <button onclick="window._converterSearch()" class="conv-btn conv-btn-cyan" data-i18n="converter.search" data-ico="search">搜索</button>
         <button onclick="window._converterAddQueue()" class="conv-btn conv-btn-blue" data-i18n="converter.addQueue">+ 添加</button>
       </div>
 
@@ -474,18 +476,18 @@
     <!-- 我的歌单 -->
     <div id="playlistPage" style="display:none;flex-direction:column;gap:14px;height:100%;overflow-y:auto;padding:16px;">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:24px;">🎼</span>
+        <span style="font-size:24px;" data-ico="music-list" data-ico-only></span>
         <div style="flex:1;">
           <div style="font-size:18px;font-weight:600;">我的歌单</div>
           <div style="font-size:12px;color:var(--neon-dim);">创建歌单，收藏喜欢的歌曲，一键整单播放</div>
         </div>
         <input class="search-input" id="playlistCardFilter" placeholder="搜索歌单..." oninput="filterPlaylistCards()" style="max-width:170px;" title="按名称或描述过滤歌单卡片">
-        <button class="tab" id="playlistCardSortBtn" title="切换歌单卡片排序：默认 / 名称 / 曲数 / 最近更新（收藏恒置顶）" onclick="cyclePlCardSort()">↕ 默认</button>
-        <button class="tab" title="扫描全部歌单，揪出同一身份散落在 ≥2 个歌单的歌（本地认文件路径、在线认来源+ID）" onclick="scanCrossPlaylistDupes()" style="white-space:nowrap;">🧮 跨单查重</button>
-        <button class="tab" title="选择 .m3u/.m3u8 文件，按本地曲库匹配（路径优先、曲名+歌手兜底）直接建为歌单，导入即可播" onclick="pickM3uForPlaylist()" style="white-space:nowrap;">📥 导入 m3u</button>
-        <button class="tab" id="plTrashBtn" title="已删除的歌单在这里保留 30 天，可恢复或彻底删除" onclick="openPlaylistTrash()" style="display:none;white-space:nowrap;">🗑 回收站</button>
-        <button class="tab" id="smartPlToggleBtn" onclick="toggleSmartPanel()" style="white-space:nowrap;" data-i18n="smartPl.open">✨ AI 生成歌单</button>
-        <button class="btn-primary" onclick="openPlaylistEditor(null)" style="white-space:nowrap;">➕ 新建歌单</button>
+        <button class="tab" id="playlistCardSortBtn" title="切换歌单卡片排序：默认 / 名称 / 曲数 / 最近更新（收藏恒置顶）" onclick="cyclePlCardSort()" data-ico="sort">默认</button>
+        <button class="tab" title="扫描全部歌单，揪出同一身份散落在 ≥2 个歌单的歌（本地认文件路径、在线认来源+ID）" onclick="scanCrossPlaylistDupes()" style="white-space:nowrap;" data-ico="calculator">跨单查重</button>
+        <button class="tab" title="选择 .m3u/.m3u8 文件，按本地曲库匹配（路径优先、曲名+歌手兜底）直接建为歌单，导入即可播" onclick="pickM3uForPlaylist()" style="white-space:nowrap;" data-ico="import">导入 m3u</button>
+        <button class="tab" id="plTrashBtn" title="已删除的歌单在这里保留 30 天，可恢复或彻底删除" onclick="openPlaylistTrash()" style="display:none;white-space:nowrap;" data-ico="trash">回收站</button>
+        <button class="tab" id="smartPlToggleBtn" onclick="toggleSmartPanel()" style="white-space:nowrap;" data-i18n="smartPl.open" data-ico="sparkle">AI 生成歌单</button>
+        <button class="btn-primary" onclick="openPlaylistEditor(null)" style="white-space:nowrap;" data-ico="plus">新建歌单</button>
       </div>
 
       <!-- 轨道三：AI 智能歌单 —— 只读生成，落库只发生在下面「存为歌单」那一下 -->
@@ -542,7 +544,7 @@
     <!-- 订阅更新 -->
     <div id="subscriptionPage" style="display:none;flex-direction:column;gap:14px;height:100%;overflow-y:auto;padding:16px;">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:24px;">📡</span>
+        <span style="font-size:24px;" data-ico="antenna" data-ico-only></span>
         <div style="flex:1;">
           <div style="font-size:18px;font-weight:600;">订阅更新</div>
           <div style="font-size:12px;color:var(--neon-dim);">订阅歌单与歌手，新歌自动提醒，可开启自动下载</div>
@@ -657,7 +659,7 @@
         </div>
       </div>
 
-      <canvas id="vizCanvas" class="viz-canvas" style="display:none;" height="34" aria-hidden="true" title="实时频谱（📊 按钮开关）"></canvas>
+      <canvas id="vizCanvas" class="viz-canvas" style="display:none;" height="34" aria-hidden="true" title="实时频谱（按钮开关）"></canvas>
 
       <div class="pc-meta">
         <div class="pc-title-row">
@@ -666,7 +668,7 @@
         <div class="pc-sub-row">
           <span class="pc-artist" id="playerArtist" data-i18n="player.artist">—</span>
           <span class="player-src-badge" id="playerQualityBadge" style="display:none;" title="本次播放音质"></span>
-          <button class="story-btn" id="btnSongStory" title="讲讲这首歌" onclick="toggleSongStory()" aria-label="讲讲这首歌">✨</button>
+          <button class="story-btn" id="btnSongStory" title="讲讲这首歌" onclick="toggleSongStory()" aria-label="讲讲这首歌" data-ico="sparkle" data-ico-only></button>
           <!-- D5.3（照 Alger）：条上不放独立时间列——时间是小灰字，贴歌手行末尾 -->
           <span class="pc-clock"><span id="timeNow">0:00</span><span class="pc-clock-sep">/</span><span id="timeTotal">0:00</span></span>
         </div>
@@ -700,7 +702,7 @@
               <span id="volumeValue">80%</span>
             </div>
           </div>
-          <button class="ctrl-btn" id="btnVisualizer" title="频谱可视化：在进度条下方显示实时频谱（复用均衡器音频图，零声音影响）" aria-label="频谱可视化开关" aria-pressed="false" onclick="toggleVisualizer()">📊</button>
+          <button class="ctrl-btn" id="btnVisualizer" title="频谱可视化：在进度条下方显示实时频谱（复用均衡器音频图，零声音影响）" aria-label="频谱可视化开关" aria-pressed="false" onclick="toggleVisualizer()" data-ico="chart" data-ico-only></button>
         </div>
       </div>
 
@@ -720,12 +722,12 @@
         <div class="pq-header-left">
           <span class="pq-header-title" data-i18n="player.playQueue">播放队列</span>
         </div>
-        <button class="pq-clear-btn" onclick="dedupePlayQueue()" title="移除队列中的重复曲目（每首保留第一次出现，正在播放跟随）">🧹 去重</button>
-        <button class="pq-clear-btn" onclick="saveQueueAsPlaylist()" title="把当前播放队列整体保存为「我的歌单」，名称自动带时间，之后可在歌单编辑器改名">💾 存为歌单</button>
-        <button class="pq-clear-btn" onclick="locatePlayingInQueue()" title="滚动到队列中正在播放的歌并闪烁标记（面板未开会先展开）">🎯 定位</button>
-        <button class="pq-clear-btn" id="pqSelBtn" onclick="togglePqSelMode()" title="多选模式：点行勾选，一次移出多首（选态跟歌走，拖拽排序也不误伤）">☑ 多选</button>
-        <button class="pq-clear-btn hidden" id="pqSelRmBtn" style="color:var(--c-danger);" onclick="removeCheckedFromQueue()" title="把勾选的行移出播放队列（不删本地文件）">🗑 移除 0</button>
-        <button class="pq-clear-btn hidden" id="pqSelPlBtn" onclick="pqSelAddPlaylist()" title="把勾选的歌加进我的歌单（拖入即播的临时行自动跳过）">🎼 歌单 0</button>
+        <button class="pq-clear-btn" onclick="dedupePlayQueue()" title="移除队列中的重复曲目（每首保留第一次出现，正在播放跟随）" data-ico="dedupe">去重</button>
+        <button class="pq-clear-btn" onclick="saveQueueAsPlaylist()" title="把当前播放队列整体保存为「我的歌单」，名称自动带时间，之后可在歌单编辑器改名" data-ico="save">存为歌单</button>
+        <button class="pq-clear-btn" onclick="locatePlayingInQueue()" title="滚动到队列中正在播放的歌并闪烁标记（面板未开会先展开）" data-ico="target">定位</button>
+        <button class="pq-clear-btn" id="pqSelBtn" onclick="togglePqSelMode()" title="多选模式：点行勾选，一次移出多首（选态跟歌走，拖拽排序也不误伤）" data-ico="check-square">多选</button>
+        <button class="pq-clear-btn hidden" id="pqSelRmBtn" style="color:var(--c-danger);" onclick="removeCheckedFromQueue()" title="把勾选的行移出播放队列（不删本地文件）" data-ico="trash">移除 0</button>
+        <button class="pq-clear-btn hidden" id="pqSelPlBtn" onclick="pqSelAddPlaylist()" title="把勾选的歌加进我的歌单（拖入即播的临时行自动跳过）" data-ico="music-list">歌单 0</button>
         <button class="pq-clear-btn" onclick="clearPlayQueue()" title="清空队列" data-i18n="player.queue.clear">清空</button>
       </div>
       <div class="pq-list" id="pqList">
@@ -801,13 +803,13 @@
 <div class="edit-overlay hidden" id="editOverlay" onclick="closeEditOnBg(event)" data-modal data-modal-close="closeEdit" data-modal-pri="80">
   <div class="edit-panel">
     <div class="edit-header">
-      <span class="edit-title" id="editTitleLabel">✏️ 编辑歌曲信息</span>
-      <button class="edit-close" onclick="closeEdit()">✕</button>
+      <span class="edit-title" id="editTitleLabel" data-ico="pencil">编辑歌曲信息</span>
+      <button class="edit-close" onclick="closeEdit()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div id="editBatchHint" class="edit-batch-hint" style="display:none"></div>
     <div class="edit-body">
       <div class="edit-cover-area">
-        <div class="edit-cover-preview" id="editCoverPreview"><span style="font-size:28px">🎵</span></div>
+        <div class="edit-cover-preview" id="editCoverPreview"><span style="font-size:28px" data-ico="music" data-ico-only></span></div>
         <div class="edit-cover-actions">
           <div class="edit-cover-hint">支持拖拽图片到此处，或点击选择文件替换封面</div>
           <input type="file" id="editCoverInput" accept="image/*" style="display:none" onchange="onEditCoverSelect(event)">
@@ -847,33 +849,33 @@
 <div class="settings-overlay hidden" id="settingsOverlay" onclick="closeSettingsOnBg(event)" data-modal data-modal-close="closeSettings" data-modal-pri="70">
   <div class="settings-panel" id="settingsPanel">
     <div class="settings-header">
-      <span class="settings-title" data-i18n="settings.title">⚙️ 设置</span>
+      <span class="settings-title" data-i18n="settings.title" data-ico="settings">设置</span>
       <input type="text" class="setting-input settings-search-input" id="settingsSearchInput"
-        data-i18n="settings.searchPh" placeholder="🔍 搜索设置项（空格分词，多词同时满足）" oninput="runSettingsSearch(this.value)">
-      <button class="settings-close" onclick="closeSettings()" aria-label="关闭">✕</button>
+        data-i18n="settings.searchPh" placeholder="搜索设置项（空格分词，多词同时满足）" oninput="runSettingsSearch(this.value)">
+      <button class="settings-close" onclick="closeSettings()" aria-label="关闭" data-ico="x" data-ico-only></button>
     </div>
 
     <div class="settings-body">
       <!-- 左侧导航：分组，账号独立，偏好三项，高级/关于垫底 -->
       <nav class="settings-nav">
         <button class="settings-nav-item active" data-tab="accounts" onclick="switchSettingsTab('accounts', this)">
-          <span class="nav-icon" aria-hidden="true">◈</span><span data-i18n="settings.accounts">账号</span>
+          <span class="nav-icon" aria-hidden="true" data-ico="user" data-ico-only></span><span data-i18n="settings.accounts">账号</span>
         </button>
 
         <div class="settings-nav-label" data-i18n="settings.group.preferences">偏好</div>
 
         <button class="settings-nav-item" data-tab="download" onclick="switchSettingsTab('download', this)">
-          <span class="nav-icon" aria-hidden="true">↓</span><span data-i18n="settings.download">下载</span>
+          <span class="nav-icon" aria-hidden="true" data-ico="download" data-ico-only></span><span data-i18n="settings.download">下载</span>
         </button>
         <button class="settings-nav-item" data-tab="appearance" onclick="switchSettingsTab('appearance', this)">
-          <span class="nav-icon" aria-hidden="true">◐</span><span data-i18n="settings.appearance">外观</span>
+          <span class="nav-icon" aria-hidden="true" data-ico="palette" data-ico-only></span><span data-i18n="settings.appearance">外观</span>
         </button>
         <button class="settings-nav-item" data-tab="playback" onclick="switchSettingsTab('playback', this)">
-          <span class="nav-icon" aria-hidden="true">▷</span><span data-i18n="settings.playback">播放</span>
+          <span class="nav-icon" aria-hidden="true" data-ico="play-circle" data-ico-only></span><span data-i18n="settings.playback">播放</span>
         </button>
 
         <button class="settings-nav-item" data-tab="advanced" onclick="switchSettingsTab('advanced', this)">
-          <span class="nav-icon" aria-hidden="true">⚙</span><span data-i18n="settings.advanced">高级</span>
+          <span class="nav-icon" aria-hidden="true" data-ico="settings" data-ico-only></span><span data-i18n="settings.advanced">高级</span>
         </button>
         <button class="settings-nav-item" data-tab="about" onclick="switchSettingsTab('about', this)">
           <span class="nav-icon" aria-hidden="true">ⓘ</span><span data-i18n="settings.about">关于</span>
@@ -1022,7 +1024,7 @@
               <input class="setting-input setting-input--num" id="settingSubCheckInterval" type="number" min="1" max="168" step="1" value="6">
               <span class="setting-hint" data-i18n="settings.general.subCheckIntervalHint">后台每隔多久检查一次已订阅的歌单/歌手有无新歌（1–168 小时）</span>
             </div>
-            <button class="btn ghost" style="margin-top:8px" onclick="showWelcome()">📖 重新查看新手引导</button>
+            <button class="btn ghost" style="margin-top:8px" onclick="showWelcome()" data-ico="book">重新查看新手引导</button>
           </div>
         </div>
 
@@ -1036,42 +1038,42 @@
               <button type="button" class="theme-card" data-theme-value="auto" onclick="selectTheme('auto')" style="--sw-bg:#2a2a35;--sw-card:#4a4a58;--sw-accent:#9aa0b5">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.auto">跟随系统</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
               <button type="button" class="theme-card" data-theme-value="default" onclick="selectTheme('default')" style="--sw-bg:#07090f;--sw-card:#0d1120;--sw-accent:#00ffc8">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.default">默认暗色</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
               <button type="button" class="theme-card" data-theme-value="light" onclick="selectTheme('light')" style="--sw-bg:#f0f2f5;--sw-card:#ffffff;--sw-accent:#0891b2">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.light">浅色</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
               <button type="button" class="theme-card" data-theme-value="cyber" onclick="selectTheme('cyber')" style="--sw-bg:#0a0a0f;--sw-card:#12121a;--sw-accent:#00ffff">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.cyber">Cyber 赛博</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
               <button type="button" class="theme-card" data-theme-value="aurora" onclick="selectTheme('aurora')" style="--sw-bg:#0d1b2a;--sw-card:#1b263b;--sw-accent:#00d4aa">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.aurora">Aurora 极光</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
               <button type="button" class="theme-card" data-theme-value="sunset" onclick="selectTheme('sunset')" style="--sw-bg:#1a0a0a;--sw-card:#2a1515;--sw-accent:#ff6b6b">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.sunset">Sunset 日落</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
               <button type="button" class="theme-card" data-theme-value="forest" onclick="selectTheme('forest')" style="--sw-bg:#0a1a0a;--sw-card:#152515;--sw-accent:#32cd32">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.forest">Forest 森林</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
               <button type="button" class="theme-card" data-theme-value="void" onclick="selectTheme('void')" style="--sw-bg:#03050b;--sw-card:#080c16;--sw-accent:#00e5ff">
                 <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="theme-name" data-i18n="settings.general.theme.void">Void 深黑蓝</span>
-                <span class="theme-check" aria-hidden="true">✓</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
               </button>
             </div>
             <!-- 真实承载主题值的元素：色卡只负责显示，读写仍走这里，故 GENERAL_PREFS 无需改动 -->
@@ -1429,8 +1431,8 @@
 <div class="playlist-modal-overlay hidden" id="convertModal" onclick="event.target === this && closeConvertModal()" data-modal data-modal-close="closeConvertModal">
   <div class="playlist-modal" style="min-width:360px;max-width:440px;">
     <div class="playlist-modal-header">
-      <span class="playlist-modal-title" id="convertModalTitle">🔄 转换格式</span>
-      <button class="playlist-modal-close" onclick="closeConvertModal()">✕</button>
+      <span class="playlist-modal-title" id="convertModalTitle" data-ico="refresh">转换格式</span>
+      <button class="playlist-modal-close" onclick="closeConvertModal()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div class="playlist-modal-body" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
       <div id="convertModalInfo" style="font-size:12px;color:var(--text-dim);word-break:break-all;"></div>
@@ -1486,8 +1488,8 @@
 <div class="playlist-modal-overlay hidden" id="playlistModal" onclick="closePlaylistModalOnBg(event)" data-modal data-modal-close="closePlaylistModal" data-modal-pri="90">
   <div class="playlist-modal">
     <div class="playlist-modal-header">
-      <span class="playlist-modal-title" id="playlistModalTitle">📀 歌单</span>
-      <button class="playlist-modal-close" onclick="closePlaylistModal()">✕</button>
+      <span class="playlist-modal-title" id="playlistModalTitle" data-ico="disc">歌单</span>
+      <button class="playlist-modal-close" onclick="closePlaylistModal()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div class="playlist-modal-body" id="playlistModalBody">
       <div class="loading"><div class="spinner"></div> 加载中...</div>
@@ -1499,8 +1501,8 @@
 <div class="playlist-modal-overlay hidden" id="dlTemplateEditorModal" onclick="event.target === this && closeDlTemplateEditor()" data-modal data-modal-close="closeDlTemplateEditor" data-modal-pri="75">
   <div class="playlist-modal" style="min-width:400px;max-width:520px;">
     <div class="playlist-modal-header">
-      <span class="playlist-modal-title" id="dlTemplateEditorTitle">➕ 新建路径模板</span>
-      <button class="playlist-modal-close" onclick="closeDlTemplateEditor()">✕</button>
+      <span class="playlist-modal-title" id="dlTemplateEditorTitle" data-ico="plus">新建路径模板</span>
+      <button class="playlist-modal-close" onclick="closeDlTemplateEditor()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div class="playlist-modal-body" style="display:flex;flex-direction:column;gap:12px;padding:16px;">
       <div class="setting-row">
@@ -1512,7 +1514,7 @@
         <input type="text" class="setting-input" id="dlTemplatePath" placeholder="例如: D:/音乐/{artist}/{album}/{title}" style="font-family:monospace;font-size:12px;">
         <div id="dlTemplateVarHints" class="setting-hint" style="font-size:11px;color:var(--neon-dim);">可用变量: {artist} {album} {title} {source} {year} {track}</div>
       </div>
-      <button class="btn-primary" onclick="saveDlTemplate()" style="margin-top:4px;">💾 保存模板</button>
+      <button class="btn-primary" onclick="saveDlTemplate()" style="margin-top:4px;" data-ico="save">保存模板</button>
     </div>
   </div>
 </div>
@@ -1522,28 +1524,28 @@
   <div class="playlist-modal" style="min-width:420px;max-width:560px;max-height:80vh;display:flex;flex-direction:column;">
     <div class="playlist-modal-header">
       <span class="playlist-modal-title" id="playlistDetailTitle">歌单</span>
-      <button class="btn-sm" style="margin-left:auto;flex-shrink:0;" title="整个歌单加入播放队列，从第一首开始播放" onclick="playAllPlaylist()">▶ 播放全部</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="整个歌单加入下载队列" onclick="downloadAllPlaylist()">⬇ 下载全部</button>
+      <button class="btn-sm" style="margin-left:auto;flex-shrink:0;" title="整个歌单加入播放队列，从第一首开始播放" onclick="playAllPlaylist()" data-ico="play">播放全部</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="整个歌单加入下载队列" onclick="downloadAllPlaylist()" data-ico="download">下载全部</button>
       <button class="btn-sm" style="flex-shrink:0;" title="导出为 m3u：已下载歌写本地文件路径，在线歌写平台歌曲页链接" onclick="exportCurrentPlaylistM3u()">⤴ 导出</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="把其他歌单的歌合并进本歌单（按平台+ID去重，源歌单保留）" onclick="openPlaylistMergePicker()">📥 合并</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="移除本歌单内的重复歌曲（按平台+ID识别，保留首次出现）" onclick="dedupeCurrentPlaylist()">🧹 清重复</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="把本歌单原样复制为新歌单（在线曲目全带走，撞名自动加「副本2」）：大改前备份、拿模板都靠它" onclick="duplicateCurrentPlaylist()">📋 副本</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="把当前过滤视图复制成一行一首的文本清单（歌名 - 歌手），发群聊直接贴" onclick="copyPlaylistListText()">📋 复制曲单</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="滚动到本歌单中正在播放的歌并闪烁标记" onclick="locatePlayingInDetail()">🎯 定位</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="搜索歌曲并添加进本歌单" onclick="openPlaylistAddSongs()">➕ 加歌</button>
-      <button class="btn-sm" style="flex-shrink:0;" title="AI 逐首判断契合度与建议动作（只读，改名/删歌由你确认）" onclick="openPlAudit(window._plDetailId)">🧬 修</button>
-      <button class="playlist-modal-close" onclick="closePlaylistDetail()">✕</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="把其他歌单的歌合并进本歌单（按平台+ID去重，源歌单保留）" onclick="openPlaylistMergePicker()" data-ico="import">合并</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="移除本歌单内的重复歌曲（按平台+ID识别，保留首次出现）" onclick="dedupeCurrentPlaylist()" data-ico="dedupe">清重复</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="把本歌单原样复制为新歌单（在线曲目全带走，撞名自动加「副本2」）：大改前备份、拿模板都靠它" onclick="duplicateCurrentPlaylist()" data-ico="list">副本</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="把当前过滤视图复制成一行一首的文本清单（歌名 - 歌手），发群聊直接贴" onclick="copyPlaylistListText()" data-ico="list">复制曲单</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="滚动到本歌单中正在播放的歌并闪烁标记" onclick="locatePlayingInDetail()" data-ico="target">定位</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="搜索歌曲并添加进本歌单" onclick="openPlaylistAddSongs()" data-ico="plus">加歌</button>
+      <button class="btn-sm" style="flex-shrink:0;" title="AI 逐首判断契合度与建议动作（只读，改名/删歌由你确认）" onclick="openPlAudit(window._plDetailId)" data-ico="dna">修</button>
+      <button class="playlist-modal-close" onclick="closePlaylistDetail()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div style="padding:4px 16px;font-size:12px;color:var(--neon-dim);" id="playlistDetailDesc">暂无描述</div>
     <div style="display:flex;gap:8px;align-items:center;margin:4px 16px 0;">
-      <input type="text" class="setting-input" id="playlistSongFilter" placeholder="🔍 过滤本歌单歌曲（标题/歌手/专辑）" style="flex:1;min-width:0;box-sizing:border-box;" oninput="onPlaylistSongFilterInput(this.value)">
-      <button class="btn-sm" id="playlistSortBtn" style="flex-shrink:0;" title="切换排序（仅视图，不改存储序；排序中拖拽停用）：默认 / 标题 / 歌手 / 添加时间" onclick="cyclePlaylistSort()">↕ 默认序</button>
-      <button class="btn-sm" id="plDlFilterBtn" style="flex-shrink:0;" title="切换下载状态过滤（仅视图）：全部 / 只看未下载（顺手补下）/ 只看已下载（本地能播的）" onclick="cyclePlDlFilter()">⬇ 全部状态</button>
-      <button class="btn-sm" id="plSelModeBtn" style="flex-shrink:0;" title="多选模式：行首出现勾选框，一次把多首歌移出本歌单（不影响歌曲本身）" onclick="togglePlBulkMode()">☑ 多选</button>
-      <button class="btn-sm hidden" id="plSelAllBtn" style="flex-shrink:0;" title="勾选/取消当前过滤视图的全部歌曲" onclick="plSelectAllVisible()">☑ 全选</button>
-      <button class="btn-sm hidden" id="plSelRemoveBtn" style="flex-shrink:0;color:var(--c-danger);" title="把勾选的歌从本歌单移除" onclick="removeCheckedFromPlaylist()">🗑 移除</button>
-      <button class="btn-sm hidden" id="plSelDlBtn" style="flex-shrink:0;" title="把勾选的歌批量加入下载队列（已在队列/已下载过的自动跳过）" onclick="plSelDownload()">⬇ 下载</button>
-      <button class="btn-sm hidden" id="plSelPlayBtn" style="flex-shrink:0;" title="把勾选的歌单独组成播放队列，从第一首起连播" onclick="plSelPlay()">▶ 播放</button>
+      <input type="text" class="setting-input" id="playlistSongFilter" placeholder="过滤本歌单歌曲（标题/歌手/专辑）" style="flex:1;min-width:0;box-sizing:border-box;" oninput="onPlaylistSongFilterInput(this.value)">
+      <button class="btn-sm" id="playlistSortBtn" style="flex-shrink:0;" title="切换排序（仅视图，不改存储序；排序中拖拽停用）：默认 / 标题 / 歌手 / 添加时间" onclick="cyclePlaylistSort()" data-ico="sort">默认序</button>
+      <button class="btn-sm" id="plDlFilterBtn" style="flex-shrink:0;" title="切换下载状态过滤（仅视图）：全部 / 只看未下载（顺手补下）/ 只看已下载（本地能播的）" onclick="cyclePlDlFilter()" data-ico="download">全部状态</button>
+      <button class="btn-sm" id="plSelModeBtn" style="flex-shrink:0;" title="多选模式：行首出现勾选框，一次把多首歌移出本歌单（不影响歌曲本身）" onclick="togglePlBulkMode()" data-ico="check-square">多选</button>
+      <button class="btn-sm hidden" id="plSelAllBtn" style="flex-shrink:0;" title="勾选/取消当前过滤视图的全部歌曲" onclick="plSelectAllVisible()" data-ico="check-square">全选</button>
+      <button class="btn-sm hidden" id="plSelRemoveBtn" style="flex-shrink:0;color:var(--c-danger);" title="把勾选的歌从本歌单移除" onclick="removeCheckedFromPlaylist()" data-ico="trash">移除</button>
+      <button class="btn-sm hidden" id="plSelDlBtn" style="flex-shrink:0;" title="把勾选的歌批量加入下载队列（已在队列/已下载过的自动跳过）" onclick="plSelDownload()" data-ico="download">下载</button>
+      <button class="btn-sm hidden" id="plSelPlayBtn" style="flex-shrink:0;" title="把勾选的歌单独组成播放队列，从第一首起连播" onclick="plSelPlay()" data-ico="play">播放</button>
     </div>
     <div class="playlist-modal-body" id="playlistDetailSongs" style="flex:1;min-height:0;overflow-y:auto;padding:12px 16px 16px;"></div>
   </div>
@@ -1553,8 +1555,8 @@
 <div class="playlist-modal-overlay hidden" id="playlistEditorModal" onclick="event.target === this && closePlaylistEditor()" data-modal data-modal-close="closePlaylistEditor" data-modal-pri="92">
   <div class="playlist-modal" style="min-width:360px;max-width:420px;">
     <div class="playlist-modal-header">
-      <span class="playlist-modal-title" id="playlistEditorTitle">📋 新建歌单</span>
-      <button class="playlist-modal-close" onclick="closePlaylistEditor()">✕</button>
+      <span class="playlist-modal-title" id="playlistEditorTitle" data-ico="list">新建歌单</span>
+      <button class="playlist-modal-close" onclick="closePlaylistEditor()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div class="playlist-modal-body" style="display:flex;flex-direction:column;gap:12px;padding:16px;">
       <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
@@ -1568,9 +1570,9 @@
       <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
         <label class="setting-label">封面链接（可选，仅 http/https）</label>
         <input type="text" class="setting-input" id="playlistEditorCover" placeholder="https://… 留空则用默认图标" maxlength="300">
-        <button class="btn-secondary" id="playlistCoverPick" style="display:none;margin-top:2px;font-size:12px;" onclick="useFirstSongCover()">🖼 用歌内首曲封面</button>
+        <button class="btn-secondary" id="playlistCoverPick" style="display:none;margin-top:2px;font-size:12px;" onclick="useFirstSongCover()" data-ico="image">用歌内首曲封面</button>
       </div>
-      <button class="btn-primary" onclick="savePlaylist()" style="margin-top:4px;">💾 保存</button>
+      <button class="btn-primary" onclick="savePlaylist()" style="margin-top:4px;" data-ico="save">保存</button>
     </div>
   </div>
 </div>
@@ -1579,8 +1581,8 @@
 <div class="playlist-modal-overlay hidden" id="playlistTrashModal" onclick="event.target === this && closePlaylistTrash()" data-modal data-modal-close="closePlaylistTrash">
   <div class="playlist-modal" style="min-width:380px;max-width:460px;">
     <div class="playlist-modal-header">
-      <span class="playlist-modal-title">🗑 回收站</span>
-      <button class="playlist-modal-close" onclick="closePlaylistTrash()">✕</button>
+      <span class="playlist-modal-title" data-ico="trash">回收站</span>
+      <button class="playlist-modal-close" onclick="closePlaylistTrash()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div class="playlist-modal-body" id="playlistTrashList" style="max-height:56vh;overflow-y:auto;">
     </div>
@@ -1591,8 +1593,8 @@
 <div class="playlist-modal-overlay hidden" id="playlistSelectModal" onclick="event.target === this && closePlaylistSelectModal()" data-modal data-modal-close="closePlaylistSelectModal" data-modal-pri="93">
   <div class="playlist-modal" style="min-width:320px;max-width:400px;">
     <div class="playlist-modal-header">
-      <span class="playlist-modal-title">📋 添加到歌单</span>
-      <button class="playlist-modal-close" onclick="closePlaylistSelectModal()">✕</button>
+      <span class="playlist-modal-title" data-ico="list">添加到歌单</span>
+      <button class="playlist-modal-close" onclick="closePlaylistSelectModal()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div class="playlist-modal-body" id="playlistSelectList" style="display:flex;flex-direction:column;gap:6px;padding:16px;"></div>
   </div>

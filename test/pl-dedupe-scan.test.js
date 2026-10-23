@@ -126,7 +126,7 @@ test('接线钉桩：playlist.js 纯函数导入+三桥、HTML 按钮、面板 p
   assert.match(PL_JS, /window\.scanCrossPlaylistDupes = scanCrossPlaylistDupes;/);
   assert.match(PL_JS, /window\.copyDedupeScanReport = copyDedupeScanReport;/);
   assert.match(PL_JS, /overlay\.id = 'dedupeScanModal';/, '动态弹层用专属 id，不与静态容器撞');
-  assert.match(HTML, /<button class="tab"[^>]*onclick="scanCrossPlaylistDupes\(\)"[^>]*>🧮 跨单查重<\/button>/);
+  assert.match(HTML, /<button class="tab"[^>]*onclick="scanCrossPlaylistDupes\(\)"[^>]*>跨单查重<\/button>/);
   assert.match(PALETTE_JS, /\{ id: 'pl-dedupescan'[\s\S]{0,160}?_call\('scanCrossPlaylistDupes'\) \},/);
 });
 

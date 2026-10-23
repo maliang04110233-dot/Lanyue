@@ -201,7 +201,9 @@ function openSleepCustomDialog() {
   title.textContent = '⏾ 自定义睡眠定时';
   const close = document.createElement('button');
   close.className = 'edit-close';
-  close.textContent = '✕';
+  close.setAttribute('data-ico', 'x');
+  close.setAttribute('data-ico-only', '');
+  close.setAttribute('aria-label', '关闭');
   close.addEventListener('click', () => _closeCustomDialog());
   header.appendChild(title);
   header.appendChild(close);

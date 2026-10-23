@@ -117,7 +117,7 @@ test('接线钉桩：歌单页工具栏按钮 + 模块 window 桥 + 命令面板
   const src = fs.readFileSync(path.join(__dirname, '../src/renderer/js/m3uToPlaylist.js'), 'utf8');
   assert.match(src, /window\.pickM3uForPlaylist = pickM3uForPlaylist;/);
   assert.match(src, /window\.importM3uAsPlaylist = importM3uAsPlaylist;/);
-  assert.match(HTML, /onclick="pickM3uForPlaylist\(\)"[^>]*>📥 导入 m3u</);
+  assert.match(HTML, /onclick="pickM3uForPlaylist\(\)"[^>]*>导入 m3u</);
   assert.match(PALETTE_JS, /id: 'pl-m3uimp'[\s\S]{0,220}?_call\('pickM3uForPlaylist'\)/);
   assert.strictEqual(typeof mod.pickM3uForPlaylist, 'function');
 });

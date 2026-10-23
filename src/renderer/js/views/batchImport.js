@@ -29,7 +29,7 @@ function _ensureOverlay() {
     <div class="edit-panel" style="width:520px;">
       <div class="edit-header">
         <span class="edit-title">📥 批量链接导入</span>
-        <button class="edit-close" onclick="closeBatchImport()">✕</button>
+        <button class="edit-close" onclick="closeBatchImport()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="edit-body">
         <textarea id="batchImportText" class="edit-input batch-import-text" rows="8"

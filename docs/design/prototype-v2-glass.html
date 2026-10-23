@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="void">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>揽乐 · 极夜玻璃 Plus · 视觉稿 v2</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   揽乐 · 极夜玻璃 Plus —— 视觉确认稿
+   ──────────────────────────────────────────────────────────────────
+   本文件是**单页视觉母版**，不是产品代码。它用与 base.css v2 完全
+   一致的令牌值写死了所有观感，因此确认后可直接对照落地，不需要
+   「照着图再猜一遍数值」。
+
+   设计 DNA
+     深到几乎无色的冷黑基底上，只有一层 1px 冷光描边和 6% 顶部高光
+     在描述结构；主色是一个**事件**（当前态/可点/播放中），不是装饰。
+
+   三条减法铁律
+     1 主色配额：同屏 --accent-ui 着色元素 ≤ 3 类
+     2 发光配额：--glow-primary 只出现在「播放中封面」「换源扫描线」
+     3 表面单源：所有面由 --bg-card 与 --text 混色派生
+   ══════════════════════════════════════════════════════════════════ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── 1 令牌 ─────────────────────────────────────────────────────── */
+:root {
+  /* 基色（void 深黑蓝） */
+  --bg-deep:   #03050b;
+  --bg-card:   #080c16;
+  --bg-hover:  #0f1420;
+  --bg-input:  #060a13;
+  --border:    #161c2e;
+  --text:      #eaf2ff;
+  --accent:    #00e5ff;
+  --accent2:   #7c3aed;
+  --green:     #00d68f;
+  --red:       #ff4f6e;
+  --gold:      #f5a623;
+  --blue:      #38bdf8;
+
+  /* 表面阶梯（color-mix 派生，6 套主题共用一套定义） */
+  --surface-0: var(--bg-deep);
+  --surface-1: var(--bg-card);
+  --surface-2: color-mix(in srgb, var(--bg-card) 92%, var(--text) 8%);
+  --surface-3: color-mix(in srgb, var(--bg-card) 82%, var(--text) 18%);
+  --surface-glass: color-mix(in srgb, var(--bg-card) 72%, transparent);
+  --surface-veil:  color-mix(in srgb, var(--bg-deep) 74%, transparent);
+
+  /* 描边四档 + 顶部高光 */
+  --stroke-0: color-mix(in srgb, var(--text) 5%, transparent);
+  --stroke-1: color-mix(in srgb, var(--text) 9%, transparent);
+  --stroke-2: color-mix(in srgb, var(--text) 17%, transparent);
+  --stroke-3: color-mix(in srgb, var(--text) 26%, transparent);
+  --rim: inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+
+  /* 文字层级 */
+  --fg-1: var(--text);
+  --fg-2: color-mix(in srgb, var(--text) 62%, var(--bg-deep));
+  --fg-3: color-mix(in srgb, var(--text) 42%, var(--bg-deep));
+
+  /* 强调 */
+  --accent-ui: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent-ui) 12%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent-ui) 34%, transparent);
+  --accent-glow: color-mix(in srgb, var(--accent-ui) 14%, transparent);
+  --on-accent: #03050b;
+  --accent-grad: linear-gradient(135deg, var(--accent-ui) 0%, var(--accent2) 100%);
+
+  /* 语义 */
+  --c-ok: var(--green);
+  --c-warn: var(--gold);
+  --c-danger: var(--red);
+  --c-info: var(--blue);
+
+  /* 间距 8pt 网格 + 4pt 半档 */
+  --sp-0-5: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 28px; --sp-8: 32px; --sp-10: 40px;
+  --sp-12: 48px; --sp-16: 64px;
+
+  /* 圆角（随面积升高） */
+  --r-xs: 4px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px;
+  --r-2xl: 28px; --r-full: 999px;
+
+  /* 字号 */
+  --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px;
+  --fs-body: 14px; --fs-lg: 15px; --fs-xl: 17px; --fs-2xl: 22px;
+  --fs-3xl: 28px; --fs-hero: clamp(26px, 2.2vw, 34px);
+  --track-cjk: .01em; --track-tight: -.012em;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--bg-deep) 60%, transparent);
+  --shadow-md: 0 4px 14px -4px color-mix(in srgb, var(--bg-deep) 70%, transparent);
+  --shadow-lg: 0 24px 64px -24px color-mix(in srgb, var(--bg-deep) 88%, transparent);
+  --shadow-xl: 0 32px 80px -32px color-mix(in srgb, var(--bg-deep) 92%, transparent);
+  --glow-primary: 0 0 20px 4px var(--accent-glow);
+  --glow-focus: 0 0 0 1px var(--accent-line), 0 0 0 4px var(--accent-soft);
+
+  /* 动效 */
+  --dur-0: .09s; --dur-1: .14s; --dur-2: .2s; --dur-3: .28s; --dur-4: .42s;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-emph: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .64, 1);
+
+  /* 布局 */
+  --content-max: 1180px;
+  --gutter: clamp(20px, 3vw, 48px);
+  --topbar-h: 64px;
+  --bb-h: 84px;
+
+  --font: 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI',
+          'Microsoft YaHei', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Semibold', 'PingFang SC',
+          'Microsoft YaHei UI', system-ui, sans-serif;
+}
+
+/* 浅色主题（只为验证「派生令牌自动跟随」，不是最终交付重点） */
+[data-theme="light"] {
+  --bg-deep: #f4f5f7; --bg-card: #ffffff; --bg-hover: #eceef1; --bg-input: #f7f8f9;
+  --border: #dfe2e7; --text: #14161a;
+  --accent: #0d9488; --accent2: #14b8a6;
+  --green: #16a34a; --red: #dc2626; --gold: #d97706; --blue: #2563eb;
+  --accent-glow: transparent;
+  --on-accent: #ffffff;
+}
+
+/* ── 2 基底 ─────────────────────────────────────────────────────── */
+html, body { height: 100%; }
+body {
+  background: var(--bg-deep); color: var(--fg-1);
+  font-family: var(--font); font-size: var(--fs-body);
+  line-height: 1.5; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: var(--track-cjk);
+}
+/* 唯一的氛围光：左上极淡主色雾，opacity 低到几乎感觉不到，只让黑不至于死 */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(60% 40% at 22% -8%,
+      color-mix(in srgb, var(--accent-ui) 7%, transparent) 0%, transparent 70%),
+    radial-gradient(40% 30% at 92% 4%,
+      color-mix(in srgb, var(--accent2) 6%, transparent) 0%, transparent 70%);
+}
+::selection { background: var(--accent-soft); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--stroke-2); border-radius: var(--r-full);
+  border: 2px solid transparent; background-clip: padding-box;
+}
+:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+
+.app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; }
+
+/* ── 3 顶栏 ─────────────────────────────────────────────────────── */
+.topbar {
+  flex-shrink: 0; height: var(--topbar-h);
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: 0 var(--gutter);
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid var(--stroke-1);
+  box-shadow: var(--rim);
+}
+/* 品牌锚点：用伪元素实现，产品落地时 DOM 一个节点都不用加 */
+.topbar::before {
+  content: '揽乐';
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg); font-weight: 600; letter-spacing: .06em;
+  color: var(--fg-1);
+  margin-right: var(--sp-2);
+  padding-right: var(--sp-5);
+  border-right: 1px solid var(--stroke-1);
+}
+.topbar-links { flex: 1; display: flex; align-items: center; gap: var(--sp-0-5); min-width: 0; }
+
+.nav-item {
+  position: relative;
+  height: 34px; padding: 0 var(--sp-3);
+  border: none; background: transparent; color: var(--fg-2);
+  font-family: inherit; font-size: var(--fs-md); font-weight: 500;
+  letter-spacing: var(--track-cjk); white-space: nowrap;
+  border-radius: var(--r-sm); cursor: pointer;
+  display: flex; align-items: center; gap: var(--sp-1);
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.nav-item:hover { color: var(--fg-1); background: var(--surface-2); }
+.nav-item:active { transform: scale(.96); }
+.nav-item.active { color: var(--accent-ui); }
+/* active 指示条：视觉上「长出来」，不是切换色块 */
+.nav-item.active::after {
+  content: ''; position: absolute; left: 50%; bottom: -1px;
+  width: 16px; height: 2px; border-radius: var(--r-full);
+  background: var(--accent-ui);
+  transform: translateX(-50%) scaleX(1);
+  transition: transform var(--dur-2) var(--ease-emph);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+/* AI 入口的差异化：右侧一个小点，不做彩虹渐变 */
+.nav-item[data-ai]::before {
+  content: ''; width: 4px; height: 4px; border-radius: var(--r-full);
+  background: var(--accent2); opacity: .8;
+}
+.nav-badge {
+  font-size: var(--fs-2xs); font-weight: 600; line-height: 1;
+  padding: 2px 6px; border-radius: var(--r-full);
+  background: var(--accent-soft); color: var(--accent-ui);
+  border: 1px solid var(--accent-line);
+  font-variant-numeric: tabular-nums;
+}
+.topbar-right { display: flex; align-items: center; gap: var(--sp-1); flex-shrink: 0; }
+.icon-btn {
+  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent;
+  color: var(--fg-3); border-radius: var(--r-sm); cursor: pointer;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+.icon-btn:hover { color: var(--fg-1); background: var(--surface-2); border-color: var(--stroke-1); }
+.icon-btn:active { transform: scale(.94); }
+.winctrls { display: flex; gap: var(--sp-1); margin-left: var(--sp-2); padding-left: var(--sp-3);
+  border-left: 1px solid var(--stroke-1); }
+.winctrls button {
+  width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--fg-3);
+  border-radius: var(--r-sm); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.winctrls button:hover { background: var(--surface-3); color: var(--fg-1); }
+.winctrls .close:hover { background: #e5484d; color: #fff; }
+
+/* ── 4 内容区（定宽居中，不随窗口拉散） ────────────────────────── */
+.main { flex: 1; display: flex; overflow: hidden; }
+.content {
+  flex: 1; display: flex; overflow: hidden;
+  padding: var(--sp-6) var(--gutter) var(--sp-5);
+}
+.content-main {
+  flex: 1; width: 100%; max-width: var(--content-max); margin-inline: auto;
+  display: flex; flex-direction: column; gap: var(--sp-5);
+  overflow-y: auto; padding-right: var(--sp-2);
+}
+
+/* ── 5 Hero ─────────────────────────────────────────────────────── */
+.hero {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--stroke-1); border-radius: var(--r-2xl);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-md), var(--rim);
+  padding: var(--sp-8) var(--sp-8) var(--sp-6);
+  flex-shrink: 0;
+}
+/* 唯一的内部光：右上角一枚，透明度压到 9% */
+.hero::after {
+  content: ''; position: absolute; right: -80px; top: -120px;
+  width: 320px; height: 320px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--accent-ui) 9%, transparent) 0%, transparent 68%);
+}
+.hero-eyebrow {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-xs); font-weight: 500; color: var(--fg-3);
+  letter-spacing: .12em; text-transform: uppercase; margin-bottom: var(--sp-3);
+}
+.hero-eyebrow i {
+  width: 4px; height: 4px; border-radius: var(--r-full);
+  background: var(--accent-ui); box-shadow: 0 0 6px var(--accent-glow);
+}
+.hero-title {
+  position: relative; z-index: 1;
+  font-family: var(--font-display); font-size: var(--fs-hero); font-weight: 600;
+  line-height: 1.2; letter-spacing: var(--track-tight); margin-bottom: var(--sp-2);
+}
+.hero-title em { font-style: normal; color: var(--accent-ui); }
+.hero-sub { position: relative; z-index: 1; font-size: var(--fs-md); color: var(--fg-2); margin-bottom: var(--sp-6); }
+
+.search-row { position: relative; z-index: 1; display: flex; gap: var(--sp-2); }
+.search-input {
+  flex: 1; height: 46px; padding: 0 var(--sp-5);
+  border-radius: var(--r-full); border: 1px solid var(--stroke-1);
+  background: var(--bg-deep); color: var(--fg-1);
+  font-family: inherit; font-size: var(--fs-body); outline: none;
+  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.search-input::placeholder { color: var(--fg-3); }
+.search-input:focus { border-color: var(--accent-line); box-shadow: var(--glow-focus); }
+.search-btn {
+  height: 46px; padding: 0 var(--sp-6); border-radius: var(--r-full);
+  border: 1px solid var(--accent-ui); background: var(--accent-ui); color: var(--on-accent);
+  font-family: inherit; font-size: var(--fs-body); font-weight: 600;
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  cursor: pointer; white-space: nowrap;
+  transition: filter var(--dur-1) var(--ease), transform var(--dur-1) var(--ease-emph);
+}
+.search-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.search-btn:active { transform: scale(.985); }
+/* 智能入口：与主按钮并排但重量更低，靠图标+文字，不做第二个彩色按钮 */
+.ai-ask {
+  height: 46px; padding: 0 var(--sp-5); border-radius: var(--r-full);
+  border: 1px solid var(--stroke-1); background: var(--surface-2);
+  color: var(--fg-2); font-family: inherit; font-size: var(--fs-md);
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  cursor: pointer; white-space: nowrap;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+              background var(--dur-1) var(--ease);
+}
+.ai-ask:hover { color: var(--fg-1); border-color: var(--accent-line); background: var(--surface-3); }
+
+.chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-5); }
+.chip {
+  padding: 6px var(--sp-3); border-radius: var(--r-full);
+  border: 1px solid var(--stroke-1); background: transparent;
+  color: var(--fg-2); font-family: inherit; font-size: var(--fs-sm); cursor: pointer;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+              background var(--dur-1) var(--ease);
+}
+.chip:hover { color: var(--accent-ui); border-color: var(--accent-line); background: var(--accent-soft); }
+.chip:active { transform: scale(.96); }
+
+/* ── 6 统计卡 ───────────────────────────────────────────────────── */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); flex-shrink: 0; }
+.stat {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface-1); border: 1px solid var(--stroke-1);
+  border-radius: var(--r-lg); box-shadow: var(--rim);
+  cursor: pointer;
+  transition: transform var(--dur-2) var(--ease-emph), border-color var(--dur-1) var(--ease);
+}
+.stat:hover { transform: translateY(-1px); border-color: var(--stroke-2); }
+.stat:hover .stat-icon { color: var(--fg-2); }
+.stat-icon { color: var(--fg-3); flex-shrink: 0;
+  transition: color var(--dur-1) var(--ease); }
+.stat-num {
+  font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 600;
+  line-height: 1.2; letter-spacing: var(--track-tight);
+  font-variant-numeric: tabular-nums;
+}
+.stat-label { font-size: var(--fs-xs); color: var(--fg-3); margin-top: 2px; }
+
+/* ── 7 区块标题 + 平台 tab ──────────────────────────────────────── */
+.sect-head { display: flex; align-items: center; gap: var(--sp-3); flex-shrink: 0; }
+.sect-title {
+  font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 600;
+  letter-spacing: var(--track-tight); display: flex; align-items: center; gap: var(--sp-2);
+}
+.sect-title::before {
+  content: ''; width: 3px; height: 14px; border-radius: var(--r-full);
+  background: var(--accent-ui);
+}
+.sect-line { flex: 1; height: 1px; background: var(--stroke-1); }
+.sect-more {
+  border: none; background: transparent; color: var(--fg-3);
+  font-family: inherit; font-size: var(--fs-sm); cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2); border-radius: var(--r-sm);
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.sect-more:hover { color: var(--fg-1); background: var(--surface-2); }
+
+.anchors { display: flex; gap: var(--sp-2); flex-shrink: 0; overflow-x: auto; }
+.anchor {
+  padding: 6px var(--sp-4); border-radius: var(--r-full);
+  border: 1px solid var(--stroke-1); background: transparent;
+  color: var(--fg-2); font-family: inherit; font-size: var(--fs-md);
+  cursor: pointer; white-space: nowrap;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+              background var(--dur-1) var(--ease);
+}
+.anchor:hover { color: var(--fg-1); background: var(--surface-2); }
+.anchor.active {
+  color: var(--accent-ui); border-color: var(--accent-line); background: var(--accent-soft);
+}
+
+/* ── 8 平台卡片流 ───────────────────────────────────────────────── */
+.card-flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-3); flex-shrink: 0; }
+.pcard { cursor: pointer; }
+.cover {
+  position: relative; aspect-ratio: 1 / 1; border-radius: var(--r-md);
+  border: 1px solid var(--stroke-0); overflow: hidden;
+  transition: transform var(--dur-2) var(--ease-emph), box-shadow var(--dur-2) var(--ease);
+}
+.cover::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: var(--rim); pointer-events: none;
+}
+.pcard:hover .cover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+/* 封面占位用双色调渐变，实际产品是真实封面 */
+.c1 { background: linear-gradient(145deg, #0b3b4d 0%, #061621 55%, #0a0f1e 100%); }
+.c2 { background: linear-gradient(145deg, #3b2a5e 0%, #1a1430 55%, #0a0f1e 100%); }
+.c3 { background: linear-gradient(145deg, #123c34 0%, #08201b 55%, #0a0f1e 100%); }
+.c4 { background: linear-gradient(145deg, #4a2b2b 0%, #22120f 55%, #0a0f1e 100%); }
+.c5 { background: linear-gradient(145deg, #1d3350 0%, #0c1728 55%, #0a0f1e 100%); }
+.pcard h4 {
+  font-size: var(--fs-md); font-weight: 500; margin-top: var(--sp-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color var(--dur-1) var(--ease);
+}
+.pcard:hover h4 { color: var(--accent-ui); }
+.pcard p { font-size: var(--fs-xs); color: var(--fg-3); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge-src {
+  position: absolute; left: var(--sp-2); bottom: var(--sp-2);
+  font-size: var(--fs-2xs); font-weight: 500; line-height: 1;
+  padding: 3px 6px; border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--bg-deep) 70%, transparent);
+  color: var(--fg-2); backdrop-filter: blur(6px);
+  border: 1px solid var(--stroke-1);
+}
+
+/* ── 9 歌曲列表行 ───────────────────────────────────────────────── */
+.list { flex-shrink: 0; border-top: 1px solid var(--stroke-0); }
+.row {
+  display: flex; align-items: center; gap: var(--sp-3);
+  height: 56px; padding: 0 var(--sp-3); border-radius: var(--r-md);
+  cursor: pointer; position: relative;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+.row:hover { background: var(--surface-2); transform: translateX(2px); }
+.row-num {
+  width: 20px; text-align: right; font-size: var(--fs-xs); color: var(--fg-3);
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+.row:hover .row-num { color: var(--accent-ui); }
+.row-cover {
+  width: 38px; height: 38px; border-radius: var(--r-sm); flex-shrink: 0;
+  border: 1px solid var(--stroke-0); overflow: hidden;
+}
+.row:hover .row-cover { transform: scale(1.03); transition: transform var(--dur-2) var(--ease-emph); }
+.row-main { flex: 1; min-width: 0; }
+.row-title {
+  font-size: var(--fs-body); color: var(--fg-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.row-title mark { background: transparent; color: var(--accent-ui); font-weight: 500; }
+.row-meta {
+  font-size: var(--fs-xs); color: var(--fg-3); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.row-tag {
+  font-size: var(--fs-2xs); font-weight: 500; line-height: 1;
+  padding: 3px 6px; border-radius: var(--r-xs); flex-shrink: 0;
+  border: 1px solid var(--stroke-1); color: var(--fg-3);
+}
+.row-tag.hq { color: var(--c-warn); border-color: color-mix(in srgb, var(--c-warn) 34%, transparent);
+  background: color-mix(in srgb, var(--c-warn) 10%, transparent); }
+.row-dur { font-size: var(--fs-xs); color: var(--fg-3); width: 44px; text-align: right;
+  font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.row-acts { display: flex; gap: var(--sp-1); opacity: 0; transition: opacity var(--dur-1) var(--ease); }
+.row:hover .row-acts { opacity: 1; }
+.row-btn {
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--fg-3); border-radius: var(--r-sm); cursor: pointer;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.row-btn:hover { color: var(--fg-1); background: var(--surface-3); }
+/* 正在播放：2px 左侧条 + 主色序号，不再满行发光 */
+.row.playing .row-num { color: var(--accent-ui); }
+.row.playing .row-title { color: var(--accent-ui); }
+.row.playing::before {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 2px; height: 20px; border-radius: var(--r-full); background: var(--accent-ui);
+}
+
+/* ── 10 组件规范区 ──────────────────────────────────────────────── */
+.spec { flex-shrink: 0; padding: var(--sp-6) 0 var(--sp-16); border-top: 1px solid var(--stroke-0); margin-top: var(--sp-4); }
+.spec h3 {
+  font-family: var(--font-display); font-size: var(--fs-md); font-weight: 600;
+  color: var(--fg-3); letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: var(--sp-4);
+}
+.spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-6); margin-bottom: var(--sp-8); }
+.spec-box {
+  border: 1px solid var(--stroke-1); border-radius: var(--r-lg);
+  background: var(--surface-1); padding: var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.spec-label { font-size: var(--fs-2xs); color: var(--fg-3); letter-spacing: .08em; text-transform: uppercase; }
+
+.btn {
+  height: 36px; padding: 0 var(--sp-4); border-radius: var(--r-md);
+  font-family: inherit; font-size: var(--fs-md); font-weight: 500;
+  display: inline-flex; align-items: center; gap: var(--sp-2); cursor: pointer;
+  border: 1px solid transparent; white-space: nowrap;
+  transition: filter var(--dur-1) var(--ease), transform var(--dur-1) var(--ease-emph),
+              background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease);
+}
+.btn:active { transform: scale(.985); }
+.btn-primary { background: var(--accent-ui); color: var(--on-accent); border-color: var(--accent-ui); }
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--fg-1); border-color: var(--stroke-2); }
+.btn-ghost:hover { background: var(--surface-2); border-color: var(--stroke-3); }
+.btn-quiet { background: transparent; color: var(--fg-2); }
+.btn-quiet:hover { background: var(--surface-2); color: var(--fg-1); }
+.btn-danger { background: transparent; color: var(--c-danger);
+  border-color: color-mix(in srgb, var(--c-danger) 34%, transparent); }
+.btn-danger:hover { background: color-mix(in srgb, var(--c-danger) 12%, transparent); }
+.btn-sm { height: 30px; padding: 0 var(--sp-3); font-size: var(--fs-sm); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+
+.field { display: flex; flex-direction: column; gap: var(--sp-1); }
+.field label { font-size: var(--fs-xs); color: var(--fg-3); }
+.input {
+  height: 36px; padding: 0 var(--sp-3); border-radius: var(--r-md);
+  border: 1px solid var(--stroke-1); background: var(--surface-0);
+  color: var(--fg-1); font-family: inherit; font-size: var(--fs-md); outline: none;
+  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.input:focus { border-color: var(--accent-line); box-shadow: var(--glow-focus); }
+
+.toast-stack { display: flex; flex-direction: column; gap: var(--sp-2); }
+.toast {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  background: var(--surface-3); border: 1px solid var(--stroke-1);
+  box-shadow: var(--shadow-md); font-size: var(--fs-md); color: var(--fg-1);
+  width: fit-content; max-width: 100%;
+}
+.toast i { width: 3px; height: 16px; border-radius: var(--r-full); flex-shrink: 0; background: var(--fg-3); }
+.toast.ok i { background: var(--c-ok); }
+.toast.warn i { background: var(--c-warn); }
+.toast.err i { background: var(--c-danger); }
+.toast.info i { background: var(--c-info); }
+.toast .cnt { color: var(--fg-3); font-size: var(--fs-xs); margin-left: var(--sp-1);
+  font-variant-numeric: tabular-nums; }
+
+/* 弹层预览（静态摆放，非真浮层） */
+.modal-demo {
+  border: 1px solid var(--stroke-1); border-radius: var(--r-xl);
+  background: var(--surface-1); box-shadow: var(--shadow-xl), var(--rim);
+  overflow: hidden; max-width: 520px;
+}
+.modal-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-6); border-bottom: 1px solid var(--stroke-0);
+  font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600;
+}
+.modal-head span { flex: 1; }
+.modal-body { padding: var(--sp-5) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-4); }
+.modal-foot {
+  display: flex; justify-content: flex-end; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-6); border-top: 1px solid var(--stroke-0);
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+}
+.modal-close {
+  width: 28px; height: 28px; border: none; background: transparent;
+  color: var(--fg-3); border-radius: var(--r-sm); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.modal-close:hover { background: var(--surface-3); color: var(--fg-1); }
+
+/* 图标对照 */
+.icon-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: var(--sp-3); }
+.icon-cell {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-2); border-radius: var(--r-md); color: var(--fg-2);
+  font-size: var(--fs-2xs); color: var(--fg-3);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  cursor: default;
+}
+.icon-cell:hover { background: var(--surface-2); color: var(--fg-1); }
+.icon-cell svg { color: var(--fg-2); }
+
+/* ── 11 底部播放条 ──────────────────────────────────────────────── */
+.bottom-bar {
+  flex-shrink: 0; height: var(--bb-h); position: relative;
+  display: grid; align-items: center;
+  grid-template-columns: auto minmax(140px, 240px) minmax(260px, 1fr) auto auto;
+  gap: 0 var(--sp-4); padding: 0 var(--sp-6);
+  background: var(--surface-glass);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-top: 1px solid var(--stroke-1);
+  box-shadow: var(--rim);
+  z-index: 20;
+}
+/* 进度线：常态 1px 贴顶，hover 长到 3px，thumb 才出现 */
+.progress {
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--stroke-1);
+}
+.progress-fill {
+  height: 100%; width: 38%;
+  background: var(--accent-ui);
+  box-shadow: 0 0 10px var(--accent-glow);
+  position: relative;
+}
+.progress-fill::after {
+  content: ''; position: absolute; right: -4px; top: 50%;
+  width: 8px; height: 8px; border-radius: var(--r-full);
+  background: var(--accent-ui); transform: translateY(-50%) scale(0);
+  transition: transform var(--dur-2) var(--ease-spring);
+}
+.bottom-bar:hover .progress-fill::after { transform: translateY(-50%) scale(1); }
+
+.pc-cover {
+  width: 60px; height: 60px; border-radius: var(--r-lg);
+  border: 1px solid var(--stroke-1); overflow: hidden; position: relative;
+  box-shadow: var(--shadow-md);
+}
+.pc-cover::after { content: ''; position: absolute; inset: 0; box-shadow: var(--rim); border-radius: inherit; }
+.pc-meta { min-width: 0; }
+.pc-title {
+  font-size: var(--fs-body); font-weight: 500; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.pc-artist {
+  font-size: var(--fs-xs); color: var(--fg-3); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: var(--sp-2);
+}
+.pc-clock { font-size: var(--fs-xs); color: var(--fg-3); font-variant-numeric: tabular-nums; }
+
+.pc-controls { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); }
+.ctrl-line { display: flex; align-items: center; gap: var(--sp-3); }
+.ctrl {
+  width: 32px; height: 32px; border: none; background: transparent;
+  color: var(--fg-2); border-radius: var(--r-full); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.ctrl:hover { color: var(--fg-1); background: var(--surface-3); }
+.ctrl:active { transform: scale(.92); }
+.play-btn {
+  width: 44px; height: 44px; border-radius: var(--r-full);
+  background: var(--accent-ui); color: var(--on-accent);
+  border: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--accent-ui) 80%, transparent);
+  transition: filter var(--dur-1) var(--ease), transform var(--dur-1) var(--ease-emph);
+}
+.play-btn:hover { filter: brightness(1.1); transform: scale(1.04); }
+.play-btn:active { transform: scale(.95); }
+.pc-tools { display: flex; align-items: center; gap: var(--sp-1); }
+.pc-tools .ctrl { width: 30px; height: 30px; color: var(--fg-3); }
+.vol { width: 68px; height: 3px; border-radius: var(--r-full); background: var(--stroke-2); position: relative; }
+.vol-fill { position: absolute; inset: 0 38% 0 0; background: var(--fg-2); border-radius: inherit; }
+
+/* ── 12 主题切换（评审用） ──────────────────────────────────────── */
+.theme-switch {
+  position: fixed; right: var(--sp-5); bottom: calc(var(--bb-h) + var(--sp-4));
+  display: flex; gap: var(--sp-1); padding: var(--sp-1);
+  background: var(--surface-3); border: 1px solid var(--stroke-2);
+  border-radius: var(--r-full); box-shadow: var(--shadow-lg); z-index: 60;
+}
+.theme-switch button {
+  height: 26px; padding: 0 var(--sp-3); border: none; border-radius: var(--r-full);
+  background: transparent; color: var(--fg-3); font-family: inherit;
+  font-size: var(--fs-2xs); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.theme-switch button:hover { color: var(--fg-1); }
+.theme-switch button.on { background: var(--surface-1); color: var(--fg-1); box-shadow: var(--shadow-sm); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ══ 顶栏：品牌锚点由 CSS 伪元素提供，DOM 与现状完全一致 ══ -->
+  <header class="topbar">
+    <nav class="topbar-links">
+      <button class="nav-item active">发现</button>
+      <button class="nav-item">歌单</button>
+      <button class="nav-item">本地曲库</button>
+      <button class="nav-item">跨源聚合</button>
+      <button class="nav-item">订阅更新 <span class="nav-badge">3</span></button>
+      <button class="nav-item">下载管理</button>
+      <button class="nav-item">格式转换</button>
+      <button class="nav-item" data-ai>AI 创作</button>
+      <button class="nav-item" data-ai>AI 助手</button>
+    </nav>
+    <div class="topbar-right">
+      <button class="icon-btn" title="打开下载目录">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v7.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>
+      </button>
+      <button class="icon-btn" title="设置">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.6 5.4l-1.7 1.7M7.1 16.9l-1.7 1.7M18.6 18.6l-1.7-1.7M7.1 7.1L5.4 5.4"/></svg>
+      </button>
+      <div class="winctrls">
+        <button title="最小化"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+        <button title="最大化"><svg width="10" height="10" viewBox="0 0 10 10"><rect x="2.2" y="2.2" width="5.6" height="5.6" rx="1" stroke="currentColor" stroke-width="1.2" fill="none"/></svg></button>
+        <button class="close" title="关闭"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2.4 2.4l5.2 5.2M7.6 2.4L2.4 7.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="content">
+      <div class="content-main">
+
+        <!-- ══ Hero ══ -->
+        <section class="hero">
+          <div class="hero-eyebrow"><i></i>VOID GLASS · v1.0.37</div>
+          <h1 class="hero-title">八个平台，<em>一次搜完</em></h1>
+          <p class="hero-sub">关键词、歌单链接、专辑页 —— 粘进来就开始下载。</p>
+          <div class="search-row">
+            <input class="search-input" placeholder="搜索歌曲、歌手、专辑，或粘贴各平台链接…">
+            <button class="ai-ask">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>
+              用一句话找歌
+            </button>
+            <button class="search-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+              搜索
+            </button>
+          </div>
+          <div class="chips">
+            <button class="chip">周杰伦</button>
+            <button class="chip">深夜驾驶</button>
+            <button class="chip">2024 华语新歌</button>
+            <button class="chip">适合写代码</button>
+            <button class="chip">City Pop</button>
+          </div>
+        </section>
+
+        <!-- ══ 统计 ══ -->
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V9M9 17V5M14 17v-5M19 17v-9"/></svg></div>
+            <div><div class="stat-num">3,806</div><div class="stat-label">本地曲库</div></div>
+          </div>
+          <div class="stat">
+            <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0l3.5-3.5M12 14l-3.5-3.5"/><path d="M4.5 17.5V19a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-1.5"/></svg></div>
+            <div><div class="stat-num">1,242</div><div class="stat-label">已下载</div></div>
+          </div>
+          <div class="stat">
+            <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg></div>
+            <div><div class="stat-num">892h</div><div class="stat-label">累计收听</div></div>
+          </div>
+          <div class="stat">
+            <div class="stat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c3.6 3.2 6 6 6 9a6 6 0 1 1-12 0c0-3 2.4-5.8 6-9z"/></svg></div>
+            <div><div class="stat-num" style="font-size:var(--fs-md)">爱情转移</div><div class="stat-label">最常播放 · 214 次</div></div>
+          </div>
+        </div>
+
+        <!-- ══ 平台 tab ══ -->
+        <div class="sect-head">
+          <div class="sect-title">今日推荐</div>
+          <div class="sect-line"></div>
+          <button class="sect-more">换一批
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.5-5.8M20 12a8 8 0 0 1-13.5 5.8"/><path d="M17.5 3v4h-4M6.5 21v-4h4"/></svg>
+          </button>
+        </div>
+        <div class="anchors">
+          <button class="anchor active">网易云</button>
+          <button class="anchor">QQ 音乐</button>
+          <button class="anchor">酷狗</button>
+          <button class="anchor">酷我</button>
+          <button class="anchor">咪咕</button>
+          <button class="anchor">B 站</button>
+          <button class="anchor">汽水</button>
+        </div>
+
+        <!-- ══ 卡片流 ══ -->
+        <div class="card-flow">
+          <div class="pcard">
+            <div class="cover c1"><span class="badge-src">网易云</span></div>
+            <h4>华语热歌榜</h4><p>每小时更新</p>
+          </div>
+          <div class="pcard">
+            <div class="cover c2"><span class="badge-src">QQ 音乐</span></div>
+            <h4>深夜电台 · 失眠</h4><p>128 首</p>
+          </div>
+          <div class="pcard">
+            <div class="cover c3"><span class="badge-src">酷狗</span></div>
+            <h4>通勤路上</h4><p>64 首</p>
+          </div>
+          <div class="pcard">
+            <div class="cover c4"><span class="badge-src">B 站</span></div>
+            <h4>City Pop 复古</h4><p>40 首</p>
+          </div>
+          <div class="pcard">
+            <div class="cover c5"><span class="badge-src">咪咕</span></div>
+            <h4>专注写代码</h4><p>无歌词纯音</p>
+          </div>
+        </div>
+
+        <!-- ══ 歌曲行 ══ -->
+        <div class="sect-head" style="margin-top:var(--sp-2)">
+          <div class="sect-title">新歌速递</div>
+          <div class="sect-line"></div>
+        </div>
+        <div class="list">
+          <div class="row playing">
+            <div class="row-num">01</div>
+            <div class="row-cover c1"></div>
+            <div class="row-main">
+              <div class="row-title">爱情转移</div>
+              <div class="row-meta">陈奕迅 · 认了吧</div>
+            </div>
+            <span class="row-tag hq">FLAC</span>
+            <span class="row-dur">04:12</span>
+            <div class="row-acts">
+              <button class="row-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0l3.5-3.5M12 14l-3.5-3.5"/><path d="M4.5 18.5h15"/></svg></button>
+              <button class="row-btn" title="更多"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-num">02</div>
+            <div class="row-cover c2"></div>
+            <div class="row-main">
+              <div class="row-title"><mark>孤</mark>勇者</div>
+              <div class="row-meta">陈奕迅 · 算什么男人</div>
+            </div>
+            <span class="row-tag hq">320K</span>
+            <span class="row-dur">04:29</span>
+            <div class="row-acts">
+              <button class="row-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0l3.5-3.5M12 14l-3.5-3.5"/><path d="M4.5 18.5h15"/></svg></button>
+              <button class="row-btn" title="更多"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-num">03</div>
+            <div class="row-cover c3"></div>
+            <div class="row-main">
+              <div class="row-title">起风了</div>
+              <div class="row-meta">买辣椒也用券 · 起风了</div>
+            </div>
+            <span class="row-tag">128K</span>
+            <span class="row-dur">05:25</span>
+            <div class="row-acts">
+              <button class="row-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0l3.5-3.5M12 14l-3.5-3.5"/><path d="M4.5 18.5h15"/></svg></button>
+              <button class="row-btn" title="更多"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-num">04</div>
+            <div class="row-cover c4"></div>
+            <div class="row-main">
+              <div class="row-title">富士山下（Live）</div>
+              <div class="row-meta">陈奕迅 · DUO 演唱会</div>
+            </div>
+            <span class="row-tag hq">FLAC</span>
+            <span class="row-dur">06:02</span>
+            <div class="row-acts">
+              <button class="row-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0l3.5-3.5M12 14l-3.5-3.5"/><path d="M4.5 18.5h15"/></svg></button>
+              <button class="row-btn" title="更多"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-num">05</div>
+            <div class="row-cover c5"></div>
+            <div class="row-main">
+              <div class="row-title">Season of Ghosts (Extended Mix)</div>
+              <div class="row-meta">Various Artists · 电子合辑 Vol.7</div>
+            </div>
+            <span class="row-tag">320K</span>
+            <span class="row-dur">08:41</span>
+            <div class="row-acts">
+              <button class="row-btn" title="下载"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0l3.5-3.5M12 14l-3.5-3.5"/><path d="M4.5 18.5h15"/></svg></button>
+              <button class="row-btn" title="更多"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ 组件规范 ══ -->
+        <section class="spec">
+          <h3>组件规范</h3>
+
+          <div class="spec-grid">
+            <div class="spec-box">
+              <div class="spec-label">按钮层级 · Filled &gt; Outlined &gt; Quiet &gt; Text</div>
+              <div class="btn-row">
+                <button class="btn btn-primary">开始下载</button>
+                <button class="btn btn-ghost">选择目录</button>
+                <button class="btn btn-quiet">取消</button>
+                <button class="btn btn-danger">清空队列</button>
+                <button class="btn btn-primary" disabled>已满</button>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-ghost btn-sm">小号</button>
+                <button class="btn btn-quiet btn-sm">小号文本</button>
+              </div>
+            </div>
+
+            <div class="spec-box">
+              <div class="spec-label">输入框 · 36px · 焦点走 glow-focus</div>
+              <div class="field">
+                <label>下载目录</label>
+                <input class="input" value="D:\Music\揽乐">
+              </div>
+              <div class="field">
+                <label>命名模板</label>
+                <input class="input" value="{歌手} - {歌名}" placeholder="使用 {歌手} {歌名} 变量">
+              </div>
+            </div>
+
+            <div class="spec-box">
+              <div class="spec-label">Toast · 状态由左侧色条承担，不带 emoji</div>
+              <div class="toast-stack">
+                <div class="toast ok"><i></i>下载完成 · 爱情转移.flac</div>
+                <div class="toast info"><i></i>已切换到备用源</div>
+                <div class="toast warn"><i></i>该平台需要登录，Cookie 已过期</div>
+                <div class="toast err"><i></i>写盘失败 · 目标目录无权限<span class="cnt">×3</span></div>
+              </div>
+            </div>
+
+            <div class="spec-box" style="padding:0;overflow:hidden;border:none;background:transparent;">
+              <div class="modal-demo">
+                <div class="modal-head">
+                  <span>新建歌单</span>
+                  <button class="modal-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+                </div>
+                <div class="modal-body">
+                  <div class="field">
+                    <label>歌单名称</label>
+                    <input class="input" value="深夜驾驶" placeholder="给歌单起个名字">
+                  </div>
+                  <div class="field">
+                    <label>描述（可选）</label>
+                    <input class="input" placeholder="一句话说明这个歌单">
+                  </div>
+                </div>
+                <div class="modal-foot">
+                  <button class="btn btn-quiet btn-sm">取消</button>
+                  <button class="btn btn-primary btn-sm">创建</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3 style="margin-top:var(--sp-4)">图标系统 · 24px 线性 stroke 1.6 · 全部 currentColor</h3>
+          <div class="spec-box">
+            <div class="icon-grid" id="iconGrid"></div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 底部播放条 ══ -->
+  <footer class="bottom-bar">
+    <div class="progress"><div class="progress-fill"></div></div>
+
+    <div class="pc-cover c1"></div>
+    <div class="pc-meta">
+      <div class="pc-title">爱情转移</div>
+      <div class="pc-artist">陈奕迅 <span class="pc-clock">01:36 / 04:12</span></div>
+    </div>
+    <div class="pc-controls">
+      <div class="ctrl-line">
+        <button class="ctrl" title="播放模式"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l10 10h3M4 17h3L17 7h3"/><path d="M18 4l2.5 3L18 10M18 14l2.5 3L18 20"/></svg></button>
+        <button class="ctrl" title="上一首"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M7 6h2v12H7zM18 6.5v11L9.5 12z"/></svg></button>
+        <button class="play-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 5.5v13l10.5-6.5z"/></svg>
+        </button>
+        <button class="ctrl" title="下一首"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M15 6h2v12h-2zM6 6.5v11L14.5 12z"/></svg></button>
+        <button class="ctrl" title="歌词"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h11M4 11h16M4 16h9M4 21h13"/></svg></button>
+      </div>
+    </div>
+    <div class="pc-tools">
+      <button class="ctrl" title="音质"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3M9 18V9M14 20V6M19 15v-3"/></svg></button>
+      <button class="ctrl" title="音量"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3L12 5.5v13L7 14.5H4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></button>
+      <div class="vol"><div class="vol-fill"></div></div>
+      <button class="ctrl" title="队列"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h12M4 12h12M4 17h8"/><path d="M18 12.5v6M18 12.5l3-1"/></svg></button>
+      <button class="ctrl" title="更多"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg></button>
+    </div>
+    <div></div>
+  </footer>
+</div>
+
+<!-- 评审用：主题切换 -->
+<div class="theme-switch">
+  <button class="on" data-t="void">Void</button>
+  <button data-t="light">Light</button>
+</div>
+
+<script>
+/* 极简图标集（真实落地时放进 js/icons.js，64 个；这里只放 24 个做对照） */
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  download: '<path d="M12 4v10m0 0l3.5-3.5M12 14l-3.5-3.5"/><path d="M4.5 18.5h15"/>',
+  play: '<path d="M9 5.5v13l10.5-6.5z"/>',
+  pause: '<path d="M9 5.5v13M15 5.5v13"/>',
+  prev: '<path d="M7 6h2v12H7zM18 6.5v11L9.5 12z"/>',
+  folder: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v7.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.6 5.4l-1.7 1.7M7.1 16.9l-1.7 1.7M18.6 18.6l-1.7-1.7M7.1 7.1L5.4 5.4"/>',
+  trash: '<path d="M4 7h16M9.5 7V5h5v2M6.5 7l1 12h9l1-12"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/>',
+  music: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+  disc: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.5"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>',
+  list: '<path d="M4 7h16M4 12h16M4 17h10"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  refresh: '<path d="M4 12a8 8 0 0 1 13.5-5.8M20 12a8 8 0 0 1-13.5 5.8"/><path d="M17.5 3v4h-4M6.5 21v-4h4"/>',
+  volume: '<path d="M4 9.5h3L12 5.5v13L7 14.5H4z"/><path d="M16 9a4 4 0 0 1 0 6"/>',
+  queue: '<path d="M4 7h12M4 12h12M4 17h8"/><path d="M18 12.5v6M18 12.5l3-1"/>',
+  sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+  flame: '<path d="M12 3.5c3.6 3.2 6 6 6 9a6 6 0 1 1-12 0c0-3 2.4-5.8 6-9z"/>',
+  bar: '<path d="M4 17V9M9 17V5M14 17v-5M19 17v-9"/>',
+  link: '<path d="M10 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.4 1.4"/><path d="M14 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.4-1.4"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.4 3.8 5.4 3.8 8.5S14.5 18.1 12 20.5c-2.5-2.4-3.8-5.4-3.8-8.5S9.5 5.9 12 3.5z"/>'
+};
+const FILLED = new Set(['play', 'pause', 'prev']);
+function icon(name, size) {
+  const body = ICONS[name];
+  if (!body) return '';
+  const fill = FILLED.has(name) ? 'currentColor' : 'none';
+  return `<svg width="${size||16}" height="${size||16}" viewBox="0 0 24 24" fill="${fill}"`
+       + ` stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+}
+const grid = document.getElementById('iconGrid');
+grid.innerHTML = Object.keys(ICONS).map(k =>
+  `<div class="icon-cell">${icon(k, 20)}<span>${k}</span></div>`
+).join('');
+
+/* 主题切换 */
+document.querySelectorAll('.theme-switch button').forEach(b => {
+  b.onclick = () => {
+    document.documentElement.dataset.theme = b.dataset.t;
+    document.querySelectorAll('.theme-switch button').forEach(x => x.classList.toggle('on', x === b));
+  };
+});
+</script>
+</body>
+</html>

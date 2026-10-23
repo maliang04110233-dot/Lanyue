@@ -94,7 +94,7 @@ test('点 chip 单清一条轴：只解这一条，另两条继续筛，按钮�
   globalThis.resetLocalFilterAxis('qual');
   assert.deepStrictEqual(shown(), ['b.mp3', 'c.flac'], '音质轴清掉后，缺封面还在筛（不该顺手全清）');
   assert.deepStrictEqual(chipTexts(), [metaModeLabel('no-cover')]);
-  assert.strictEqual(dom.element('localQualBtn').textContent, '🧪 音质', '清掉的轴按钮要回到关档文案');
+  assert.strictEqual(dom.element('localQualBtn').textContent, '音质', '清掉的轴按钮要回到关档文案');
   assert.ok(!dom.element('localQualBtn').classList.contains('active'), '关档不许还亮着');
 });
 

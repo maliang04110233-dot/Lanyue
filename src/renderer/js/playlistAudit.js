@@ -79,7 +79,7 @@ function _ensurePanel() {
     <div class="playlist-modal" style="min-width:520px;max-width:680px;max-height:82vh;display:flex;flex-direction:column;">
       <div class="playlist-modal-header">
         <span class="playlist-modal-title">🧬 歌单体检</span>
-        <button class="playlist-modal-close" onclick="closePlAudit()">✕</button>
+        <button class="playlist-modal-close" onclick="closePlAudit()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="playlist-modal-body" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;">
         <div id="plAuditGoalRow" style="display:flex;gap:8px;align-items:center;">

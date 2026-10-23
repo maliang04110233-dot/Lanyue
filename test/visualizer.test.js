@@ -56,13 +56,15 @@ test('所有权钉：visualizer.js 不创建任何音频节点（图唯一主是
   );
 });
 
-test('engine.js：analyser 已串入图尾（filters→analyser→destination）；eq.js 仍导出访问器', () => {
+test('audioPool.js：analyser 已串入图尾（filters→analyser→destination）；eq.js 仍导出访问器', () => {
   // 阶段 3 · P1：建图职责已从 eq.js 移交 playback/engine.js。
-  // 不变量不变（analyser 在滤波链尾、桥到 destination），断言宿主跟着搬家。
-  const engineSrc = read('src/renderer/js/playback/engine.js');
-  assert.match(engineSrc, /createAnalyser\s*\(\s*\)/, '引擎图中缺 AnalyserNode');
-  assert.match(engineSrc, /node\.connect\(analyser\)/, 'analyser 未接在滤波链尾');
-  assert.match(engineSrc, /analyser\.connect\(ctx\.destination\)/, 'analyser 未桥到 destination（会哑音）');
+  // 2026-10-21：建图职责进一步下沉到 playback/audioPool.js（交叉淡入淡出需要
+  // 两个实例，图必须按元素缓存）。不变量不变（analyser 在滤波链尾、桥到
+  // destination），断言宿主跟着搬家。
+  const poolSrc = read('src/renderer/js/playback/audioPool.js');
+  assert.match(poolSrc, /createAnalyser\s*\(\s*\)/, '池中缺 AnalyserNode');
+  assert.match(poolSrc, /node\.connect\(analyser\)/, 'analyser 未接在滤波链尾');
+  assert.match(poolSrc, /analyser\.connect\(context\.destination\)/, 'analyser 未桥到 destination（会哑音）');
 
   const eqSrc = read('src/renderer/js/player/eq.js');
   assert.match(eqSrc, /export function ensureAudioGraph/, 'ensureAudioGraph 未导出');

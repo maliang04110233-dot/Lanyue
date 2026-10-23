@@ -718,7 +718,7 @@ function openHomeChartModal(sec) {
         <span class="playlist-modal-title">${esc(_tr(meta.i18n, meta.title))} · ${esc(platformName(_platOf(sec)))}</span>
         <span class="home-chart-count">${esc(countText)}</span>
         <button class="btn-sm" onclick="playAllHomeChart('${escQ(sec)}')">${esc(_tr('home.playAllChartBtn', '▶ 播放全部'))}</button>
-        <button class="playlist-modal-close" aria-label="${escAttr(_tr('home.close', '关闭'))}" onclick="closeHomeChartModal()">✕</button>
+        <button class="playlist-modal-close" aria-label="${escAttr(_tr('home.close', '关闭'))}" onclick="closeHomeChartModal()" data-ico="x" data-ico-only></button>
       </div>
       <div class="playlist-modal-body" id="homeChartBody">${songRowsHtml(meta, pairs)}</div>
     </div>`;

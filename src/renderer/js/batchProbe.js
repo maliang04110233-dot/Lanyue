@@ -97,7 +97,9 @@ function showProbeReportModal(items) {
   title.textContent = `🔬 音质扫描报告（${items.length}）`;
   const close = document.createElement('button');
   close.className = 'edit-close';
-  close.textContent = '✕';
+  close.setAttribute('data-ico', 'x');
+  close.setAttribute('data-ico-only', '');
+  close.setAttribute('aria-label', '关闭');
   close.addEventListener('click', closeProbeReport);
   header.appendChild(title);
   header.appendChild(close);

@@ -133,7 +133,7 @@ function _ensureOverlay() {
     <div class="edit-panel" style="width:560px;">
       <div class="edit-header">
         <span class="edit-title">⏰ 定时下载</span>
-        <button class="edit-close" onclick="closeScheduledPanel()">✕</button>
+        <button class="edit-close" onclick="closeScheduledPanel()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="edit-body">
         <div class="sched-row">

@@ -105,7 +105,9 @@ function _renderTrendModal(buckets, total) {
   title.textContent = `📊 下载趋势 · 近 ${buckets.length} 天`;
   const close = document.createElement('button');
   close.className = 'edit-close';
-  close.textContent = '✕';
+  close.setAttribute('data-ico', 'x');
+  close.setAttribute('data-ico-only', '');
+  close.setAttribute('aria-label', '关闭');
   close.addEventListener('click', _closeTrendPanel);
   header.appendChild(title);
   header.appendChild(close);

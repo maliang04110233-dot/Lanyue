@@ -91,7 +91,7 @@ test('勾选可撤：每行都能被用户去掉，移除只收勾上的', () =>
 
 test('入口与面板齐全：歌单详情页有「修」按钮，app 引入模块', () => {
   assert.match(HTML, /onclick="openPlAudit\(/);
-  assert.match(HTML, /🧬 修/, '详情页要有可见入口');
+  assert.match(HTML, /data-ico="dna"[^>]*>修/, '详情页要有可见入口');
   assert.match(APP, /import '\.\/playlistAudit\.js';/, 'app.js 必须引入运维面板模块');
   for (const fn of ['openPlAudit', 'closePlAudit', 'runPlAudit', 'applyPlAuditRemove', 'applyPlAuditSuggest']) {
     assert.match(VIEW, new RegExp(`window\\.${fn} = ${fn}`), `${fn} 没挂 window（内联 onclick 只认 window）`);

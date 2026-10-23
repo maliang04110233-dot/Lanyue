@@ -17,7 +17,14 @@ test('nextLocalSortMode：七档循环，未知模式回默认', async () => {
   for (let i = 0; i < 7; i++) { m = nextLocalSortMode(m); seq.push(m); }
   assert.deepStrictEqual(seq, ['title', 'artist', 'duration-desc', 'size-desc', 'plays-desc', 'mtime-desc', 'default']);
   assert.strictEqual(nextLocalSortMode('nope'), 'default');
-  for (const mode of LOCAL_SORT_MODES) assert.ok(localSortLabel(mode).includes('↕'), mode);
+  /* 2026-10-23：轴图标改为由按钮上的 data-ico 承担（CSS mask 渲染），
+     文案本身不再带 ↕ 前缀。判据随之从「含 ↕」改为「非空且不含任何
+     emoji/几何符号」—— 这样既守住文案不空，也守住"符号不许回到字符串里"。 */
+  for (const mode of LOCAL_SORT_MODES) {
+    const label = localSortLabel(mode);
+    assert.ok(label && label.length > 0, mode);
+    assert.ok(!/[\u{2600}-\u{27BF}\u{1F300}-\u{1FAFF}]/u.test(label), `${mode} 的文案仍带符号：${label}`);
+  }
 });
 
 test('sortLocalSongs：plays-desc 按注入计数表降序，未播/缺表垫底保序', async () => {

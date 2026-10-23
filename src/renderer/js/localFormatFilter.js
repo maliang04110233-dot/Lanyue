@@ -1,7 +1,7 @@
 /**
  * 本地曲库「格式过滤」—— 纯函数（node 可单测，无 DOM 依赖）
  *
- * 与「♥ 仅收藏」「排序」同为会话级视图开关：只在曲库里实际存在的扩展名之间循环，
+ * 与「仅收藏」「排序」同为会话级视图开关：只在曲库里实际存在的扩展名之间循环，
  * 曲库没有的格式（如没下过 FLAC）不会出现，杜绝空转；
  * 当前格式随扫描失效时下一击自动回落 all。判定只看 filePath 扩展名，不碰文件内容。
  */
@@ -43,11 +43,11 @@ function nextFmtMode(mode, formats) {
 }
 
 /**
- * 按钮文案（mode 来自扩展名白名单，无注入面）：默认态报轴名「🎞 格式」= 不按格式筛，
+ * 按钮文案（mode 来自扩展名白名单，无注入面）：默认态报轴名「格式」= 不按格式筛，
  * 切到某一格式后只报扩展名；"有没有在筛"由 .active 高亮表示（views/local.js cycleLocalFmt）。
  */
 function fmtModeLabel(mode) {
-  return (!mode || mode === 'all') ? '🎞 格式' : `🎞 ${mode.toUpperCase()}`;
+  return (!mode || mode === 'all') ? '格式' : `${mode.toUpperCase()}`;
 }
 
 /** 按扩展名过滤视图歌曲；all/空/非法值原样返回（顺序不动） */

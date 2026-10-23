@@ -40,7 +40,6 @@
   --orange:    #fb923c;
   --gold:      #fbbf24;
   --radius:    12px;
-  --shadow:    0 4px 24px rgba(0,0,0,.5);
   --font:      'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
   /* ── 霓虹色板（保留：被各视图大量引用，逐轮收敛中） ── */
@@ -77,7 +76,7 @@
   --fw-normal: 400; --fw-med: 500; --fw-semi: 600; --fw-bold: 700;
   --lh-tight: 1.25;  --lh-base: 1.5;
   /* 动效（统一曲线，避免每处各写一个 ease） */
-  --dur-1: .12s; --dur-2: .2s; --dur-3: .32s;
+  --dur-1: .14s; --dur-2: .2s; --dur-3: .32s;
   --ease:     cubic-bezier(.4, 0, .2, 1);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
   /* 层级 */
@@ -107,8 +106,8 @@
 
   /* 文字层级（旧 --text-dim/-muted 保留兼容，新代码用 --fg-*） */
   --fg-1: var(--text);
-  --fg-2: color-mix(in srgb, var(--text) 66%, var(--bg-deep));
-  --fg-3: color-mix(in srgb, var(--text) 46%, var(--bg-deep));
+  --fg-2: color-mix(in srgb, var(--text) 62%, var(--bg-deep));
+  --fg-3: color-mix(in srgb, var(--text) 42%, var(--bg-deep));
 
   /* ══ UI 强调色 ═════════════════════════════════════════════════
      全应用只允许存在「一个」UI 强调色，就是它。
@@ -125,7 +124,7 @@
      现代播放器风格：阴影克制，层次主要靠 1px 描边 + 表面明度差。 */
   --shadow-sm: 0 1px 2px color-mix(in srgb, var(--bg-deep) 60%, transparent);
   --shadow-md: 0 4px 14px -4px color-mix(in srgb, var(--bg-deep) 70%, transparent);
-  --shadow-lg: 0 16px 40px -12px color-mix(in srgb, var(--bg-deep) 85%, transparent);
+  --shadow-lg: 0 24px 64px -24px color-mix(in srgb, var(--bg-deep) 88%, transparent);
   --focus-ring: color-mix(in srgb, var(--accent-ui) 70%, transparent);
 
   /* ══ S2 Void Glass 派生令牌（跨主题级联） ═════════════════════
@@ -137,6 +136,81 @@
   --glow-primary: 0 0 20px 4px var(--accent-glow);
   /* 换源扫描线颜色（S4）：主色 35% 透明，各主题自动跟随 */
   --scan-color: color-mix(in srgb, var(--accent-ui) 35%, transparent);
+
+  /* ══ v2 极夜玻璃 Plus（2026-10-23）═════════════════════════════
+     全站视觉重构的令牌层。全部派生自上面已有的基色，因此 6 套主题
+     不需要各写一遍 —— 加令牌 = 自动获得 6 套主题支持。
+     纪律：新代码一律用这里的令牌，旧令牌保留兼容并逐批收敛。
+
+     ⚠ 本区块必须留在这个 :root 内。test/css-token-integrity.test.js
+       会把任何新的 :root{} 当成第 7 套主题并要求齐备 11 个核心令牌。 */
+
+  /* ── 表面阶梯 ──────────────────────────────────────────────
+     0=页面底 1=卡片 2=卡内浮层 3=悬停/选中。数字越大离观者越近，
+     层级靠明度差表达而非阴影（深色界面里阴影几乎不可见）。 */
+  --surface-0: var(--bg-deep);
+  --surface-1: var(--bg-card);
+  --surface-2: color-mix(in srgb, var(--bg-card) 92%, var(--text) 8%);
+  --surface-3: color-mix(in srgb, var(--bg-card) 82%, var(--text) 18%);
+  --surface-glass: color-mix(in srgb, var(--bg-card) 72%, transparent);
+  --surface-veil:  color-mix(in srgb, var(--bg-deep) 74%, transparent);
+
+  /* ── 描边四档 ──────────────────────────────────────────────
+     0=几乎不可见的分隔（表格行）  1=常规容器  2=悬停/聚焦容器
+     3=需要强调的边界（选中、拖拽目标）。--rim 是卡片顶部 1px 高光，
+     制造「有厚度的玻璃」错觉，是玻璃拟态比纯半透明高级的关键。 */
+  --stroke-0: color-mix(in srgb, var(--text) 5%, transparent);
+  --stroke-3: color-mix(in srgb, var(--text) 26%, transparent);
+  --rim: inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+
+  /* ── 排版补充 ──────────────────────────────────────────────
+     --fs-2xs / --fs-body 补上此前缺失的 10px 与 14px 两档（原体系
+     从 13px 直接跳到 15px，44 处只能写裸值）。--fs-hero 用 clamp
+     让首页主标题在 900px~2560px 窗口间连续缩放，不用媒体查询。
+   --track-* 字距：中文正文放宽 .01em 更透气，大标题收紧 -.012em
+   让「扬」这类字形不散。 */
+  --fs-2xs: 10px;
+  --fs-body: 14px;
+  --fs-hero: clamp(26px, 2.2vw, 34px);
+  --track-cjk: .01em;
+  --track-tight: -.012em;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Semibold', 'PingFang SC',
+                  'Microsoft YaHei UI', system-ui, sans-serif;
+
+  /* ── 间距补齐 ──────────────────────────────────────────────
+     8pt 网格成形：0-5 半档给图标与文字对齐，7/10/12/16 给版面留白。
+     原体系缺 28/40/48/64 四档，导致大留白只能写死 px。 */
+  --sp-0-5: 2px; --sp-7: 28px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
+
+  /* ── 圆角补充 ────────────────────────────────────────────────
+     --r-2xl 给弹层与沉浸式播放页（28px 与 14px 之间跨度太大）。 */
+  --r-2xl: 28px;
+
+  /* ── 动效补充 ──────────────────────────────────────────────
+     --dur-0 给「即时反馈」（按压、勾选），比 --dur-1 更短才不粘手。
+     --ease-emph 用于较大的位移（面板滑入），起步更快、收尾更缓。
+     --ease-spring 仅用于「可回弹」的小元件（播放键、开关）。 */
+  --dur-0: .09s;
+  --dur-4: .42s;
+  --ease-emph: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .64, 1);
+
+  /* ── 阴影补充 ──────────────────────────────────────────────
+     --shadow-xl 给浮层/弹层（原最大只有 40px 偏移，撑不起遮罩层）。
+     --glow-focus 把焦点环做成 1px 实线 + 4px 光晕两层，比单层描边
+     更清楚又不刺眼。 */
+  --shadow-xl: 0 32px 80px -32px color-mix(in srgb, var(--bg-deep) 92%, transparent);
+  --glow-focus: 0 0 0 1px var(--accent-line), 0 0 0 4px var(--accent-soft);
+
+  /* ── 布局尺度 ──────────────────────────────────────────────
+     --content-max: 内容区定宽。此前用 clamp(16px,8vw,140px) 做左右
+       留白，1920px 屏上内容被拉到 1640px，八张卡一字排开 —— 这是
+       「不大气」的结构性原因。改为定宽居中后，宽屏留白、窄屏自适应。
+     --gutter: 顶栏与内容区共用的左右内边距，替换散落的 vw 计算。 */
+  --content-max: 1180px;
+  --gutter: clamp(20px, 3vw, 48px);
+  --topbar-h: 64px;
+  --bb-h: 84px;
 }
 
 /* ── 浅色主题 ─────────────────────────────────────── */
@@ -158,7 +232,6 @@
   --gold-dim: rgba(217,119,6,0.12);
   --orange:    #ea580c;
   --gold:      #d97706;
-  --shadow:    0 2px 12px rgba(0,0,0,.08);
   --neon-cyan:       #0d9488;
   --neon-cyan-dim:   rgba(13,148,136,0.1);
   --neon-purple:     #7c3aed;
@@ -194,7 +267,6 @@
   --gold-dim: rgba(255,204,0,0.15);
   --orange:    #ff9900;
   --gold:      #ffcc00;
-  --shadow:    0 0 20px rgba(0,255,255,.15);
   --neon-cyan:       #00ffff;
   --neon-cyan-dim:   rgba(0,255,255,0.15);
   --neon-purple:     #ff00ff;
@@ -229,7 +301,6 @@
   --gold-dim: rgba(255,190,11,0.15);
   --orange:    #ffd166;
   --gold:      #ffbe0b;
-  --shadow:    0 4px 20px rgba(0,0,0,.3);
   --neon-cyan:       #00d4aa;
   --neon-cyan-dim:   rgba(0,212,170,0.15);
   --neon-purple:     #7b68ee;
@@ -264,7 +335,6 @@
   --gold-dim: rgba(255,215,0,0.15);
   --orange:    #ffa500;
   --gold:      #ffd700;
-  --shadow:    0 4px 20px rgba(0,0,0,.35);
   --neon-cyan:       #ff6b6b;
   --neon-cyan-dim:   rgba(255,107,107,0.15);
   --neon-purple:     #ffa500;
@@ -299,7 +369,6 @@
   --gold-dim: rgba(218,165,32,0.15);
   --orange:    #ffa500;
   --gold:      #daa520;
-  --shadow:    0 4px 20px rgba(0,0,0,.35);
   --neon-cyan:       #32cd32;
   --neon-cyan-dim:   rgba(50,205,50,0.15);
   --neon-purple:     #90ee90;
@@ -337,7 +406,6 @@
   --gold-dim: rgba(245,166,35,0.15);
   --orange:    #ffa500;
   --gold:      #f5a623;
-  --shadow:    0 8px 32px rgba(0,0,0,.6);
   --neon-cyan:       #00e5ff;
   --neon-cyan-dim:   rgba(0,229,255,0.15);
   --neon-purple:     #7c3aed;

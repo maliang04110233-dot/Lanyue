@@ -83,7 +83,7 @@ test('接线：历史页重下入口二次判活、用 deadEntries、确认之�
 
 test('接线：工具栏按钮只在当前页真有失效行时出现（常态零占位，绕开头部拥挤）', () => {
   const html = read('src/renderer/index.html');
-  assert.match(html, /<button class="tab" id="historyRedlBtn" onclick="redownloadDeadHistory\(\)"[^>]*hidden>/);
+  assert.match(html, /<button class="tab" id="historyRedlBtn" onclick="redownloadDeadHistory\(\)"[^>]*hidden[^>]*>/);
   const src = read('src/renderer/js/views/history.js');
   assert.match(src, /historyRedlBtn/);
   assert.match(src, /\.hidden = /);               // 渲染时按当页死账数决定显隐

@@ -69,7 +69,7 @@ function _ensureOverlay() {
     <div class="edit-panel" style="width:560px;">
       <div class="edit-header">
         <span class="edit-title">🎤 按歌名批量导入</span>
-        <button class="edit-close" onclick="closeNameBatch()">✕</button>
+        <button class="edit-close" onclick="closeNameBatch()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="edit-body">
         <textarea id="nameBatchText" class="edit-input batch-import-text" rows="6"

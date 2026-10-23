@@ -246,15 +246,71 @@ function createResolveTrackService({
    *
    * @param {import('../../shared/dto').Song} rawSong
    * @param {string} [quality]
+   * @param {object} [options] 单次调用的行为覆盖（不改全局设置）
+   * @param {boolean} [options.allowToggleSource] 覆盖跨源换源总开关。
+   *        缺省 ⇒ 读注入的 fallbackEnabled（现有行为，零回归）。
+   *        **必须显式区分「未传」与「传 false」** —— 用 typeof 判定而非 ??，
+   *        否则 null 会被当成「未传」而悄悄放开了换源。
+   * @param {(event: {type:'toggled', from:string, to:string, matchedSong?:object}) => void}
+   *        [options.onToggleSource] 换源回调：只在**真正发生切换**时调用
+   *        （记忆路径与候选路径），本源成功不调用。给程序化消费方
+   *        （MCP 工具 / AI 助手）一个事件通道 —— 它们从结果对象里读不到
+   *        「中途换过源」这件事。
+   * @param {boolean} [options.isRefresh] 强制重新解析，**跳过 `_altSource` 记忆**，
+   *        强制走本源重新取流。
+   *
+   *        语义澄清（这一点与 spotube 的同名参数不同）：
+   *        Lanyue 的**取流链路没有 URL 缓存层** —— `gateway.getUrl` 每次都重新
+   *        调平台插件解析直链，渲染层的预取缓存（`playPrefetch.js`）又是
+   *        「取用即失效」，一条直链只用一次。所以「绕过 URL 缓存」在这里
+   *        **没有可绕的缓存**。
+   *
+   *        真正需要强制重解析的是 **`_altSource` 记忆**：上次换源成功的源会被
+   *        优先尝试，而那条链可能已经失效（平台改了签名算法、换了 CDN、
+   *        歌曲被下架重上）。此时「我怀疑记忆里那条源不行了，要重新找」就是
+   *        本参数要表达的意思。
+   *
+   *        **不替代** streamProtocol 的 refreshUpstreamOn403 —— 那是播放中
+   *        收到 403 的被动同源重取（主进程内，不跨进程）；本参数解决的是
+   *        「还没开始播，但我怀疑记忆里那条链不行」这个**另一个时机**。
+   *        两者不得互相调用。
    * @returns {Promise<import('../../shared/dto').TrackResult>}
    */
-  async function resolve(rawSong, quality) {
+  async function resolve(rawSong, quality, options = {}) {
     const song = normalizeSong(rawSong);
     if (!song.id || !song.source) {
       return normalizeTrackResult({ error: '参数无效：缺少歌曲 id/source', code: 'INVALID_ARGS' });
     }
     _disabledCache = null; // 每次解析重读偏好：设置页改完即刻生效，无需重启队列
     _fallbackCache = null; // 同上：换源总开关改动即刻生效
+
+    /**
+     * 本次调用的换源许可。
+     *
+     * 优先级：options.allowToggleSource（显式布尔）> 注入的全局开关。
+     * 用 `typeof === 'boolean'` 判定「是否显式传了」——
+     * `options.allowToggleSource ?? crossSourceOn()` 会把 null 当成「未传」，
+     * 而 null 极可能来自「上游把参数原样透传但值是空」的情形。
+     */
+    const allowToggle = typeof options.allowToggleSource === 'boolean'
+      ? options.allowToggleSource
+      : crossSourceOn();
+
+    /**
+     * 换源事件回调（可选）。
+     *
+     * 抛错必须被吞掉：回调是**观察者**，不是控制者。
+     * 它抛错不该让一首歌播不出来 —— 与 `record()` 的容错纪律一致
+     * （统计不可用不影响取流主流程）。
+     */
+    const notifyToggled = (from, to, matchedSong) => {
+      if (typeof options.onToggleSource !== 'function') return;
+      try {
+        options.onToggleSource({ type: 'toggled', from, to, matchedSong });
+      } catch (e) {
+        logger.warn('[ResolveTrack] onToggleSource 回调抛错（已忽略）:', (e && e.message) || e);
+      }
+    };
 
     /**
      * 试听片段校验（纯元数据，零网络）：三条取流路径共用。
@@ -270,14 +326,20 @@ function createResolveTrackService({
     //    登录/Cookie 后，队列里带着旧换源记忆的歌（_altSource 随 play-queue
     //    持久化）会永远绕回别家源，本源 VIP 明明已可用却不再被尝试。
     //
+    //    isRefresh 时**整段记忆跳过**：调用方明确表示「记忆里那条链不行了，
+    //    重新找」。此时本源优先（步骤 2），失败后照常走跨源候选。
+    //
     // 三条取流路径（记忆 / 本源 / 候选）一律过 verifyPreviewClip：试听片段判定只用
     // 元数据，零新增请求；记忆路径尤其不能免检 —— 一旦某次换源落在了酷我占位片上，
     // 记忆会让后续每次播放都直接回吐那段 11 秒。
     const alt = rawSong && rawSong._altSource;
-    if (crossSourceOn() && alt && alt.source && alt.id && alt.source !== song.source && !hasCookie(song.source)
+    const skipAltMemory = options.isRefresh === true;
+    if (!skipAltMemory
+        && allowToggle && alt && alt.source && alt.id && alt.source !== song.source && !hasCookie(song.source)
         && !disabledPlatforms().has(alt.source)) {
       const r = await trySource(String(alt.id), alt.source, quality, verifyPreviewClip);
       if (isTrackSuccess(r)) {
+        notifyToggled(song.source, alt.source, null);
         return normalizeTrackResult({
           ...r, source: alt.source, matchedFrom: song.source, fromAltMemory: true,
         });
@@ -294,7 +356,7 @@ function createResolveTrackService({
     // 3. 失败且可换源 ⇒ 跨源候选逐个尝试
     //    总开关关闭时这一步整体跳过：用户诉求是「播放即本源，本源没有音源就诚实失败」，
     //    宁可少播一首，也不要拿别家平台的版本冒充这首歌。
-    if (!crossSourceOn() || !shouldFallbackToOtherSource(result)) {
+    if (!allowToggle || !shouldFallbackToOtherSource(result)) {
       return normalizeTrackResult(result);
     }
 
@@ -333,6 +395,7 @@ function createResolveTrackService({
       const r = await trySource(String(cand.id), cand.source, quality, verifyCandidate);
       if (isTrackSuccess(r)) {
         logger.log(`[ResolveTrack] 换源成功: "${song.title}" ${song.source} → ${cand.source}`);
+        notifyToggled(song.source, cand.source, cand);
         return normalizeTrackResult({
           ...r, source: cand.source, matchedSong: cand, matchedFrom: song.source,
         });

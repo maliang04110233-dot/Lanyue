@@ -41,10 +41,41 @@ function register() {
   });
 
   // 智能取流（换源）：渲染层播放链路用——本源失败自动跨源找同曲
-  handle('get-download-url-smart', async (_, song, quality) => {
+  //
+  // options 是 2026-10-22 新增的第三参（P0 换源参数化，见
+  // docs/design/P0-fallback-params.md）：
+  //   { allowToggleSource?, isRefresh?, onToggleSource? }
+  //
+  // 安全约束：
+  //   · onToggleSource 是**函数**，无法跨进程传递，因此这个键**永远不该出现**
+  //     在渲染层发来的 options 里 —— 主进程收到就丢弃并告警。函数回调只能在
+  //     主进程侧构造（见 MCP 工具面），或渲染层自己持有（不经过本通道）。
+  //   · 允许透传的是 allowToggleSource / isRefresh 两个布尔值。
+  //   · 契约规格是 t.obj()（只做形状检查），内部字段的语义校验放在这里。
+  handle('get-download-url-smart', async (_, song, quality, rawOptions) => {
+
+    // 只摘取并校验可透传的两个布尔键。onToggleSource 若是函数，
+    // 序列化后已经变成 null/丢失，这里再加一道防线防止未来调用方传错。
+    // 初始值是 undefined 而非 null：service 层 resolve() 的第三参默认值
+    // `options = {}` 只对 undefined 生效 —— 传 null 会让
+    // `options.allowToggleSource` 直接抛 TypeError。
+    let options = undefined;
+    if (rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)) {
+      const cleaned = {};
+      if (typeof rawOptions.allowToggleSource === 'boolean') {
+        cleaned.allowToggleSource = rawOptions.allowToggleSource;
+      }
+      if (rawOptions.isRefresh === true) {
+        cleaned.isRefresh = true;
+      }
+      if (typeof rawOptions.onToggleSource === 'function') {
+        logger.warn('[stream] onToggleSource 是函数，无法跨 IPC 传递，已忽略');
+      }
+      if (Object.keys(cleaned).length > 0) options = cleaned;
+    }
 
     try {
-      return await api.getDownloadUrlSmart(song, quality);
+      return await api.getDownloadUrlSmart(song, quality, options);
     } catch (e) {
       logger.warn('智能取流失败:', e.message || e);
       return { error: e.message || e };

@@ -1,5 +1,5 @@
 /**
- * 本地曲库「🗂 文件夹分组」
+ * 本地曲库「文件夹分组」
  *
  * 歌手/专辑分组把名称写进关键词过滤框，但过滤框只匹配 title/artist/album，
  * 路径永远进不去——文件夹视图需要独立的「当前文件夹」状态，在 filterLocalSongs
@@ -135,10 +135,12 @@ function _renderPanel(groups, songs) {
   const title = document.createElement('span');
   title.className = 'edit-title';
   const totalSongs = groups.reduce((a, g) => a + g.count, 0);
-  title.textContent = `🗂 文件夹分组 · ${groups.length} 组 / ${totalSongs} 首`;
+  title.textContent = `文件夹分组 · ${groups.length} 组 / ${totalSongs} 首`;
   const close = document.createElement('button');
   close.className = 'edit-close';
-  close.textContent = '✕';
+  close.setAttribute('data-ico', 'x');
+  close.setAttribute('data-ico-only', '');
+  close.setAttribute('aria-label', '关闭');
   close.addEventListener('click', () => _closePanel());
   header.appendChild(title);
   header.appendChild(close);
@@ -153,7 +155,7 @@ function _renderPanel(groups, songs) {
   if (_activeFolder) {
     const clear = document.createElement('div');
     clear.style.cssText = 'padding:6px 4px;margin-bottom:4px;cursor:pointer;border:1px dashed var(--stroke-2);border-radius:6px;font-size:12px;';
-    clear.textContent = '🗂 全部文件夹（清除当前过滤）';
+    clear.textContent = '全部文件夹（清除当前过滤）';
     clear.addEventListener('click', () => _apply(null));
     body.appendChild(clear);
   }

@@ -654,7 +654,7 @@ function _ensurePlAddModal() {
     <div class="playlist-modal" style="min-width:420px;max-width:560px;max-height:70vh;display:flex;flex-direction:column;">
       <div class="playlist-modal-header">
         <span class="playlist-modal-title">${t('pl.add.title')}</span>
-        <button class="playlist-modal-close" onclick="closePlaylistAddSongs()">✕</button>
+        <button class="playlist-modal-close" onclick="closePlaylistAddSongs()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div style="display:flex;gap:8px;padding:12px 16px 4px;">
         <input type="text" class="setting-input" id="plAddInput" placeholder="${t('pl.add.placeholder')}" style="flex:1;" onkeydown="if(event.key==='Enter')doPlAddSearch()">
@@ -801,7 +801,7 @@ function _ensurePlMergeModal() {
     <div class="playlist-modal" style="min-width:420px;max-width:560px;max-height:70vh;display:flex;flex-direction:column;">
       <div class="playlist-modal-header">
         <span class="playlist-modal-title">${t('pl.merge.title')}</span>
-        <button class="playlist-modal-close" onclick="closePlaylistMergePicker()">✕</button>
+        <button class="playlist-modal-close" onclick="closePlaylistMergePicker()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div id="plMergeList" class="playlist-modal-body" style="flex:1;min-height:0;overflow-y:auto;padding:8px 16px 16px;"></div>
     </div>`;
@@ -945,7 +945,7 @@ function showDedupeModal(groups) {
     <div class="playlist-modal" style="max-width:540px;">
       <div class="playlist-modal-header">
         <span class="playlist-modal-title">🧮 跨歌单重复 · ${groups.length} 首</span>
-        <button class="playlist-modal-close" onclick="closeDedupeScanModal()">✕</button>
+        <button class="playlist-modal-close" onclick="closeDedupeScanModal()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="playlist-modal-body" style="max-height:60vh;overflow-y:auto;">
         ${groups.map((g, i) => `

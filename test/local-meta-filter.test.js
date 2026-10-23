@@ -97,10 +97,10 @@ test('all / 未知模式原样浅拷贝；脏输入不炸', async () => {
 
 test('文案：每个 mode 一句话，未知 mode 回落全部（按钮文字来自函数，不散落字面量）', async () => {
   const { metaModeLabel, META_MODES } = await fresh();
-  assert.equal(metaModeLabel('all'), '🏷 完整度');
-  assert.equal(metaModeLabel('no-lyric'), '🏷 缺内嵌歌词');
-  assert.equal(metaModeLabel('weird'), '🏷 完整度');
-  for (const m of META_MODES) assert.ok(metaModeLabel(m).startsWith('🏷 '), m);
+  assert.equal(metaModeLabel('all'), '完整度');
+  assert.equal(metaModeLabel('no-lyric'), '缺内嵌歌词');
+  assert.equal(metaModeLabel('weird'), '完整度');
+  for (const m of META_MODES) assert.ok(metaModeLabel(m).startsWith(''), m);
 });
 
 test('接线钉：local.js 管线 + 循环函数 + window 桥 + HTML 按钮 + 面板项，纯函数模块零 DOM', () => {

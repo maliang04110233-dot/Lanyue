@@ -274,7 +274,7 @@ const LOCAL_AXES = [
     get: () => _localFavOnly,
     set: (m) => { _localFavOnly = m; },
     next: (m) => !m,                                  // 两态：开↔关
-    label: (m) => (m ? '♥ 仅收藏' : '♥ 收藏'),
+    label: (m) => (m ? '仅收藏' : '收藏'),
     isActive: (m) => !!m,
   },
   {
@@ -1086,7 +1086,7 @@ function openBatchRename() {
     <div class="stats-panel rename-panel">
       <div class="stats-header">
         <span>📝 批量重命名 ${count} 首</span>
-        <button onclick="document.getElementById('renameModal').remove()">✕</button>
+        <button onclick="document.getElementById('renameModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button>
       </div>
       <div class="stats-body">
         <div class="rename-section">

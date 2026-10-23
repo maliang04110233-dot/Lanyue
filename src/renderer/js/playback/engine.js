@@ -40,20 +40,21 @@ const MODES = Object.freeze(['order', 'shuffle', 'single', 'list-loop']);
 /** 蓝图第 4 节的状态全集 */
 const STATES = Object.freeze(['idle', 'loading', 'playing', 'paused', 'error']);
 
+import { createAudioPool } from './audioPool.js';
+import { EQ_BANDS } from './eqBands.js';
+
 /**
- * EQ 五段频段定义 —— **必须与 player/eq.js:36-42 逐字一致**。
- * 这里复制而不是 import，是因为 eq.js 依赖 DOM（document.getElementById），
- * 而引擎的硬约束是零 DOM 依赖（否则无法在 node:test 里跑）。
- * 两侧一致性由 t3 的 eq.js 改造守卫：eq.js 改为消费引擎的图之后，
- * 频段只有引擎这一份，不会漂移。
+ * EQ 五段频段定义 —— **唯一事实来源是 playback/eqBands.js**。
+ *
+ * 此前这里内联复制了一份（原注释：「必须与 player/eq.js:36-42 逐字一致。
+ * 这里复制而不是 import，是因为 eq.js 依赖 DOM」）。绕开 DOM 依赖的正解
+ * 不是复制数据，而是把纯数据抽到零依赖模块里 —— 现在 engine、audioPool
+ * 与（改造后的）eq.js 三方都从 eqBands.js 引入，漂移从「靠测试盯」
+ * 变成「结构上不可能」。
+ *
+ * 频段数值一字未改：改它等于改 EQ 曲线手感。
  */
-const EQ_BANDS = Object.freeze([
-  { freq: 60, type: 'lowshelf' },
-  { freq: 230, type: 'peaking' },
-  { freq: 910, type: 'peaking' },
-  { freq: 3600, type: 'peaking' },
-  { freq: 14000, type: 'highshelf' },
-]);
+export { EQ_BANDS };
 
 function clampVolume(v) {
   const n = Number(v);
@@ -81,9 +82,12 @@ function clampRate(r) {
  * @param {Function|null} [deps.audioContextFactory] 可选 AudioContext 工厂。
  *        默认取 window.AudioContext；测试注入假工厂即可在 node:test 里
  *        断言「图只建一次」——幂等性因此是可执行的，而不是靠肉眼读代码。
+ * @param {object|null} [deps.audioPool]             可选实例池（交叉淡入淡出用）。
+ *        不传时把单个 audio 包成单实例池，**旧调用方无需改动**。
  */
 export function createPlaybackEngine({
   audio,
+  audioPool = null,
   resolveTrack,
   proxyPlay,
   saveProgress,
@@ -93,7 +97,7 @@ export function createPlaybackEngine({
 } = {}) {
   // 早失败优于静默失效：缺哪一项就说清哪一项
   const missing = [];
-  if (!audio) missing.push('audio');
+  if (!audio && !audioPool) missing.push('audio');
   if (typeof resolveTrack !== 'function') missing.push('resolveTrack');
   if (typeof proxyPlay !== 'function') missing.push('proxyPlay');
   if (typeof saveProgress !== 'function') missing.push('saveProgress');
@@ -104,6 +108,27 @@ export function createPlaybackEngine({
 
   function warn(...args) {
     if (logger && typeof logger.warn === 'function') logger.warn('[playback-engine]', ...args);
+  }
+
+  /**
+   * 实例池。旧调用方传单个 audio，这里把它包成单实例池 ——
+   * 这样「多实例」这条新能力不需要改动任何既有调用点。
+   *
+   * audioContextFactory 转给池：AudioContext 的所有权在**池**（全池共享一个），
+   * 引擎不再自己解析它 —— 否则同一份工厂逻辑会有两处实现。
+   */
+  const pool = audioPool || createAudioPool({
+    elements: { primary: audio },
+    audioContextFactory,
+    logger,
+  });
+
+  /** 当前主实例 id（交叉淡入淡出会在 primary / secondary 之间迁移） */
+  let primaryId = 'primary';
+
+  /** 取当前主实例的元素。既有代码里所有 `audio.xxx` 都经它拿。 */
+  function activeAudio() {
+    return pool.getElement(primaryId) || audio;
   }
 
   // ── 内部状态：唯一事实来源 ──────────────────────────────
@@ -117,33 +142,13 @@ export function createPlaybackEngine({
   let muted = false;
   let rate = 1;
 
-  /** 音频图（EQ / 频谱）。audioGraphAttempted 是「已尝试过」的显式标志。 */
-  let audioGraph = null;
-  let audioGraphAttempted = false;
-
-  /** 取一个 AudioContext：优先注入的工厂，其次浏览器全局。 */
-  function resolveAudioContext() {
-    if (typeof audioContextFactory === 'function') {
-      try {
-        return audioContextFactory();
-      } catch (e) {
-        warn('注入的 audioContextFactory 抛错:', e && e.message);
-        return null;
-      }
-    }
-    if (typeof window !== 'undefined') {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (typeof AC === 'function') {
-        try {
-          return new AC();
-        } catch (e) {
-          warn('创建 AudioContext 失败:', e && e.message);
-          return null;
-        }
-      }
-    }
-    return null;
-  }
+  /**
+   * 每个实例的**交叉增益**（0..1），缺省 1（即不参与交叉）。
+   *
+   * 实际音量 = 用户音量 × 该实例的交叉增益。交叉层只改这个值，
+   * 由引擎统一落到元素上 —— 音量写手仍然只有引擎一个。
+   */
+  const instanceGains = new Map();
 
   /** 订阅者集合。广播时遍历副本，允许回调里退订。 */
   const subscribers = new Set();
@@ -156,12 +161,13 @@ export function createPlaybackEngine({
   let suppressAudioEvents = false;
 
   function snapshot() {
+    const el = activeAudio();
     return {
       state,
       song: currentSong,
       error: lastError,
-      position: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
-      duration: Number.isFinite(audio.duration) ? audio.duration : 0,
+      position: Number.isFinite(el.currentTime) ? el.currentTime : 0,
+      duration: Number.isFinite(el.duration) ? el.duration : 0,
       volume,
       muted,
       rate,
@@ -222,9 +228,11 @@ export function createPlaybackEngine({
     }
   }
 
-  function onError() {
+  function onError(event) {
     if (suppressAudioEvents) return;
-    const mediaError = audio.error || null;
+    // 事件来自哪个实例就用哪个实例的 error —— 多实例下不能用主实例的
+    const el = (event && event.target) || activeAudio();
+    const mediaError = el.error || null;
     setError({
       code: 'DECODE_ERROR',
       message: mediaError && mediaError.message
@@ -245,13 +253,44 @@ export function createPlaybackEngine({
     broadcast();
   }
 
-  audio.addEventListener('playing', onPlaying);
-  audio.addEventListener('play', onPlaying);
-  audio.addEventListener('pause', onPause);
-  audio.addEventListener('ended', onEnded);
-  audio.addEventListener('error', onError);
-  audio.addEventListener('timeupdate', onTimeUpdate);
-  audio.addEventListener('loadedmetadata', onLoadedMetadata);
+  /**
+   * 把音频事件挂到**每一个**实例上。
+   *
+   * 为什么不能只挂主实例：交叉淡入淡出时，副实例会先 `playing`、
+   * 主实例后 `ended`。只挂主实例的话，副实例的 playing 收不到 ——
+   * 而那正是「新歌真的开始响了」的信号。
+   *
+   * 为什么不在 attach 时才挂：attach 是后加的入口，挂载逻辑分散两处
+   * 容易漏。这里统一在池的实例列表变化时重挂（幂等：先解绑再绑）。
+   */
+  const boundElements = new Set();
+  function bindInstanceEvents() {
+    for (const id of pool.listIds()) {
+      const el = pool.getElement(id);
+      if (!el || boundElements.has(el)) continue;
+      el.addEventListener('playing', onPlaying);
+      el.addEventListener('play', onPlaying);
+      el.addEventListener('pause', onPause);
+      el.addEventListener('ended', onEnded);
+      el.addEventListener('error', onError);
+      el.addEventListener('timeupdate', onTimeUpdate);
+      el.addEventListener('loadedmetadata', onLoadedMetadata);
+      boundElements.add(el);
+    }
+  }
+  function unbindInstanceEvents() {
+    for (const el of boundElements) {
+      el.removeEventListener('playing', onPlaying);
+      el.removeEventListener('play', onPlaying);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('ended', onEnded);
+      el.removeEventListener('error', onError);
+      el.removeEventListener('timeupdate', onTimeUpdate);
+      el.removeEventListener('loadedmetadata', onLoadedMetadata);
+    }
+    boundElements.clear();
+  }
+  bindInstanceEvents();
 
   // ── 驱动面 ────────────────────────────────────────────
   async function loadTrack(song, options = {}) {
@@ -277,8 +316,9 @@ export function createPlaybackEngine({
       const prevSuppress = suppressAudioEvents;
       suppressAudioEvents = true;
       try {
-        audio.src = url;
-        if (typeof audio.load === 'function') audio.load();
+        const el = activeAudio();
+        el.src = url;
+        if (typeof el.load === 'function') el.load();
       } finally {
         suppressAudioEvents = prevSuppress;
       }
@@ -298,7 +338,7 @@ export function createPlaybackEngine({
     try {
       // 假元素/真实元素的 play() 都会在返回前同步派发 'play'，
       // 所以状态会在本函数返回前就落到 playing（测试据此断言）
-      await audio.play();
+      await activeAudio().play();
     } catch (e) {
       setError({ code: 'ABORTED', message: (e && e.message) ? String(e.message) : '播放被中断' });
       setState('error');
@@ -307,11 +347,40 @@ export function createPlaybackEngine({
 
   function pause() {
     try {
-      audio.pause();
+      activeAudio().pause();
     } catch (e) {
       warn('pause 失败:', e && e.message);
     }
     if (currentSong && state === 'playing') setState('paused');
+  }
+
+  /**
+   * 交叉淡入淡出到另一首歌。
+   *
+   * ⚠️ 未实现 —— 有意留白，不要当成可用能力
+   * ----------------------------------------
+   * 需要它成立，前置条件是**引擎成为生产播放路径**：`player.js` 目前用模块级
+   * `audio` 元素直连（`loadAndPlay` 写 `audio.src` / `audio.play()`），
+   * 根本不走引擎 —— `docs/architecture/PLAYBACK-ENGINE.md` 明确记载引擎是
+   * 「旁路建好的缝」，阶段 3 才迁移 11 个调用方。
+   *
+   * 为什么不做半成品
+   * --------------
+   * crossfade 需要「预载到第二个实例」。但 `loadTrack()` 只认 `activeAudio()`
+   * （主实例），不接受实例 id；而创建第二个 `<audio>` 需要 DOM，会破坏本文件
+   * 「零 DOM 依赖、可在 node:test 单测」的硬约束。硬塞进来只有两种结果：
+   * 要么预载静默失效（歌仍载进主实例），要么引擎背上 DOM 依赖。
+   *
+   * 正确顺序：阶段 3 把播放路径迁到引擎 → 引擎获得 DOM 装配职责 →
+   * 再实现本方法。届时 `playback/crossfade.js`（编排层）与 `audioPool.js`
+   * （实例池）已就位，这里只是接线。
+   *
+   * @param {object} song
+   * @returns {Promise<null>} 恒为 null —— 调用方需自行降级到硬切
+   */
+  async function crossfadeTo(song) {
+    warn('crossfadeTo 未实现：引擎尚未接入生产播放路径，降级为硬切');
+    return null;
   }
 
   function toggle() {
@@ -323,7 +392,7 @@ export function createPlaybackEngine({
     const prevSuppress = suppressAudioEvents;
     suppressAudioEvents = true;
     try {
-      audio.pause();
+      activeAudio().pause();
     } catch (e) {
       warn('stop 时 pause 失败:', e && e.message);
     } finally {
@@ -337,7 +406,8 @@ export function createPlaybackEngine({
   function seek(sec) {
     const target = Number(sec);
     if (!Number.isFinite(target)) return;
-    const duration = Number(audio.duration);
+    const el = activeAudio();
+    const duration = Number(el.duration);
     let next = target;
     if (Number.isFinite(duration) && duration > 0) {
       next = Math.min(Math.max(target, 0), duration);
@@ -345,7 +415,7 @@ export function createPlaybackEngine({
       next = Math.max(target, 0);
     }
     try {
-      audio.currentTime = next;
+      el.currentTime = next;
     } catch (e) {
       warn('seek 失败:', e && e.message);
       return;
@@ -356,18 +426,54 @@ export function createPlaybackEngine({
   function seekBy(delta) {
     const d = Number(delta);
     if (!Number.isFinite(d)) return;
-    const cur = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const cur = Number.isFinite(activeAudio().currentTime) ? activeAudio().currentTime : 0;
     seek(cur + d);
   }
 
   function setVolume(v) {
     volume = clampVolume(v);
+    // 用户音量对**所有**实例生效：交叉淡入淡出时两个实例都要跟着用户的
+    // 滑条走，否则交叉期间滑条拖动只影响一半的声音。
+    for (const id of pool.listIds()) applyVolumeTo(id);
+    broadcast();
+  }
+
+  /**
+   * 把「用户音量 × 该实例的交叉增益」落到元素上。
+   *
+   * 这是引擎作为**唯一音量写手**的落点（铁律 3）。交叉层只请求
+   * setInstanceGain 改交叉增益，绝不自己写 audio.volume。
+   */
+  function applyVolumeTo(instanceId) {
+    const el = pool.getElement(instanceId);
+    if (!el) return;
+    const g = instanceGains.get(instanceId);
+    const factor = g === undefined ? 1 : g;
     try {
-      audio.volume = volume;
+      el.volume = clampVolume(volume * factor);
+      el.muted = muted;
     } catch (e) {
       warn('设置音量失败:', e && e.message);
     }
-    broadcast();
+  }
+
+  /**
+   * 设置某实例的**交叉增益**（0..1）。
+   *
+   * 交叉淡入淡出期间，旧实例增益 1→0、新实例 0→1。实际音量 =
+   * 用户音量 × 交叉增益。这样「音量只有引擎一个主人」的铁律仍然成立，
+   * 而交叉层获得了它需要的第二个维度。
+   */
+  function setInstanceGain(instanceId, value) {
+    const g = Number(value);
+    const clamped = Number.isFinite(g) ? Math.min(1, Math.max(0, g)) : 1;
+    instanceGains.set(instanceId, clamped);
+    applyVolumeTo(instanceId);
+  }
+
+  function getInstanceGain(instanceId) {
+    const g = instanceGains.get(instanceId);
+    return g === undefined ? 1 : g;
   }
 
   function getVolume() {
@@ -376,20 +482,22 @@ export function createPlaybackEngine({
 
   function toggleMute() {
     muted = !muted;
-    try {
-      audio.muted = muted;
-    } catch (e) {
-      warn('设置静音失败:', e && e.message);
-    }
+    for (const id of pool.listIds()) applyVolumeTo(id);
     broadcast();
   }
 
   function setRate(r) {
     rate = clampRate(r);
-    try {
-      audio.playbackRate = rate;
-    } catch (e) {
-      warn('设置倍速失败:', e && e.message);
+    // 倍速对所有实例生效：交叉期间新实例起来时必须已经是用户选的倍速，
+    // 否则会出现「前 3 秒 1x、之后 2x」的突兀。
+    for (const id of pool.listIds()) {
+      const el = pool.getElement(id);
+      if (!el) continue;
+      try {
+        el.playbackRate = rate;
+      } catch (e) {
+        warn('设置倍速失败:', e && e.message);
+      }
     }
     broadcast();
   }
@@ -495,88 +603,98 @@ export function createPlaybackEngine({
   }
 
   /**
-   * 音频图访问器（S2b 实现幂等装配）。
+   * 音频图访问器 —— 委托给实例池。
    *
-   * 为什么幂等标志比 try/catch 重要
-   * --------------------------------
-   * `createMediaElementSource(audio)` 对同一个元素**只能调用一次**，
-   * 第二次抛 InvalidStateError。旧 eq.js:177-183 把这段包在 try/catch 里，
-   * 捕获后静默 return false —— 表现为「EQ 明明开了却没效果，控制台一行报错都没有」。
-   * 所以这里用 audioGraph / audioGraphAttempted 两个标志做**显式**幂等，
-   * try/catch 只负责把真实失败变成「可观察的 null + 日志」，不承担幂等职责。
+   * 装配逻辑搬到了 playback/audioPool.js，原因是**多实例**：
+   * 图必须按**元素**缓存（createMediaElementSource 对同一元素只能调用一次，
+   * 第二次抛 InvalidStateError），而实例可能被回收重建。
+   * audioPool 用 WeakMap 做「元素 → 图」的映射，并保留显式幂等标志
+   * （graphFailed），try/catch 只负责把真实失败变成「可观察的 null + 日志」。
    *
    * 链序与 eq.js:141-184 逐字一致：
    *   source → preamp(Gain) → 5×Biquad → analyser → destination
    * preamp 必须放链首：trim 与滤波串联才等效于输出衰减；插在 filters 之后
    * 会让 analyser 读到被自己抵消后的信号（eq.js:46-50 的取舍说明）。
+   *
+   * @param {string} [instanceId] 不传则取当前主实例
    */
-  function getAudioGraph() {
-    if (audioGraph) return audioGraph;
-    if (audioGraphAttempted) return null;
+  function getAudioGraph(instanceId = primaryId) {
+    return pool.getGraph(instanceId);
+  }
 
-    const ctx = resolveAudioContext();
-    if (!ctx) {
-      audioGraphAttempted = true;
-      warn('无 AudioContext 可用，音频图不装配（EQ / 频谱将不可用）');
-      return null;
+  /**
+   * 切换主实例（交叉淡入淡出完成时由编排层调用）。
+   *
+   * @param {string} instanceId
+   */
+  function setPrimaryInstance(instanceId) {
+    if (!instanceId || instanceId === primaryId) return;
+    const el = pool.getElement(instanceId);
+    if (!el) {
+      warn('切换主实例失败：池里没有该实例', instanceId);
+      return;
     }
-
+    primaryId = instanceId;
+    // 新主实例要立刻继承当前的音量/静音/倍速，否则会有一瞬间用默认值
+    applyVolumeTo(primaryId);
     try {
-      const source = ctx.createMediaElementSource(audio);
-      const preamp = ctx.createGain();
-      preamp.gain.value = 1;
-      source.connect(preamp);
-
-      const filters = [];
-      let node = preamp;
-      for (const band of EQ_BANDS) {
-        const f = ctx.createBiquadFilter();
-        f.type = band.type;
-        f.frequency.value = band.freq;
-        // Q 固定 1：与 eq.js:162 一致，改它等于改 EQ 曲线手感
-        f.Q.value = 1;
-        node.connect(f);
-        node = f;
-        filters.push(f);
-      }
-
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
-      node.connect(analyser);
-      analyser.connect(ctx.destination);
-
-      if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
-        ctx.resume().catch(() => {});
-      }
-
-      audioGraph = {
-        ctx,
-        source,
-        preamp,
-        filters,
-        analyser,
-        destination: ctx.destination,
-      };
-      return audioGraph;
+      el.playbackRate = rate;
     } catch (e) {
-      audioGraphAttempted = true;
-      warn(
-        '音频图装配失败:',
-        e && e.message,
-        '（若为 InvalidStateError，说明该 audio 元素已被其它模块建过图 ——',
-        'createMediaElementSource 只能调用一次）',
-      );
-      return null;
+      warn('切换主实例时设置倍速失败:', e && e.message);
     }
+    bindInstanceEvents();
+    broadcast();
+  }
+
+  /** 取当前主实例 id */
+  function getPrimaryInstance() {
+    return primaryId;
+  }
+
+  /** 挂载一个新实例并把音频事件绑上（交叉淡入淡出启用时才调用） */
+  function attachInstance(instanceId, element) {
+    const ok = pool.attach(instanceId, element);
+    if (!ok) return false;
+    // 新实例立刻对齐当前音量/静音/倍速，避免交叉起点音量突变
+    applyVolumeTo(instanceId);
+    try {
+      element.playbackRate = rate;
+    } catch (e) {
+      warn('挂载实例时设置倍速失败:', e && e.message);
+    }
+    bindInstanceEvents();
+    return true;
+  }
+
+  /** 卸载实例并解绑其事件 */
+  function detachInstance(instanceId) {
+    const el = pool.getElement(instanceId);
+    if (el) {
+      el.removeEventListener('playing', onPlaying);
+      el.removeEventListener('play', onPlaying);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('ended', onEnded);
+      el.removeEventListener('error', onError);
+      el.removeEventListener('timeupdate', onTimeUpdate);
+      el.removeEventListener('loadedmetadata', onLoadedMetadata);
+      boundElements.delete(el);
+    }
+    instanceGains.delete(instanceId);
+    if (primaryId === instanceId) primaryId = 'primary';
+    return pool.detach(instanceId);
   }
 
   return {
     // 驱动
     loadTrack, play, pause, toggle, stop,
+    crossfadeTo,
     seek, seekBy,
     setVolume, getVolume, toggleMute,
     setRate, getRate,
+    // 交叉淡入淡出（按实例操作，音量仍由引擎单方面落地）
+    setInstanceGain, getInstanceGain,
+    setPrimaryInstance, getPrimaryInstance,
+    attachInstance, detachInstance,
     // 队列
     setQueue, playAt, next, prev, setMode,
     // 观察

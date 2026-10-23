@@ -10,14 +10,21 @@
 .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
 /* ── 窗口控制按钮（D6.1：原 52px 品牌标题栏并入顶栏，这里只剩按钮组） ── */
-.winctrls { display: flex; gap: var(--sp-1); margin-left: var(--sp-2); -webkit-app-region: no-drag; }
+.winctrls {
+  display: flex; gap: var(--sp-1); margin-left: var(--sp-2);
+  padding-left: var(--sp-3); border-left: 1px solid var(--stroke-1);
+  -webkit-app-region: no-drag;
+}
 .winctrls button {
   width: 30px; height: 30px; border-radius: var(--r-sm); border: none;
   background: transparent; color: var(--fg-3); font-size: var(--fs-md);
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.winctrls button:hover { background: var(--elev-2); color: var(--fg-1); }
+.winctrls button:hover { background: var(--surface-3); color: var(--fg-1); }
+.winctrls button:active { transform: scale(.94); }
+/* 图标化后按钮内不再有文字，SVG 统一 12px 描边 1.25 与顶栏右侧图标同族 */
+.winctrls button svg { width: 12px; height: 12px; stroke-width: 1.25; }
 /* 关闭按钮是窗口管理器的约定色（红=关闭），与主题无关，刻意不跟主题走 */
 .winctrls .close:hover { background: #e5484d; color: #fff; }
 
@@ -34,24 +41,56 @@
    · 左右 10vw 大留白 —— YesPlay 呼吸感的来源，窗口窄时 clamp 保底
    · 链接 = 粗体文字，无底色；hover 淡底，active 主色文字
    · 毛玻璃 backdrop-filter，与 titlebar 同族
-   流内布局（不用 fixed+padding 补偿）：.app 纵向 flex 自然堆叠。 */
+   流内布局（不用 fixed+padding 补偿）：.app 纵向 flex 自然堆叠。
+
+   ── v2 改动（2026-10-23）────────────────────────────────────
+   1 左右内边距改为「与内容区同一条轴线」：
+     max(--gutter, (100% - --content-max) / 2)
+     此前顶栏用 clamp(16px,8vw,140px)、内容区用同一个 clamp，两者
+     虽然在 1440px 下碰巧接近，但 1920px 屏上顶栏左边距只有 140px
+     而内容区元素会被拉到 1640px 宽 —— 品牌名和内容左边缘对不上，
+     这正是"界面散"的观感来源。改为共用同一条轴线公式后，任意窗口
+     宽度下品牌左边缘始终与第一张卡片左边缘对齐。
+   2 字重 700 → 500。9 个粗体中文字挤在一起是"不高级"的直接原因，
+     粗体应该留给真正的标题。
+   3 active 增加 2px 短指示条（原来只有变色，切换时几乎没有反馈）。
+   4 品牌锚点用 ::before 伪元素 —— **DOM 一个节点都不加**，
+     renderer-audit 对 9 个 data-tab 的顺序与 onclick 串有逐字断言。 */
 .topbar {
   flex-shrink: 0;
-  height: 64px;
+  height: var(--topbar-h);
   display: flex; align-items: center;
-  padding: 0 clamp(16px, 8vw, 140px);
-  gap: var(--sp-4);
-  background: var(--glass);
-  backdrop-filter: blur(20px) saturate(180%);
+  padding: 0 max(var(--gutter), calc((100% - var(--content-max)) / 2));
+  gap: var(--sp-3);
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border-bottom: 1px solid var(--stroke-1);
+  box-shadow: var(--rim);
   -webkit-app-region: drag;
   z-index: var(--z-side);
+}
+/* 品牌锚点：顶栏左侧原本是空的，9 个链接居中漂浮没有视觉起点。
+   加一个品牌字 + 一条竖分隔线，「通栏」立刻有了左边界。
+   产品名不随界面语言翻译（品牌名保持原样是惯例）。 */
+.topbar::before {
+  content: '揽乐';
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--fg-1);
+  margin-right: var(--sp-1);
+  padding-right: var(--sp-4);
+  border-right: 1px solid var(--stroke-1);
+  -webkit-app-region: no-drag;
 }
 .topbar button, .topbar a { -webkit-app-region: no-drag; }
 .topbar-links {
   flex: 1;
   display: flex; align-items: center; justify-content: center;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -61,37 +100,87 @@
   display: flex; align-items: center; gap: var(--sp-1);
   flex-shrink: 0;
 }
+/* 顶栏图标按钮比播放器内的高一档（32px vs 26px）：顶栏是 64px 高的
+   大面，26px 的小方块贴在里面会显得「抠」，点按热区也不足 32px 的
+   桌面端惯例。只覆写顶栏这一个上下文，不碰播放器里的 .icon-btn。 */
+.topbar-right .icon-btn {
+  width: 32px; height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  transition: color var(--dur-1) var(--ease),
+              background var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+.topbar-right .icon-btn:hover {
+  color: var(--fg-1);
+  background: var(--surface-2);
+  border-color: var(--stroke-1);
+}
+.topbar-right .icon-btn:active { transform: scale(.94); }
 
-/* 导航项（顶栏形态）：文字链接，active=主色文字（YesPlay 同款，
-   不是色块）。类名沿用 nav-item——switchTab 靠它找按钮。 */
+/* 导航项（顶栏形态）：文字链接，active=主色文字 + 下方短指示条。
+   类名沿用 nav-item——switchTab 靠它找按钮。
+   注意：指示条必须留在 nav-item 自身高度内（bottom:3px）。父级
+   .topbar-links 有 overflow-x:auto，按 CSS 规范 overflow-y 会被
+   算成 auto，任何超出 34px 高度的部分都会被裁掉。 */
 .nav-item {
   position: relative;
-  display: flex; align-items: center; gap: 2px;
-  height: 34px; padding: 0 12px;
+  display: flex; align-items: center; gap: var(--sp-1);
+  height: 34px; padding: 0 var(--sp-3);
   border-radius: var(--r-sm);
   cursor: pointer; color: var(--fg-2);
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
-              transform var(--dur-1) var(--ease);
-  font-size: var(--fs-md); font-weight: 700;
+              transform var(--dur-0) var(--ease);
+  font-size: var(--fs-md); font-weight: var(--fw-med);
+  letter-spacing: var(--track-cjk);
   border: none; background: transparent; text-align: center;
   white-space: nowrap; flex-shrink: 0;
 }
-.nav-item:hover { background: var(--elev-1); color: var(--fg-1); }
-.nav-item:active { transform: scale(.92); }
+.nav-item:hover { background: var(--surface-2); color: var(--fg-1); }
+.nav-item:active { transform: scale(.96); }
 .nav-item.active { background: transparent; color: var(--accent-ui); }
-.nav-item .icon { display: none; } /* 顶栏文字链接不放图标（YesPlay 形态） */
-.nav-item .nav-badge {
-  font-size: 10px; padding: 1px 7px;
+.nav-item.active::after {
+  content: "";
+  position: absolute;
+  left: 50%; bottom: 3px;
+  width: 16px; height: 2px;
   border-radius: var(--r-full);
-  background: var(--accent-ui); color: var(--on-accent);
-  font-weight: var(--fw-bold);
+  background: var(--accent-ui);
+  transform: translateX(-50%) scaleX(1);
+  transform-origin: center;
+  transition: transform var(--dur-2) var(--ease-emph);
+}
+.nav-item .icon { display: none; } /* 顶栏文字链接不放图标（YesPlay 形态） */
+/* AI 两个入口的差异化：右上角 4px 辅色点，不做彩虹渐变。
+   用属性选择器定位（data-tab 是 JS 契约的一部分，不能改）。 */
+.nav-item[data-tab="ai-music"]::before,
+.nav-item[data-tab="assistant"]::before {
+  content: "";
+  position: absolute;
+  top: 7px; right: 5px;
+  width: 4px; height: 4px;
+  border-radius: var(--r-full);
+  background: var(--accent2);
+  opacity: .85;
+}
+.nav-item .nav-badge {
+  font-size: var(--fs-2xs); line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft); color: var(--accent-ui);
+  border: 1px solid var(--accent-line);
+  font-weight: var(--fw-semi);
+  font-variant-numeric: tabular-nums;
 }
 
-/* ── 内容区（D6：侧栏退役后占满全宽） ─────────────────── */
+/* ── 内容区（D6：侧栏退役后占满全宽） ───────────────────
+   v2：左右内边距与顶栏共用同一条轴线公式（见顶栏注释），
+   大屏时内容定宽 1180px 居中，不再随窗口无限拉伸。
+   上方 24px / 下方 20px：底部留白略小是因为播放条自带视觉重量。 */
 .content {
   flex: 1; display: flex; flex-direction: row;
   overflow: hidden;
-  padding: var(--sp-5) clamp(16px, 8vw, 140px);
+  padding: var(--sp-6) max(var(--gutter), calc((100% - var(--content-max)) / 2)) var(--sp-5);
   gap: var(--sp-4);
   min-width: 0;
 }

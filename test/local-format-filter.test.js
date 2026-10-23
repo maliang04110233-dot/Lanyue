@@ -50,10 +50,10 @@ test('nextFmtMode：all→格式逐个循环回 all；空曲库钉 all；失效�
 
 test('fmtModeLabel/filterByFmt：文案大写；all 原序拷贝；按扩展名精确匹配', async () => {
   const { fmtModeLabel, filterByFmt } = await fresh();
-  assert.equal(fmtModeLabel('all'), '🎞 格式');
-  assert.equal(fmtModeLabel(undefined), '🎞 格式');
-  assert.equal(fmtModeLabel('flac'), '🎞 FLAC');
-  assert.equal(fmtModeLabel('mp3'), '🎞 MP3');
+  assert.equal(fmtModeLabel('all'), '格式');
+  assert.equal(fmtModeLabel(undefined), '格式');
+  assert.equal(fmtModeLabel('flac'), 'FLAC');
+  assert.equal(fmtModeLabel('mp3'), 'MP3');
   const songs = [
     { filePath: 'a.flac', n: 0 }, { filePath: 'b.mp3', n: 1 },
     { filePath: 'c.FLAC', n: 2 }, { filePath: 'd', n: 3 },

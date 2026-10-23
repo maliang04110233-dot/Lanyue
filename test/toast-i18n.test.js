@@ -821,7 +821,10 @@ const PASSTHROUGH = {
   //   抽到 views/playlist/detail.js，随迁 2 处（「从歌单移除」菜单标签 + 「保存失败」）。
   // 剩下的 14 处是 **logger 诊断文案**与尚未收编的弹窗/剪贴板报告文案，
   // 按批推进；每收就一处的是数字不是词条。
-  'src/renderer/js/views/playlist.js': 14,
+  // 14 → 16：阶段 4 把关闭键的 ✕ 字形换成 data-ico 图标后，屏幕阅读器
+  //   失去了可读名（原来读的是字形本身），给两个弹层关闭键补了
+  //   aria-label="关闭"。这不是反馈调用，进不了 LEDGER，只能记在这里。
+  'src/renderer/js/views/playlist.js': 16,
   'src/renderer/js/views/playlist/core.js': 6,
   'src/renderer/js/views/playlist/detail.js': 2,
 };

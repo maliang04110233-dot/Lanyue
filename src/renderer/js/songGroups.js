@@ -104,7 +104,7 @@ function _renderGroupsModal() {
     <div class="edit-panel">
       <div class="edit-header">
         <span class="edit-title">🔗 跨平台同名分组（${_groups.length} 组）</span>
-        <span class="edit-close" onclick="closeSongGroupsModal()">✕</span>
+        <span class="edit-close" onclick="closeSongGroupsModal()" data-ico="x" data-ico-only></span>
       </div>
       <div class="edit-body">${_groups.map(_rowHtml).join('') || '<div style="color:var(--text-dim,#8b93a7);">暂无分组</div>'}</div>
     </div>`;

@@ -901,7 +901,7 @@ function showAiLyricsDetail(json) {
     overlay.setAttribute('data-modal', '');
     overlay.setAttribute('data-modal-close', '-');
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-    overlay.innerHTML = `<div class="ai-modal"><div class="ai-modal-header"><span>📝 歌词详情</span><button onclick="document.getElementById('aiLyricsDetailModal').remove()">✕</button></div><div class="ai-modal-body"><pre class="ai-lyrics-detail">${esc(lyrics)}</pre></div></div>`;
+    overlay.innerHTML = `<div class="ai-modal"><div class="ai-modal-header"><span>📝 歌词详情</span><button onclick="document.getElementById('aiLyricsDetailModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button></div><div class="ai-modal-body"><pre class="ai-lyrics-detail">${esc(lyrics)}</pre></div></div>`;
     document.body.appendChild(overlay);
   } catch (_e) { showToast(t('toast.aiLoadFailed'), 'error'); }
 }
@@ -1047,7 +1047,7 @@ async function translateLyricsUI() {
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   overlay.innerHTML = `
     <div class="ai-modal">
-      <div class="ai-modal-header"><span>🌐 翻译歌词</span><button onclick="document.getElementById('aiTranslateModal').remove()">✕</button></div>
+      <div class="ai-modal-header"><span>🌐 翻译歌词</span><button onclick="document.getElementById('aiTranslateModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button></div>
       <div class="ai-modal-body">
         <div class="ai-field-row" style="margin-bottom:16px">
           <label style="min-width:80px">目标语言</label>
