@@ -126,3 +126,27 @@ cookie-helper.html
 
 # ── 杂项 ──────────────────────────────────────────────────
 imageed*.png
+image*.png
+
+# ── 非本项目素材与工具产物（2026-10-23 基线锚定时隔离）────────
+# 短剧素材被误置于仓库根：与本项目无关，体积大且含视频/字体二进制
+短剧-离婚当天我买下了他的公司/
+.build-short-drama/
+# 构建/检查产物
+.asar-inspect/
+# 外部 agent 工具的运行痕迹（含积分缓存，共 40+ 文件）
+.qoder-credits/
+.omo/
+.box-agent/
+.agent-teams/
+# 临时调试输入输出（仅限仓库根，避免误伤同名的项目文件）
+/p1.json
+/p2.json
+/r.json
+
+# ── 本地 agent 运行时痕迹（不入库）──────────────────────────
+# .workbuddy/ 是 agent 的工作记忆与项目数据，属本机状态
+.workbuddy/
+.zion-mcp/
+.dsh-env-probe.txt
+_score_input.json
