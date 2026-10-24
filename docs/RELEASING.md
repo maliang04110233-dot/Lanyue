@@ -213,5 +213,9 @@ npm run bench -- --check     # 与基线对比，劣化超阈值则退出码 1
 - [ ] `CHANGELOG.md` 有本次 `## [版本]` 条目，且「安全」小节与实际改动一致
 - [ ] `npm run verify` 全绿
 - [ ] `npm run bench -- --check` 无显著劣化
+- [ ] 真机冒烟**裸跑一次**（等同用户双击，不加任何旗标）：
+      `SMOKE_LAUNCH_VIA_SHELL=1 node scripts/smoke-test-manual.js "<安装目录>\Lanyue.exe"`
+      必须 **8/8** 且汇总行显示「渲染层: 已加载（loadFile done）」——该模式经 `explorer.exe` 代理启动，
+      父子链落在真实桌面会话，渲染进程沙箱可正常初始化（直启在受限环境下必然白屏，见 `docs/process/QA.md` §四）
 - [ ] 本地跑一次安装包（Windows）：安装、启动、搜索、入队、下载、播放、更新检查
 - [ ] tag 与版本一致，且 tag 推送权限受保护
