@@ -28,15 +28,16 @@ test('fresh 换源：文案含双方平台中文名与原源错误语义', () =>
     { url: 'u', source: 'kuwo', matchedFrom: 'netease', matchedSong: { source: 'kuwo', id: '9' } },
     'netease', nameOf,
   );
-  assert.equal(t, '🎵 网易云源不可用，已切换到酷我音源');
+  // 2026-10-24 toast emoji 全量清理：前缀字符剥离，语义由类型色条承载
+  assert.equal(t, '网易云源不可用，已切换到酷我音源');
 });
 
-test('记忆命中：🔁 文案（此前零提示的缺口）', () => {
+test('记忆命中：沿用上次换源结果的文案（此前零提示的缺口）', () => {
   const t = buildFallbackNotice(
     { url: 'u', source: 'kuwo', matchedFrom: 'netease', fromAltMemory: true },
     'netease', nameOf,
   );
-  assert.match(t, /^🔁 沿用上次的换源结果，正在播放酷我音源/);
+  assert.match(t, /^沿用上次的换源结果，正在播放酷我音源/);
   assert.ok(t.includes('网易云'), '应带原源名解释为何不是原平台');
 });
 
@@ -44,7 +45,7 @@ test('matchedFrom 缺失时回落 ownSource（防御归一化字段不全）', (
   const t = buildFallbackNotice(
     { url: 'u', matchedSong: { source: 'kuwo', id: '9' } }, 'netease', nameOf,
   );
-  assert.equal(t, '🎵 网易云源不可用，已切换到酷我音源');
+  assert.equal(t, '网易云源不可用，已切换到酷我音源');
 });
 
 test('记忆命中但源没变（异常数据）不提示', () => {

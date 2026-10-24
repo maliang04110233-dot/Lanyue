@@ -364,6 +364,7 @@ function switchTab(tab, btn) {
   if (navBtn) navBtn.classList.add('active');
 
   const homePage = document.getElementById('homePage');
+  const recentPage = document.getElementById('recentPage');
   const searchPage = document.getElementById('searchPage');
   const downloadPage = document.getElementById('downloadPage');
   const localPage = document.getElementById('localPage');
@@ -376,6 +377,7 @@ function switchTab(tab, btn) {
   const aiAssistantPage = document.getElementById('aiAssistantPage');
 
   homePage.style.display = 'none';
+  if (recentPage) recentPage.style.display = 'none';
   searchPage.style.display = 'none';
   downloadPage.style.display = 'none';
   localPage.classList.remove('active');
@@ -391,6 +393,12 @@ function switchTab(tab, btn) {
   if (tab === 'home') {
     homePage.style.display = 'flex';
     if (!getState('homeRecommendations')) loadHomeRecommendations();
+  } else if (tab === 'recent') {
+    // 最近播放页（2026-10-24 从发现页独立）：进页即重渲染，取最新播放记录
+    if (recentPage) {
+      recentPage.style.display = 'flex';
+      if (typeof window.renderRecentlyPlayed === 'function') window.renderRecentlyPlayed();
+    }
   } else if (tab === 'search') {
     searchPage.style.display = 'flex';
   } else if (tab === 'download' || tab === 'history') {
@@ -563,7 +571,7 @@ function renderPlaylistModal(songs) {
         <button class="btn-sm" onclick="addPlaylistToQueueClick(false)">加入队列</button>
         <button class="btn-sm" onclick="addPlaylistToQueueClick(true)">仅未下载</button>
         <button class="btn-sm" title="把勾选的歌新建为「我的歌单」（在线引用，不下载）" onclick="savePlModalAsPlaylist()">📥 存为歌单</button>
-        <button class="btn-sm" title="把勾选的歌加入某个已有歌单（引擎端自动去重）" onclick="addPlModalToPlaylist()">➕ 加进歌单</button>
+        <button class="btn-sm" title="把勾选的歌加入某个已有歌单（引擎端自动去重）" onclick="addPlModalToPlaylist()"data-ico="plus">加进歌单</button>
       </div>
     </div>
   `;
@@ -910,7 +918,7 @@ async function openAlbumView(albumMid, source, albumName) {
       }).catch(e => logger.warn('检测本地已下载失败:', e.message));
     }
   } catch (e) {
-    body.innerHTML = `<div style="color:var(--accent);font-size:12px;padding:16px;text-align:center;">⚠️ 加载失败: ${esc(errBrief(e))}</div>`;
+    body.innerHTML = `<div style="color:var(--accent);font-size:12px;padding:16px;text-align:center;">加载失败: ${esc(errBrief(e))}</div>`;
   }
 }
 
@@ -1110,7 +1118,8 @@ function _syncPqSelBtns() {
   if (btn) btn.textContent = _pqSelMode ? '⬚ 退出' : '☑ 多选';
   if (rm) {
     rm.classList.toggle('hidden', !_pqSelMode);
-    rm.textContent = `🗑 移除 ${_pqSel.size}`;
+    rm.setAttribute('data-ico', 'trash');
+    rm.textContent = `移除 ${_pqSel.size}`;
   }
   const pl = document.getElementById('pqSelPlBtn');
   if (pl) {

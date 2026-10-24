@@ -339,14 +339,14 @@ test('home.js: 分区列表的计数必须来自过滤结果（用未过滤的 d
   const body = fnBodyL(stripComments(read('js', 'views', 'home.js')), 'renderSection');
   assert.ok(body.includes('filterHomeSection('),
     'renderSection 需走 filterHomeSection 收敛（哨兵缺失，钉可能已失效）');
-  const call = /listHtml\(([^)]*)\)/.exec(body);
-  assert.ok(call, 'renderSection 需调用 listHtml');
-  assert.ok(call[1].includes('pairs.length'),
-    `listHtml 的计数实参必须来自过滤结果 pairs.length，实际「${call[1]}」——`
-    + '用 data.length（未过滤总量）会让筛选后仍显示「共 N 首」，'
-    + '且 N > LIST_FOLD 时按钮明明该消失却还在（点开只看到 2 首）');
-  assert.ok(!call[1].includes('data.length'),
-    'listHtml 的计数实参不得引用未过滤的 data.length');
+  // 2026-10-24 榜单分区由行列表改为封面卡（songCardHtml），行模板保留给榜单弹窗；
+  // 过滤管道契约原样重钉到新渲染入口。
+  assert.ok(/pairs\.slice\(0, SONG_CARD_LIMIT\)\.map\(\(p\) => songCardHtml\(meta, p\)\)/.test(body),
+    'renderSection 需以过滤后的 pairs 驱动 songCardHtml（榜单封面卡形态）');
+  assert.ok(body.includes('chartMoreBtn(meta, pairs.length)'),
+    '「查看完整榜单」的计数必须来自过滤结果 pairs.length ——'
+    + '用未过滤的 data.length 会在筛选后仍报全量（renderSection 顶部的空数据守卫'
+    + '用的是 data.length，那是合法用法，不在本钉范围）');
 });
 
 test('home.js: 「查看完整榜单」弹窗必须应用同一个过滤词', () => {
@@ -527,14 +527,15 @@ test('顶栏 D6：侧栏已退役，导航链接在 .topbar 内按播放器优�
     '侧栏分组 i18n 键已随竖栏退役，顶栏不挂分组标题');
 });
 
-test('顶栏条目：九个 data-tab，顺序沿用 D1 播放器优先重排', () => {
+test('顶栏条目：十个 data-tab（2026-10-24 增「最近播放」），其余顺序沿用 D1/D6', () => {
   const html = read('index.html');
   const tb = html.slice(html.indexOf('<div class="topbar">'), html.indexOf('<div class="main">'));
   const tabs = [...tb.matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]);
   // D1 定的顺序在 D6 原样搬进顶栏：home 打头，歌单在本地曲库前，下载在工具段。
-  // 集合仍是这 9 个 —— 只换载体（竖栏→顶栏），不增删页面。
-  assert.deepStrictEqual(tabs, ['home', 'playlist', 'local', 'aggregate', 'subscription', 'download', 'converter', 'ai-music', 'assistant'],
-    '条目增删/换序会破坏 switchTab 兜底查询与 ⌘K/快捷键的 data-tab 反查 —— D6 只换载体不增删');
+  // 2026-10-24 用户定向：最近播放从发现页区块独立成导航页，插在 home 之后 —— 首次增页，
+  // 其余九个的相对顺序不变；switchTab/⌘K/快捷键的反查契约对新条目同样成立（recent 已接线）。
+  assert.deepStrictEqual(tabs, ['home', 'recent', 'playlist', 'local', 'aggregate', 'subscription', 'download', 'converter', 'ai-music', 'assistant'],
+    '条目增删/换序会破坏 switchTab 兜底查询与 ⌘K/快捷键的 data-tab 反查 —— 增删须连同本钉一起改');
   for (const t of tabs) {
     assert.ok(tb.includes(`onclick="switchTab('${t}',this)"`), `${t} 的 onclick 形状被改，切换链路可能断`);
   }

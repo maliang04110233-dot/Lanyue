@@ -130,9 +130,9 @@ test('接线钉桩：playlist.js 纯函数导入+三桥、HTML 按钮、面板 p
   assert.match(PALETTE_JS, /\{ id: 'pl-dedupescan'[\s\S]{0,160}?_call\('scanCrossPlaylistDupes'\) \},/);
 });
 
-test('接线钉桩：逐行 🧲 收拢按钮 + consolidateDup 走 save-user-playlist，零新通道', () => {
+test('接线钉桩：逐行 收拢按钮（data-ico=dedupe，2026-10-24 去 🧲 emoji）+ consolidateDup 走 save-user-playlist，零新通道', () => {
   assert.match(SCAN_JS, /export function planConsolidate\(playlists, key\) \{/);
-  assert.match(PL_JS, /onclick="consolidateDup\(\$\{i\}\)"[^>]*>🧲 收拢<\/button>/, '每行一枚收拢按钮，下标随组走');
+  assert.match(PL_JS, /onclick="consolidateDup\(\$\{i\}\)"[^>]*data-ico="dedupe">收拢<\/button>/, '每行一枚收拢按钮，下标随组走');
   assert.match(PL_JS, /groups\.map\(\(g, i\) =>/);
   assert.match(PL_JS, /async function consolidateDup\(i\) \{/);
   assert.match(PL_JS, /window\.consolidateDup = consolidateDup;/);

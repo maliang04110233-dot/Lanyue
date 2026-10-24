@@ -124,7 +124,7 @@ function _renderManager() {
   } else {
     body.innerHTML = `
       <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">
-        <button class="btn-sm" id="dismClearAll">🗑 清空全部</button>
+        <button class="btn-sm" id="dismClearAll">data-ico="trash">清空全部</button>
       </div>` +
       _list.map((x, i) => `
         <div style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--stroke-1);">

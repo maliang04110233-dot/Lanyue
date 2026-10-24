@@ -16,24 +16,24 @@ import { enqueuePayloadFor, classifyRetryResult } from './enqueuePayload.js';
  */
 async function retryAfterPlayFailure(row) {
   const payload = enqueuePayloadFor(row, getState('saveDir'));
-  if (!payload) { showToast('⚠️ 这首歌缺少平台标识，重新下载不了', 'warn'); return; }
+  if (!payload) { showToast('这首歌缺少平台标识，重新下载不了', 'warn'); return; }
   let res = null;
   try {
     res = await api.addToQueue(payload);
   } catch (e) {
     logger.warn('[playRetry] 重新下载入队失败:', e.message);
-    showToast('⬇ 重新下载失败：' + errBrief(e), 'error');
+    showToast('重新下载失败：' + errBrief(e), 'error');
     return;
   }
   const kind = classifyRetryResult(res);
   if (kind === 'added') {
-    showToast('⬇ 已重新加入下载队列', 'success');
+    showToast('已重新加入下载队列', 'success');
     if (typeof switchDlSubTab === 'function') switchDlSubTab('queue');
     return;
   }
-  if (kind === 'dup') { showToast('ℹ️ 这首歌本来就在下载队列里，等它下完即可', 'info'); return; }
-  if (kind === 'had') { showToast('ℹ️ 文件又回到了磁盘上（可能刚被同步盘放回来），没有重复下载', 'info', 5000); return; }
-  showToast('⬇ 重新下载失败：' + ((res && res.error) || '未知错误'), 'error');
+  if (kind === 'dup') { showToast('这首歌本来就在下载队列里，等它下完即可', 'info'); return; }
+  if (kind === 'had') { showToast('文件又回到了磁盘上（可能刚被同步盘放回来），没有重复下载', 'info', 5000); return; }
+  showToast('重新下载失败：' + ((res && res.error) || '未知错误'), 'error');
 }
 
 export { retryAfterPlayFailure };

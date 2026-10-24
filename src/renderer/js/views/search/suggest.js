@@ -69,7 +69,7 @@ function showSearchSuggestions() {
         type: 'recent',
         title: song.title,
         artist: song.artist,
-        icon: '🎵',
+        icon: 'music',
       });
     }
   }
@@ -84,7 +84,7 @@ function showSearchSuggestions() {
           suggestions.push({
             type: 'history',
             title: h.keyword,
-            icon: '🕐',
+            icon: 'history',
           });
         }
       }
@@ -106,7 +106,7 @@ function showSearchSuggestions() {
 
     container.innerHTML = suggestions.map(s => `
       <div class="suggestion-item" onmousedown="selectSuggestion('${escQ(s.title)}')">
-        <span class="suggestion-icon">${s.icon}</span>
+        <span class="suggestion-icon" data-ico="${s.icon}" data-ico-only></span>
         <span class="suggestion-title">${esc(s.title)}</span>
         ${s.artist ? `<span class="suggestion-artist">${esc(s.artist)}</span>` : ''}
       </div>
@@ -256,7 +256,7 @@ function showSearchHistory() {
       </div>
       ${filtered.map(h => `
       <div class="search-history-item">
-        <span class="history-icon">🕐</span>
+        <span class="history-icon" data-ico="history" data-ico-only></span>
         <span class="history-kw" onmousedown="event.preventDefault();searchInput.value='${escQ(h.keyword)}';doSearch(1);hideSearchHistory()">${esc(h.keyword)}</span>
         <span class="history-meta">
           <span class="history-time">${fmtHistoryTime(h.time)}</span>

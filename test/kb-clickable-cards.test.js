@@ -69,12 +69,13 @@ test('index.html: 4 张 stat-card 全部键盘可达（数字卡是找到本地�
   assertCardPinned('index.html', src, ['<div class="stat-card"'], 4);
 });
 
-test('home.js: 4 类可点击模板（歌单卡/最近播放/榜单行/分区重试）全部挂桥属性', () => {
+test('home.js: 5 类可点击模板（歌单卡/最近播放/榜单行[弹窗]/榜单封面卡/分区重试）全部挂桥属性', () => {
   const src = read('js', 'views', 'home.js');
   assertCardPinned('home.js', src, [
     '<div class="playlist-card"', '<div class="recent-item"',
-    '<div class="top-song-row"', '<div class="home-sec-msg is-error"',
-  ], 4);
+    '<div class="top-song-row"', '<div class="home-song-card"',
+    '<div class="home-sec-msg is-error"',
+  ], 5);
 });
 
 test('playlist.js(+core.js): 歌单卡与"加入歌单"弹层条目挂桥属性（弹层内也可键盘选定）', () => {

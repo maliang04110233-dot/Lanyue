@@ -148,7 +148,7 @@ async function exportHistoryM3u() {
     }
     const pageNote = _historyItems.length >= PAGE_SIZE ? '（仅当前页）' : '';
     const skipped = _historyItems.filter(s => s.status === 'done' && s.savePath && s.missing).length;
-    showToast(`✅ 已导出 ${done.length} 首歌曲${pageNote}${skipped ? `，跳过 ${skipped} 首文件已不在的` : ''}`, 'success');
+    showToast(`已导出 ${done.length} 首歌曲${pageNote}${skipped ? `，跳过 ${skipped} 首文件已不在的` : ''}`, 'success');
   } catch (e) {
     showToast('导出失败: ' + errBrief(e), 'error');
   }

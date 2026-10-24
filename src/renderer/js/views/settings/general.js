@@ -23,6 +23,9 @@ export const GENERAL_PREFS = {
   shortcutNext: { key: 'shortcutNext', default: 'MediaNextTrack', el: 'settingShortcutNext' },
   shortcutShowHide: { key: 'shortcutShowHide', default: '', el: 'settingShortcutShowHide' },
   theme:         { key: 'theme',         default: 'default',     el: 'settingTheme' },
+  // 发现页布局（2026-10-24）：a 内容优先 / b 双栏驾驶舱 / c 音乐门户，
+  // CSS 侧见 content.css「首页布局变体」；应用逻辑在 applyDiscoverLayout。
+  discoverLayout: { key: 'discoverLayout', default: 'a',          el: 'settingDiscoverLayout' },
   language:      { key: 'language',      default: 'zh',          el: 'settingLanguage' },
   lyricFontSize: { key: 'lyricFontSize', default: 18,            el: 'settingLyricFontSize' },
   lyricOffset:   { key: 'lyricOffset',   default: 0,             el: 'settingLyricOffset' },
@@ -67,6 +70,10 @@ export async function loadGeneralSettings() {
       }
     });
     syncThemeCards();
+    syncLayoutCards();
+    // 打开设置页时把已存布局同步到 #homePage（boot 恢复之外的兜底，幂等）
+    const dl = document.getElementById('settingDiscoverLayout');
+    if (dl) applyDiscoverLayout(dl.value);
     updateFilenameTmplPreview();
   } catch (e) {
     logger.error(`[loadGeneralSettings] error:`, e);
@@ -104,6 +111,9 @@ export function syncThemeCards(value) {
   const sel = document.getElementById('settingTheme');
   const cur = value != null ? String(value) : (sel ? sel.value : 'default');
   document.querySelectorAll('.theme-card').forEach(card => {
+    // 无 data-theme-value 的卡片（布局卡复用 .theme-card 视觉）不归主题同步管，
+    // 否则切主题会把布局卡的选中态顺手抹掉
+    if (card.dataset.themeValue === undefined) return;
     const on = card.dataset.themeValue === cur;
     card.classList.toggle('active', on);
     card.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -118,6 +128,41 @@ export function selectTheme(value) {
     sel.dispatchEvent(new Event('change'));
   }
   syncThemeCards(value);
+}
+
+// ── 发现页布局（a 内容优先 / b 双栏驾驶舱 / c 音乐门户）──────────────
+// 与主题同一条管道：卡片点击 → 隐藏 select 派发 change → GENERAL_PREFS
+// 监听写 prefs → applyDiscoverLayout 写 #homePage dataset（CSS 侧生效）。
+
+const LAYOUT_VALUES = ['a', 'b', 'c'];
+
+export function applyDiscoverLayout(val) {
+  const layout = LAYOUT_VALUES.includes(val) ? val : 'a';
+  const hp = document.getElementById('homePage');
+  if (hp) hp.dataset.discoverLayout = layout;
+  // 门户布局无 tab，全平台同屏：进该布局即幂等拉齐各平台首分区，
+  // 否则被 CSS 强制显形的块停留在「待加载」骨架（loadPlatform 重复调用直接返回）
+  if (layout === 'c' && typeof window.loadAllHomePlatforms === 'function') window.loadAllHomePlatforms();
+}
+
+export function syncLayoutCards(value) {
+  const sel = document.getElementById('settingDiscoverLayout');
+  const cur = value != null ? String(value) : (sel ? sel.value : 'a');
+  document.querySelectorAll('[data-layout-value]').forEach(card => {
+    const on = card.dataset.layoutValue === cur;
+    card.classList.toggle('active', on);
+    card.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+export function selectDiscoverLayout(value) {
+  if (!LAYOUT_VALUES.includes(value)) return;
+  const sel = document.getElementById('settingDiscoverLayout');
+  if (sel) {
+    sel.value = value;
+    sel.dispatchEvent(new Event('change'));
+  }
+  syncLayoutCards(value);
 }
 
 // ── 全局快捷键 ──────────────────────────────────────────
@@ -157,6 +202,9 @@ export function setupGeneralSettingListeners() {
       }
       if (cfg.key === 'theme') {
         applyTheme(val);
+      }
+      if (cfg.key === 'discoverLayout') {
+        applyDiscoverLayout(val);
       }
       if (isShortcutPref(cfg.key)) {
         reapplyGlobalShortcuts();

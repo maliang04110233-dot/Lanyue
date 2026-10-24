@@ -76,16 +76,14 @@ export function syncImmersive(audio) {
     $('immTitle').textContent = song ? (song.title || '未知歌曲') : '未在播放';
     $('immArtist').textContent = song ? (song.artist || '—') : '—';
     $('immSource').textContent = song && song.source ? srcLabel(song.source) : '';
+    // 封面已移除（2026-10-24 用户需求）：#immCover 只作隐藏取色载体，
+    // 永远 display:none（inline 钉死），extractColor 靠它喂氛围光。
     const img = $('immCover');
-    const ph = $('immCoverPh');
     if (song && song.cover) {
       img.src = song.cover;
-      img.style.display = '';
-      ph.style.display = 'none';
       extractColor(img);
     } else {
-      img.style.display = 'none';
-      ph.style.display = '';
+      img.removeAttribute('src');
       applyColor('');
     }
     _lyricSig = ''; // 换歌强制重绘歌词

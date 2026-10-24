@@ -16,6 +16,9 @@ async function loadMenu() {
 
 const SONG = { title: 'A', artist: 'B', filePath: 'C:\\music\\a.mp3' };
 
+/** 从 iconHtml 里取 data-ico 名（2026-10-24 起菜单图标从文本 emoji 换成 data-ico SVG，见 localRowMenu.js）。 */
+const icoName = (it) => (it.iconHtml ? (it.iconHtml.match(/data-ico="([a-z-]+)"/) || [])[1] : undefined);
+
 test('buildLocalRowMenuItems：恰 7 项，顺序/图标/标签钉死，第 4 项为分隔线（88 加收藏后）', async () => {
   const { buildLocalRowMenuItems } = await loadMenu();
   const acts = { play() {}, edit() {}, fav() {}, probe() {}, reveal() {}, copyPath() {}, probeDone: false };
@@ -24,11 +27,14 @@ test('buildLocalRowMenuItems：恰 7 项，顺序/图标/标签钉死，第 4 �
   assert.strictEqual(items[3].sep, true);
   const labels = items.filter((i) => !i.sep).map((i) => i.label);
   assert.deepStrictEqual(labels, ['播放', '编辑信息', '收藏', '检测真实音质', '打开所在文件夹', '复制文件路径']);
-  const icons = items.filter((i) => !i.sep).map((i) => i.icon);
-  assert.deepStrictEqual(icons, ['▶', '✏️', '♥', '🔬', '📂', '📋']);
+  // 图标契约（2026-10-24 重钉）：菜单图标位从文本 emoji 改走 data-ico SVG；
+  // 收藏一项保留 ♥/♡ 文本字形 —— 与 heartBtnHtml 全站同款（见 localRowMenu.js 注释）。
+  const icons = items.filter((i) => !i.sep).map(icoName);
+  assert.deepStrictEqual(icons, ['play', 'pencil', undefined, 'microscope', 'folder-open', 'link']);
+  assert.strictEqual(items[2].icon, '♥');
 });
 
-test('favOn/probeDone 只切各自图标：收藏 ♥/💔、音质 🔬/✓，不影响项数与顺序', async () => {
+test('favOn/probeDone 只切各自图标：收藏 ♥/💔、音质 microscope/check，不影响项数与顺序', async () => {
   const { buildLocalRowMenuItems } = await loadMenu();
   const acts = { play() {}, edit() {}, fav() {}, probe() {}, reveal() {}, copyPath() {} };
   const on = buildLocalRowMenuItems(SONG, { ...acts, probeDone: true, favOn: true });
@@ -37,8 +43,8 @@ test('favOn/probeDone 只切各自图标：收藏 ♥/💔、音质 🔬/✓，�
   assert.strictEqual(on[2].label, '取消收藏');
   assert.strictEqual(off[2].icon, '♥');
   assert.strictEqual(off[2].label, '收藏');
-  assert.strictEqual(on[4].icon, '✓');
-  assert.strictEqual(off[4].icon, '🔬');
+  assert.strictEqual(icoName(on[4]), 'check');
+  assert.strictEqual(icoName(off[4]), 'microscope');
   assert.strictEqual(on.length, 7);
   assert.strictEqual(off.length, 7);
 });

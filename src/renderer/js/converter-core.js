@@ -343,12 +343,12 @@ export async function doConvertAudio(outputFormat, bitrate = DEFAULT_BITRATE) {
     });
     if (result && result.canceled) return;
     if (result && result.success) {
-      showToast(`✅ 转换成功：${result.path}`, 'success', 4000);
+      showToast(`转换成功：${result.path}`, 'success', 4000);
     } else {
-      showToast('❌ 转换失败：' + (result?.error || '未知错误'), 'error', 5000);
+      showToast('转换失败：' + (result?.error || '未知错误'), 'error', 5000);
     }
   } catch (e) {
-    showToast('❌ 转换异常：' + errBrief(e), 'error', 5000);
+    showToast('转换异常：' + errBrief(e), 'error', 5000);
   }
 }
 

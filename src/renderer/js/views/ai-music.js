@@ -48,23 +48,23 @@ let _historyRenderSeq = 0;
 // ══════════════════════════════════════════════════════════
 
 const STYLES = [
-  { v: 'pop', l: '流行', i: '🎤', c: '#ff6b9d' },
-  { v: 'rock', l: '摇滚', i: '🎸', c: '#ff4757' },
-  { v: 'ballad', l: '民谣', i: '🎵', c: '#2ed573' },
-  { v: 'electronic', l: '电子', i: '🎧', c: '#1e90ff' },
-  { v: 'r&b', l: 'R&B', i: '💃', c: '#a78bfa' },
-  { v: 'hip-hop', l: '嘻哈', i: '🎙️', c: '#ffa502' },
-  { v: 'jazz', l: '爵士', i: '🎷', c: '#ff6348' },
-  { v: 'lo-fi', l: 'Lo-Fi', i: '☕', c: '#70a1ff' },
+  { v: 'pop', l: '流行', c: '#ff6b9d' },
+  { v: 'rock', l: '摇滚', c: '#ff4757' },
+  { v: 'ballad', l: '民谣', c: '#2ed573' },
+  { v: 'electronic', l: '电子', c: '#1e90ff' },
+  { v: 'r&b', l: 'R&B', c: '#a78bfa' },
+  { v: 'hip-hop', l: '嘻哈', c: '#ffa502' },
+  { v: 'jazz', l: '爵士', c: '#ff6348' },
+  { v: 'lo-fi', l: 'Lo-Fi', c: '#70a1ff' },
 ];
 
 const MOODS = [
-  { v: 'happy', l: '快乐', i: '😊' },
-  { v: 'sad', l: '悲伤', i: '😢' },
-  { v: 'romantic', l: '浪漫', i: '💕' },
-  { v: 'energetic', l: '激昂', i: '⚡' },
-  { v: 'calm', l: '平静', i: '🌊' },
-  { v: 'nostalgic', l: '怀旧', i: '🌅' },
+  { v: 'happy', l: '快乐' },
+  { v: 'sad', l: '悲伤' },
+  { v: 'romantic', l: '浪漫' },
+  { v: 'energetic', l: '激昂' },
+  { v: 'calm', l: '平静' },
+  { v: 'nostalgic', l: '怀旧' },
 ];
 
 // 人声偏好。上游 music_generation 请求里没有音色字段（查 2026-09 官方
@@ -115,7 +115,8 @@ function _applyProvider(cfg) {
   const badge = document.getElementById('aiKeyBadge');
   if (badge) {
     badge.className = `ai-api-badge ${aiState.hasKey ? 'ok' : 'warn'}`;
-    badge.textContent = aiState.hasKey ? '✅ 已连接' : '⚠️ 未配置';
+    badge.dataset.ico = aiState.hasKey ? 'check-circle' : 'alert';
+    badge.textContent = aiState.hasKey ? '已连接' : '未配置';
   }
   _applyMusicGate();
 }
@@ -182,7 +183,7 @@ function renderSidebar() {
           <span class="ai-card-icon">🔑</span>
           <span class="ai-card-title">API 配置</span>
         </div>
-        <div class="ai-api-badge ${hasKey ? 'ok' : 'warn'}" id="aiKeyBadge">${hasKey ? '✅ 已连接' : '⚠️ 未配置'}</div>
+        <div class="ai-api-badge ${hasKey ? 'ok' : 'warn'}" id="aiKeyBadge" data-ico="${hasKey ? 'check-circle' : 'alert'}">${hasKey ? '已连接' : '未配置'}</div>
         <!-- 厂商/型号/端点/Key 都由共用面板画（助手页挂的是同一个模块）：
              名单与 Key 映射的判据在主进程登记表，这里镜像一份就会分叉 -->
         <div class="ai-provider-panel" id="aiProviderPanel"></div>
@@ -191,14 +192,14 @@ function renderSidebar() {
       <!-- 风格选择 -->
       <div class="ai-card">
         <div class="ai-card-header">
-          <span class="ai-card-icon">🎨</span>
+          <span class="ai-card-icon" data-ico="palette" data-ico-only></span>
           <span class="ai-card-title">音乐风格</span>
         </div>
         <div class="ai-grid-4">
           ${STYLES.map(s => `
             <button class="ai-chip ${s.v === 'pop' ? 'active' : ''}" data-style="${s.v}" onclick="selectAiStyle('${s.v}',this)">
               <span class="ai-chip-dot" style="background:${s.c}"></span>
-              ${s.i} ${s.l}
+              ${s.l}
             </button>
           `).join('')}
         </div>
@@ -208,13 +209,13 @@ function renderSidebar() {
       <!-- 情感选择 -->
       <div class="ai-card">
         <div class="ai-card-header">
-          <span class="ai-card-icon">💭</span>
+          <span class="ai-card-icon" data-ico="heart" data-ico-only></span>
           <span class="ai-card-title">情感氛围</span>
         </div>
         <div class="ai-grid-3">
           ${MOODS.map(m => `
             <button class="ai-chip ${m.v === 'happy' ? 'active' : ''}" data-mood="${m.v}" onclick="selectAiMood('${m.v}',this)">
-              ${m.i} ${m.l}
+              ${m.l}
             </button>
           `).join('')}
         </div>
@@ -223,8 +224,8 @@ function renderSidebar() {
 
       <!-- 高级设置 -->
       <div class="ai-card">
-        <button class="ai-card-toggle" onclick="toggleAdvanced()">
-          ⚙️ 高级设置 <span class="ai-toggle-arrow">${aiState.advancedOpen ? '▾' : '▸'}</span>
+        <button class="ai-card-toggle" onclick="toggleAdvanced()" data-ico="settings">
+          高级设置 <span class="ai-toggle-arrow">${aiState.advancedOpen ? '▾' : '▸'}</span>
         </button>
         <div class="ai-advanced" id="aiAdvancedPanel" style="display:${aiState.advancedOpen ? 'block' : 'none'}">
           <div class="ai-field-row">
@@ -255,7 +256,7 @@ function renderSidebar() {
                 title="只出曲子，不写词也不唱（可直接在主题里写「雨后钢琴独奏」这类描述）">🎹 纯音乐</button>
               <button class="ai-chip${aiState.autoLyrics ? ' active' : ''}" data-flag="autoLyrics"
                 onclick="toggleAiFlag('autoLyrics',this)"
-                title="跳过本机写词，把主题一句话交给模型自己填词开唱">✍️ 一句话直出</button>
+                title="跳过本机写词，把主题一句话交给模型自己填词开唱" data-ico="sparkle">一句话直出</button>
             </div>
           </div>
           <div class="ai-field-row" id="aiVoiceRow" style="display:${aiState.instrumental ? 'none' : 'block'}">
@@ -299,9 +300,9 @@ function renderLyricsPanel() {
       <!-- 顶部标签栏 -->
       <div class="ai-tabs-bar">
         <div class="ai-tabs-left">
-          <button class="ai-tab active" data-mode="ai" onclick="switchLyricsMode('ai',this)">🤖 AI 生成</button>
-          <button class="ai-tab" data-mode="manual" onclick="switchLyricsMode('manual',this)">✏️ 手动输入</button>
-          <button class="ai-tab" data-mode="playlist" onclick="switchLyricsMode('playlist',this)">📋 歌单策划</button>
+          <button class="ai-tab active" data-mode="ai" onclick="switchLyricsMode('ai',this)" data-ico="robot">AI 生成</button>
+          <button class="ai-tab" data-mode="manual" onclick="switchLyricsMode('manual',this)" data-ico="pencil">手动输入</button>
+          <button class="ai-tab" data-mode="playlist" onclick="switchLyricsMode('playlist',this)" data-ico="list">歌单策划</button>
         </div>
         <button class="ai-btn-text" onclick="clearAiLyrics()">清空</button>
       </div>
@@ -328,10 +329,10 @@ function renderLyricsPanel() {
           <div id="aiMusicPromptHint" style="display:none"></div>
           <!-- 工具栏：翻译 + 重新生成 + 生成歌曲 -->
           <div class="ai-preview-bar">
-            <span class="ai-preview-label">📝 歌词</span>
+            <span class="ai-preview-label" data-ico="note">歌词</span>
             <div style="display:flex;gap:4px;align-items:center">
               <button class="ai-btn-action" onclick="translateLyricsUI()">🌐 翻译</button>
-              <button class="ai-btn-text" onclick="regenerateAiLyrics()">🔄 重新生成</button>
+              <button class="ai-btn-text" onclick="regenerateAiLyrics()" data-ico="refresh">重新生成</button>
               <button class="ai-btn-generate" onclick="generateAiMusic()" id="btnGenMusicResult">🎶 生成歌曲</button>
             </div>
           </div>
@@ -370,11 +371,11 @@ function renderLyricsPanel() {
             <option value="15">15首</option>
             <option value="20">20首</option>
           </select>
-          <button class="ai-btn-primary" onclick="generateAiPlaylist()" id="btnGenPlaylist">📋 生成歌单</button>
+          <button class="ai-btn-primary" onclick="generateAiPlaylist()" id="btnGenPlaylist" data-ico="music-list">生成歌单</button>
         </div>
         <div id="aiPlaylistResult" style="display:none;margin-top:12px">
           <div class="ai-preview-bar">
-            <span class="ai-preview-label">📋 推荐歌单</span>
+            <span class="ai-preview-label" data-ico="music-list">推荐歌单</span>
             <button class="ai-btn-text" onclick="addAllPlaylistToQueue()">📥 全部加入队列</button>
           </div>
           <div id="aiPlaylistList" class="ai-playlist-list"></div>
@@ -416,7 +417,7 @@ function renderHistoryTab(el) {
     if (!items.length) {
       el.innerHTML = `
         <div class="ai-empty">
-          <div class="ai-empty-icon">🎵</div>
+          <div class="ai-empty-icon"><span data-ico="music" data-ico-only></span></div>
           <div class="ai-empty-title">暂无生成历史</div>
           <div class="ai-empty-desc">使用 AI 创作功能生成歌曲后会显示在这里</div>
           <button class="ai-btn-primary" onclick="switchAiTab('create')">✨ 开始创作</button>
@@ -434,7 +435,7 @@ function renderHistoryTab(el) {
         ${items.map(it => `
           <div class="ai-history-card">
             <div class="ai-history-top">
-              <div class="ai-history-avatar">🎵</div>
+              <div class="ai-history-avatar"><span data-ico="music" data-ico-only></span></div>
               <div class="ai-history-meta">
                 <div class="ai-history-name">${esc(it.title)}</div>
                 <div class="ai-history-detail">${esc(it.style || '流行')} · ${fmtAiDate(it.createdAt)}</div>
@@ -442,9 +443,9 @@ function renderHistoryTab(el) {
             </div>
             ${it.lyrics ? `<div class="ai-history-lyrics">${esc(it.lyrics.substring(0, 100))}${it.lyrics.length > 100 ? '...' : ''}</div>` : ''}
             <div class="ai-history-actions">
-              ${it.audioPath ? `<button class="ai-btn-action" onclick="playAiSong('${escQ(it.audioPath)}')">▶ 播放</button>` : ''}
-              <button class="ai-btn-action" onclick="regenerateFromHistory('${escQ(JSON.stringify(it))}')">🔄 重生成</button>
-              <button class="ai-btn-action" onclick="showAiLyricsDetail('${escQ(JSON.stringify(it.lyrics || ''))}')">📝</button>
+              ${it.audioPath ? `<button class="ai-btn-action" onclick="playAiSong('${escQ(it.audioPath)}')" data-ico="play">播放</button>` : ''}
+              <button class="ai-btn-action" onclick="regenerateFromHistory('${escQ(JSON.stringify(it))}')" data-ico="refresh">重生成</button>
+              <button class="ai-btn-action" onclick="showAiLyricsDetail('${escQ(JSON.stringify(it.lyrics || ''))}')" data-ico="note" data-ico-only title="查看歌词"></button>
             </div>
           </div>
         `).join('')}
@@ -455,7 +456,7 @@ function renderHistoryTab(el) {
     `;
   }).catch(e => {
     if (seq !== _historyRenderSeq || aiState.tab !== 'history') return;
-    el.innerHTML = '<div class="ai-empty"><div class="ai-empty-icon">⚠️</div><div class="ai-empty-title">加载失败</div></div>';
+    el.innerHTML = '<div class="ai-empty"><div class="ai-empty-icon"><span data-ico="alert" data-ico-only></span></div><div class="ai-empty-title">加载失败</div></div>';
     logger.warn('[aiHistory] 加载失败:', e.message);
   });
 }
@@ -575,9 +576,10 @@ async function generateAiLyrics() {
         hint = document.createElement('div');
         hint.id = 'aiMusicPromptHint';
         hint.style.cssText = 'font-size:12px;color:var(--fg-3);margin-top:4px;padding:4px 8px;background:var(--elev-1);border-radius:4px;border-left:2px solid var(--neon-purple);';
+        hint.dataset.ico = 'music';
         titleEl.parentNode.insertBefore(hint, titleEl.nextSibling);
       }
-      hint.textContent = '🎵 音乐描述: ' + aiState.musicPrompt;
+      hint.textContent = '音乐描述: ' + aiState.musicPrompt;
       hint.style.display = 'block';
     }
 
@@ -747,10 +749,10 @@ async function generateAiMusic() {
     // 至少有一首成功
     setProgressWidth('100%');
     if (succeeded.length === totalTasks) {
-      setProgressText('✅ 全部完成！');
+      setProgressText('全部完成！');
       showToast(t('toast.aiMusicDone', { n: totalTasks }), 'success');
     } else {
-      setProgressText(`✅ ${succeeded.length}/${totalTasks} 完成`);
+      setProgressText(`${succeeded.length}/${totalTasks} 完成`);
       showToast(t('toast.aiMusicPartial', { ok: succeeded.length, fail: failed.length }), 'warn');
     }
 
@@ -772,13 +774,13 @@ async function generateAiMusic() {
       // 于是 ' 又变回裸单引号、逃出字符串（AI 生成的音频文件名可含任意字符）。
       const escapedPath = escQ(res.filePath);
       return `<div class="ai-result-card${succeeded.length > 1 ? ' ai-result-card-sm' : ''}">
-        <div class="ai-result-icon">🎵</div>
+        <div class="ai-result-icon"><span data-ico="music" data-ico-only></span></div>
         <div class="ai-result-info">
           <div class="ai-result-title">${esc(title)}</div>
           <div class="ai-result-meta">${res.label ? esc(res.label) + ' · ' : ''}${esc(styleLabel)}</div>
         </div>
         <div class="ai-result-btns">
-          <button class="ai-btn-action" onclick="playAiSong('${escapedPath}')">▶ 播放</button>
+          <button class="ai-btn-action" onclick="playAiSong('${escapedPath}')" data-ico="play">播放</button>
           <button class="ai-btn-action" onclick="openAiFolder()">📂</button>
         </div>
       </div>`;
@@ -794,7 +796,7 @@ async function generateAiMusic() {
     if (areaCard) {
       const redoBtn = document.createElement('div');
       redoBtn.style.cssText = 'margin-top:10px;text-align:center';
-      redoBtn.innerHTML = '<button class="ai-btn-primary" onclick="regenerateAiMusic()">🔄 重新生成全部</button>';
+      redoBtn.innerHTML = '<button class="ai-btn-primary" onclick="regenerateAiMusic()" data-ico="refresh">重新生成全部</button>';
       areaCard.appendChild(redoBtn);
     }
 
@@ -901,7 +903,7 @@ function showAiLyricsDetail(json) {
     overlay.setAttribute('data-modal', '');
     overlay.setAttribute('data-modal-close', '-');
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-    overlay.innerHTML = `<div class="ai-modal"><div class="ai-modal-header"><span>📝 歌词详情</span><button onclick="document.getElementById('aiLyricsDetailModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button></div><div class="ai-modal-body"><pre class="ai-lyrics-detail">${esc(lyrics)}</pre></div></div>`;
+    overlay.innerHTML = `<div class="ai-modal"><div class="ai-modal-header"><span data-ico="note">歌词详情</span><button onclick="document.getElementById('aiLyricsDetailModal').remove()" data-ico="x" data-ico-only aria-label="关闭"></button></div><div class="ai-modal-body"><pre class="ai-lyrics-detail">${esc(lyrics)}</pre></div></div>`;
     document.body.appendChild(overlay);
   } catch (_e) { showToast(t('toast.aiLoadFailed'), 'error'); }
 }
@@ -987,7 +989,7 @@ async function generateAiPlaylist() {
   } catch (e) {
     showToast(t('toast.aiGenFailed', { msg: errBrief(e) }), 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '📋 生成歌单'; }
+    if (btn) { btn.disabled = false; btn.textContent = '生成歌单'; }
   }
 }
 

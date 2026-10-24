@@ -99,8 +99,16 @@ const HOME_PLATFORMS = [
  *   完整列表不是首页该承担的信息量。
  */
 const LIST_FOLD = 8;
-/** 横向卡片流里歌单卡的列数上限（超过则靠横向滚动，不再挤压缩小） */
-const GRID_LIMIT = 12;
+/**
+ * 封面网格的渲染上限（2026-10-24）：榜单分区（songCardHtml）与歌单分区
+ * （playlistCardHtml）共用同一上限 —— 用户实测反馈「两个平台的视图大小
+ * 不一致」，根因是两套网格的列宽与条数各自为政（榜单 120px×16、歌单
+ * 104px×12，band 高度差一倍）。统一后两种分区同尺寸同行数。
+ * 「横向卡片流」的旧语义已废：现在是 auto-fill 网格，超上限走各分区
+ * 的「查看完整榜单 / 查看完整歌单」入口。
+ */
+const SONG_CARD_LIMIT = 16;
+const GRID_LIMIT = SONG_CARD_LIMIT;
 /** 单分区请求超时（毫秒） */
 const SECTION_TIMEOUT = 10000;
 
@@ -243,7 +251,23 @@ function renderHomeShell() {
   }
 
   _shellRendered = true;
+
+  // 门户布局（发现页布局 c）：无 tab，全平台同屏。骨架在这里刚渲染完，
+  // 各平台首分区仍是「待加载」——若当前是门户布局，立即幂等拉齐
+  //（loadPlatform 对 loading/done 直接返回，重复调用无害）。
+  const homeRoot = document.getElementById('homePage');
+  if (homeRoot && homeRoot.dataset.discoverLayout === 'c') loadAllHomePlatforms();
 }
+
+/**
+ * 门户布局的数据预载：四个平台的首分区一次拉齐。
+ * 供 applyDiscoverLayout（设置切换 / boot 恢复）与 renderHomeBlocks 尾部调用；
+ * 幂等性由 loadPlatform 自己保证，这里不做去重。
+ */
+function loadAllHomePlatforms() {
+  for (const p of HOME_PLATFORMS) loadPlatform(p.plat);
+}
+window.loadAllHomePlatforms = loadAllHomePlatforms;
 
 // ── 平台 tab 切换 / 平台内分区切换 ────────────────────────
 /**
@@ -451,9 +475,9 @@ async function loadHomeRecommendations() {
 /**
  * 渲染一个分区的内容。
  *
- * grid 分区按 GRID_LIMIT 截断：网易云推荐歌单上游会给到 30+ 条，全渲染后
- * 网格要占 3 行以上（6 列 × 110px 卡），单块高度又会失控 —— 那正是这次
- * 改版要解决的问题。首页承担「发现」，超出部分交给「查看完整歌单」。
+ * grid 分区按 GRID_LIMIT 截断（= SONG_CARD_LIMIT，两种分区形态一致）：
+ * 推荐歌单上游会给到 30+ 条，全渲染后单块高度失控 —— 首页承担「发现」，
+ * 超出部分交给「查看完整歌单」。
  */
 function renderSection(meta, data) {
   const el = document.getElementById(_domId(meta.sec));
@@ -482,15 +506,56 @@ function renderSection(meta, data) {
       ? items.slice(0, GRID_LIMIT).map(playlistCardHtml).join('')
       : `<div class="home-sec-msg">没有匹配「${esc(_homeFilterStr)}」的歌单</div>`;
   } else {
+    // 2026-10-24 榜单改封面卡形态：与歌单分区同一视觉语言（用户定向「都做成封面网格」）。
+    // 行模板 songRowsHtml 保留给「查看完整榜单」弹窗（详情视图行信息更全）。
+    // 计数必须用**过滤后**的 pairs.length：用未过滤的 data.length 会让
+    // 「查看完整榜单」在筛选后仍报全量（renderer-audit 钉的是这条管道）。
     const { pairs } = filterHomeSection('list', data, _homeFilterStr);
-    // 计数必须用**过滤后**的 pairs.length，不能用 data.length：
-    // 后者是未过滤总量，「查看完整榜单（共 N 首）」会在筛选后仍报全量，
-    // 且 N > LIST_FOLD 时按钮明明该消失却还在（点开只看到 2 首）。
     el.innerHTML = pairs.length
-      ? listHtml(meta, pairs, pairs.length)
+      ? chartPlayAllBtn(meta, pairs.length)
+        + pairs.slice(0, SONG_CARD_LIMIT).map((p) => songCardHtml(meta, p)).join('')
+        + chartMoreBtn(meta, pairs.length)
       : `<div class="home-sec-msg">没有匹配「${esc(_homeFilterStr)}」的歌曲</div>`;
   }
   _sinkUnavailableSections(_platOf(meta.sec));
+}
+
+/* SONG_CARD_LIMIT 声明在文件头部常量区（与 GRID_LIMIT 绑定，见彼处注释）。 */
+
+/** 播放全部按钮（榜单卡分区顶部）：整单连播走 planSectionPlay 从原始数据重取。 */
+function chartPlayAllBtn(meta, total) {
+  const playAllCount = total > PLAY_ALL_LIMIT ? `前 ${PLAY_ALL_LIMIT}` : `共 ${total}`;
+  return `<button class="list-more-btn" onclick="playAllHomeChart('${escQ(meta.sec)}')" data-ico="play">${esc(_tr('home.playAllChart', `播放全部（${playAllCount} 首）`, { n: total }))}</button>`;
+}
+
+/** 查看完整榜单按钮（榜单卡分区底部）：完整行视图开弹窗。 */
+function chartMoreBtn(meta, total) {
+  return total > SONG_CARD_LIMIT
+    ? `<button class="list-more-btn" onclick="openHomeChartModal('${escQ(meta.sec)}')">${esc(_tr('home.viewFullChart', `查看完整榜单（共 ${total} 首）`, { n: total }))} ▸</button>`
+    : '';
+}
+
+/**
+ * 榜单封面卡。与行模板 songRowsHtml（「查看完整榜单」弹窗用）共享同一套
+ * 处理器与下标+id 双重校验（_resolveSectionSong），只是展示形态不同：
+ * 封面 + 名次角标（前三名高亮）+ 标题/歌手，操作按钮悬停显形。
+ */
+function songCardHtml(meta, { s, i }) {
+  return `
+    <div class="home-song-card" data-sec="${escAttr(meta.sec)}" data-ridx="${i}" tabindex="0" role="button" onclick="playRecommendById('${escQ(meta.sec)}',${i},'${escQ(s.id)}')">
+      <div class="home-song-cover">
+        ${coverThumbHtml(s.cover, 'home-song-cover-img')}
+        <span class="home-song-rank${i < 3 ? ' top3' : ''}">${i + 1}</span>
+        <div class="home-song-hover">
+          <button class="top-song-action" title="播放" aria-label="播放 ${escAttr(s.title)}" onclick="event.stopPropagation();playRecommendById('${escQ(meta.sec)}',${i},'${escQ(s.id)}')">${svgIcon('play')}</button>
+          <button class="top-song-action" title="下载" aria-label="下载 ${escAttr(s.title)}" onclick="event.stopPropagation();addRecommendDownload('${escQ(meta.sec)}',${i},'${escQ(s.id)}')">${svgIcon('down')}</button>
+          <button class="top-song-action" title="添加到歌单" aria-label="添加到歌单" onclick="event.stopPropagation();quickAddRecommendToPlaylist('${escQ(meta.sec)}',${i},'${escQ(s.id)}')">${svgIcon('plus')}</button>
+          ${heartBtnHtml(s, 'top-song-action')}
+        </div>
+      </div>
+      <div class="home-song-title" title="${esc(s.title)}">${esc(s.title)}</div>
+      <div class="home-song-artist">${esc(s.artist)}</div>
+    </div>`;
 }
 
 function renderSectionError(meta, msg) {
@@ -564,24 +629,11 @@ function playlistCardHtml(p) {
           : ''}
         <div class="playlist-cover-ph">${noCoverSvgHtml()}</div>
         ${p.playCount ? `<span class="playlist-playcount">${formatPlayCount(p.playCount)}</span>` : ''}
-        <div class="playlist-hover-play">▶ 浏览歌单</div>
+        <div class="playlist-hover-play" data-ico="play">浏览歌单</div>
       </div>
       <div class="playlist-name" title="${esc(p.name)}">${esc(p.name)}</div>
       <div class="playlist-source">${esc(srcLabel(p.source))}</div>
     </div>`;
-}
-
-function listHtml(meta, pairs, total) {
-  const shown = pairs.slice(0, LIST_FOLD);
-  const more = total > LIST_FOLD
-    ? `<button class="list-more-btn" onclick="openHomeChartModal('${escQ(meta.sec)}')">${esc(_tr('home.viewFullChart', `查看完整榜单（共 ${total} 首）`, { n: total }))} ▸</button>`
-    : '';
-  // 折叠视图只画 8 行，整单连播走 planSectionPlay 从原始数据重取 ——
-  // 按钮若只播 shown，用户点的「播放全部」就永远只有前 8 首。
-  // 超出入队上限时按钮写「前 N 首」：写「共 233 首」却只连播 100 首等于骗人。
-  const playAllCount = total > PLAY_ALL_LIMIT ? `前 ${PLAY_ALL_LIMIT}` : `共 ${total}`;
-  const playAll = `<button class="list-more-btn" onclick="playAllHomeChart('${escQ(meta.sec)}')">${esc(_tr('home.playAllChart', `▶ 播放全部（${playAllCount} 首）`, { n: total }))}</button>`;
-  return playAll + songRowsHtml(meta, shown) + more;
 }
 
 /**
@@ -717,7 +769,7 @@ function openHomeChartModal(sec) {
       <div class="playlist-modal-header">
         <span class="playlist-modal-title">${esc(_tr(meta.i18n, meta.title))} · ${esc(platformName(_platOf(sec)))}</span>
         <span class="home-chart-count">${esc(countText)}</span>
-        <button class="btn-sm" onclick="playAllHomeChart('${escQ(sec)}')">${esc(_tr('home.playAllChartBtn', '▶ 播放全部'))}</button>
+        <button class="btn-sm" onclick="playAllHomeChart('${escQ(sec)}')" data-ico="play">${esc(_tr('home.playAllChartBtn', '播放全部'))}</button>
         <button class="playlist-modal-close" aria-label="${escAttr(_tr('home.close', '关闭'))}" onclick="closeHomeChartModal()" data-ico="x" data-ico-only></button>
       </div>
       <div class="playlist-modal-body" id="homeChartBody">${songRowsHtml(meta, pairs)}</div>
@@ -779,7 +831,7 @@ async function playRecommendSong(song) {
       quality,
     });
     if (!proxied || !proxied.fileUrl) {
-      showToast('⚠️ 音源下载失败：' + (proxied?.error || '未知错误'), 'error', 5000);
+      showToast('音源下载失败：' + (proxied?.error || '未知错误'), 'error', 5000);
       return;
     }
     const songs = [song];
@@ -790,7 +842,7 @@ async function playRecommendSong(song) {
     await loadAndPlay(song, proxied.fileUrl, true);
   } catch (e) {
     logger.warn('播放推荐歌曲失败:', e);
-    showToast('⚠️ 播放失败：' + errBrief(e), 'error', 4000);
+    showToast('播放失败：' + errBrief(e), 'error', 4000);
   }
 }
 
@@ -915,18 +967,28 @@ function renderRecentlyPlayed() {
   if (!section || !list) return;
 
   const recent = typeof getRecentlyPlayed === 'function' ? getRecentlyPlayed() : [];
+  const titleEl = section.querySelector('.hot-section-title');
   if (!recent.length) {
-    section.style.display = 'none';
+    // 2026-10-24 最近播放独立成导航页：空态不能整页留白，行内提示替代旧「隐藏区块」语义
+    section.style.display = 'block';
+    const stale = titleEl && titleEl.querySelector('.section-playall-btn');
+    if (stale) stale.remove();
+    list.innerHTML = `
+      <div class="empty-state" style="padding:40px;">
+        <div class="empty-icon"><span data-ico="history" data-ico-only></span></div>
+        <div class="empty-text">还没有播放记录</div>
+        <div class="empty-hint">去「发现」搜一首歌播放，之后就会出现在这里</div>
+      </div>`;
     return;
   }
 
   section.style.display = 'block';
   // 标题行加「播放全部」：整单最近播放进队列从第一首播
-  const titleEl = section.querySelector('.hot-section-title');
   if (titleEl && !titleEl.querySelector('.section-playall-btn')) {
     const btn = document.createElement('button');
     btn.className = 'section-playall-btn';
-    btn.textContent = '▶ 播放全部';
+    btn.setAttribute('data-ico', 'play');
+    btn.textContent = '播放全部';
     btn.onclick = () => playAllRecent();
     titleEl.appendChild(btn);
   }
@@ -935,9 +997,9 @@ function renderRecentlyPlayed() {
     <div class="recent-item" tabindex="0" role="button" onclick="playRecentSong(${i})" title="${esc(s.title)} - ${esc(s.artist)}">
       <div class="recent-cover">
         ${s.cover
-          ? `<img src="${escAttr(s.cover)}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')" onerror="this.parentElement.innerHTML='🎵'">`
-          : '🎵'}
-        <div class="recent-play-overlay">▶</div>
+          ? `<img src="${escAttr(s.cover)}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')" onerror="this.parentElement.innerHTML='<span data-ico=&quot;music&quot; data-ico-only></span>'">`
+          : '<span data-ico="music" data-ico-only></span>'}
+        <div class="recent-play-overlay" data-ico="play" data-ico-only></div>
       </div>
       <div class="recent-info">
         <div class="recent-title">${esc(s.title)}</div>
@@ -972,7 +1034,7 @@ async function playAllRecent() {
     setState('playIdx', 0);
     setState('currentPlaying', songs[0]);
     await loadAndPlay(songs[0]);
-    showToast(`▶ 正在播放最近播放（共 ${songs.length} 首）`, 'success', 2500);
+    showToast(`正在播放最近播放（共 ${songs.length} 首）`, 'success', 2500);
   } catch (e) {
     logger.warn('[playAllRecent] error:', e);
     showToast('播放失败：' + errBrief(e), 'error', 3000);

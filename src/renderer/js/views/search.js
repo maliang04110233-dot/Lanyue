@@ -62,7 +62,7 @@ function clearLoading() {
 function showLoadError(msg) {
   if (_dom.songList) {
     _dom.songList.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">⚠️</div>
+      <div class="empty-icon"><span data-ico="alert" data-ico-only></span></div>
       <div class="empty-text">加载失败</div>
       <div class="empty-hint">${esc(msg || '')}</div>
     </div>`;
@@ -558,7 +558,7 @@ function renderSongList(list, targetEl = null) {
       ${s.cover
         ? `<img class="song-cover" src="${escAttr(s.cover)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
         : ''}
-      <div class="song-cover-ph" ${s.cover ? 'style="display:none"' : ''}>🎵</div>
+      <div class="song-cover-ph" ${s.cover ? 'style="display:none"' : ''}><span data-ico="music" data-ico-only></span></div>
       <div class="song-info">
         <div class="song-title">${markTerm(s.title, _kw)}</div>
         <div class="song-meta">${markTerm(s.artist, _kw)}${s.album ? ' · ' + (s.albumMid
@@ -571,8 +571,8 @@ function renderSongList(list, targetEl = null) {
       ${dlBadgeHtml(s, _dlQueue)}
       <div class="song-actions">
         ${heartBtnHtml(s)}
-        <button class="action-btn" title="试听" onclick="playSong(${i})">▶</button>
-        <button class="action-btn download-btn" title="下载" onclick="addDownload(${i})">⬇</button>
+        <button class="action-btn" title="试听" onclick="playSong(${i})" data-ico="play" data-ico-only></button>
+        <button class="action-btn download-btn" title="下载" onclick="addDownload(${i})" data-ico="download" data-ico-only></button>
       </div>
     </div>
   `}).join('');
@@ -707,7 +707,7 @@ function batchPlay() {
   setState('playIdx', 0);
   // 传入勾选列表：不带队列参数时 playSong 会把 playQueue 覆盖成整页结果（M9）
   playSong(0, playList);
-  showToast(`▶ 将播放 ${playList.length} 首歌曲`, 'info', 2000);
+  showToast(`将播放 ${playList.length} 首歌曲`, 'info', 2000);
 }
 
 /** 批量：追加到播放队列尾部（不切换当前播放） */
@@ -718,7 +718,7 @@ function batchAddToQueue() {
   const picks = Array.from(selected).sort((a, b) => a - b).map(i => songs[i]).filter(Boolean);
   if (!picks.length) return;
   setState('playQueue', (getState('playQueue') || []).concat(picks));
-  showToast(`➕ 已加入播放队列 ${picks.length} 首`, 'success');
+  showToast(`已加入播放队列 ${picks.length} 首`, 'success');
 }
 
 /** 批量：加入用户歌单（复用歌单选择弹层，quickAddToPlaylist 已支持数组） */
@@ -740,7 +740,7 @@ async function batchFavorite() {
   const picks = Array.from(selected).sort((a, b) => a - b).map(i => songs[i]).filter(Boolean);
   if (!picks.length) { showToast('请先勾选要收藏的歌曲', 'warn'); return; }
   const { toFav, already } = planBatchFav(picks, getState('favoriteKeys') || new Set(), s => favKey(s.source, s.id));
-  if (!toFav.length) { showToast(`♥ ${already} 首都已在收藏夹`, 'info', 2200); return; }
+  if (!toFav.length) { showToast(`${already} 首都已在收藏夹`, 'info', 2200); return; }
   let ok = 0, failed = 0;
   for (const s of toFav) {
     registerFavSong(s);
@@ -748,7 +748,7 @@ async function batchFavorite() {
     else failed++;
   }
   const fail = failed ? `，${failed} 首失败` : '';
-  showToast(`♥ 已收藏 ${ok} 首${favSkipSuffix(already)}${fail}`, ok ? 'success' : 'error');
+  showToast(`已收藏 ${ok} 首${favSkipSuffix(already)}${fail}`, ok ? 'success' : 'error');
 }
 
 // ── 单曲下载 ─────────────────────────────────────────
@@ -812,7 +812,7 @@ async function playSong(idx, queueOverride = null) {
     });
     if (reqId !== _searchPlayRequestId) return;
     if (!proxied || !proxied.fileUrl) {
-      showToast('⚠️ 音源获取失败', 'error', 5000);
+      showToast('音源获取失败', 'error', 5000);
       return;
     }
     // 设置播放队列：batchPlay 传入勾选列表时用它，否则整个搜索结果入队
@@ -826,7 +826,7 @@ async function playSong(idx, queueOverride = null) {
   } catch (e) {
     if (reqId === _searchPlayRequestId) {
       logger.warn('播放失败:', e);
-      showToast('⚠️ 播放失败：' + errBrief(e), 'error', 4000);
+      showToast('播放失败：' + errBrief(e), 'error', 4000);
     }
   }
 }

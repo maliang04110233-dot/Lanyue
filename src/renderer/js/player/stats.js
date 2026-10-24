@@ -293,7 +293,7 @@ export async function copyPlayReportText() {
     lastPlayed: stats.lastPlayed,
   });
   const ok = await copyText(text);
-  showToast(ok ? '📋 听歌报告已复制，可直接粘贴分享' : '复制失败：剪贴板被占用或无权限', ok ? 'success' : 'error', 2500);
+  showToast(ok ? '听歌报告已复制，可直接粘贴分享' : '复制失败：剪贴板被占用或无权限', ok ? 'success' : 'error', 2500);
 }
 
 function showReportModal(html) {

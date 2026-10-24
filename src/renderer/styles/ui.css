@@ -1496,6 +1496,43 @@
 .btn-primary:disabled,
 .btn-primary.is-disabled { opacity: .45; filter: grayscale(.3); cursor: default; transform: none; }
 
+/* ── 3c-12b `.btn-secondary`：3c-12 的同病兄弟 ───────────────────────
+   2026-10-24 视觉检查（CDP 真机截图）抓到：index.html 三处按钮引用了这
+   个全仓无定义的类 —— AI 助手「清空对话」(:522)、智能歌单面板「收起」(:511)、
+   歌单编辑弹窗「用歌内首曲封面」(:1573)。后果与 .btn-primary 当年一样：
+   渲染成 UA 原生按钮，void 主题下是一块刺眼白底（AI 助手页右上角实测），
+   编辑弹窗里还被裁成无字白条。次级按钮 = 描边幽灵样式：透明底 + 边框随
+   主题 token，hover 提亮，尺寸对齐 .btn-primary。 */
+.btn-secondary {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--neon-blue-dim);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-med);
+  letter-spacing: var(--track-cjk);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              transform var(--dur-0) var(--ease);
+}
+.btn-secondary:hover { background: var(--bg-hover); border-color: var(--accent-line); }
+.btn-secondary:active { transform: scale(.98); }
+.btn-secondary:focus-visible { outline: none; box-shadow: var(--glow-focus); }
+
+/* ── 3c-12c `.btn.ghost`：无定义类审计（2026-10-24）补的变体 ────────────
+   index.html:1036「重新查看新手引导」写着 class="btn ghost" —— .btn 基类
+   有定义、ghost 修饰类全仓零命中，按钮一直渲染成实心主样式而非预期的
+   幽灵描边形态。取 .btn-secondary 同款幽灵契约（选择器 0,2,0 胜过 .btn 基类）。 */
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--neon-blue-dim);
+}
+.btn.ghost:hover { background: var(--bg-hover); border-color: var(--accent-line); }
+
 /* ── 3c-13 空态居中 ─────────────────────────────────────────────
    `.queue-empty` 原本是个普通块：一句「暂无下载任务」贴在内容区顶部，
    下面 600px 全是黑的。空态是用户会停留的界面（新装、清空队列后），

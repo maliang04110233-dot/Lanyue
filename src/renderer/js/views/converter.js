@@ -379,7 +379,7 @@ function renderQueue() {
   if (!_convQueue.length) {
     container.innerHTML = `
       <div class="conv-queue-empty">
-        <div class="conv-queue-empty-icon">📋</div>
+        <div class="conv-queue-empty-icon"><span data-ico="music-list" data-ico-only></span></div>
         <div>转换队列为空</div>
         <div class="conv-queue-empty-hint">从上方列表添加歌曲</div>
       </div>`;
@@ -547,7 +547,7 @@ function showConverterEmpty(msg) {
   if (container) {
     container.innerHTML = `
       <div class="empty-state" style="flex:1;padding:40px;">
-        <div class="empty-icon">📂</div>
+        <div class="empty-icon"><span data-ico="folder-open" data-ico-only></span></div>
         <div class="empty-text">${esc(msg || '暂无歌曲')}</div>
       </div>`;
   }

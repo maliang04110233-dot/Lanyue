@@ -84,6 +84,15 @@
   height: 100%; overflow-y: auto; padding-right: var(--sp-1);
 }
 
+/* 最近播放页（2026-10-24 从发现页独立成导航项）：容器规格与 #homePage 一致，
+   内容就是搬过来的 .hot-section 区块 —— 元素 id 未改，渲染链路零改动。 */
+#recentPage {
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  height: 100%; overflow-y: auto; padding-right: var(--sp-1);
+}
+/* 独立成页后区块占满容器宽度（原发现页里与统计卡/榜单同列宽），顶部留白对齐首页节奏 */
+#recentPage .hot-section { margin-top: var(--sp-2); }
+
 /* 首页顶部快捷搜索条
    D5 播放器化打磨：hero 是发现页的门面——加大留白、输入框升格为
    「主角级」44px、搜索按钮带主色光晕。只动视觉不动 DOM。 */
@@ -220,6 +229,112 @@
 }
 
 /* ══════════════════════════════════════════════════════════
+   首页布局变体（2026-10-24）：#homePage[data-discover-layout="a|b|c"]
+   ──────────────────────────────────────────────────────────
+   三套布局定稿自 docs/design/prototype-discover-redesign.html，
+   共用同一份 DOM（#homePage 子元素不增不减），只靠属性选择器切排布：
+     a  内容优先（默认）—— hero/统计/锚点保持既有形态，纵向节奏压缩；
+     b  双栏驾驶舱 —— 锚点条转左侧平台轨（sticky 转常驻），右列 hero/
+        统计/过滤/榜单；栅格区按 grid-area 摆位，子元素顺序无关；
+     c  音乐门户 —— 无 tab：锚点条隐藏，四个平台块的 hidden 被本布局
+        显式覆盖为同屏纵排；进入/切换到该布局时由 loadAllHomePlatforms
+        幂等拉齐各平台首分区（home.js），否则强制显形的块停留在骨架态。
+   切换管道：设置→外观「发现页布局」卡片 → 隐藏 select → GENERAL_PREFS
+   change 监听 → applyDiscoverLayout（写 dataset + 门户预加载）。
+   ══════════════════════════════════════════════════════════ */
+
+/* ── a · 内容优先 ── */
+#homePage[data-discover-layout="a"] .home-hero {
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-lg);
+}
+#homePage[data-discover-layout="a"] .home-search-input,
+#homePage[data-discover-layout="a"] .home-search-btn { height: 38px; }
+#homePage[data-discover-layout="a"] .home-hero-tags { margin-top: var(--sp-2); }
+#homePage[data-discover-layout="a"] .home-stats { display: flex; gap: var(--sp-6); }
+#homePage[data-discover-layout="a"] .home-stats .stat-card {
+  background: none; border: none; box-shadow: none; padding: 0;
+  border-radius: 0; gap: var(--sp-2);
+}
+#homePage[data-discover-layout="a"] .home-stats .stat-card:hover { transform: none; box-shadow: none; }
+#homePage[data-discover-layout="a"] .home-stats .stat-icon { display: none; }
+#homePage[data-discover-layout="a"] .home-anchors {
+  border: 1px solid var(--stroke-1); border-radius: var(--r-md);
+  background: var(--elev-1);
+}
+#homePage[data-discover-layout="a"] .anchor-chip { flex: 1; justify-content: center; }
+
+/* ── b · 双栏驾驶舱 ── */
+#homePage[data-discover-layout="b"] {
+  display: grid; grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-areas:
+    "rail hero"
+    "rail stats"
+    "rail filter"
+    "rail blocks";
+  grid-auto-rows: min-content; align-content: start; column-gap: var(--sp-4);
+}
+#homePage[data-discover-layout="b"] .home-anchors {
+  grid-area: rail; position: static; flex-direction: column; align-items: stretch;
+  gap: var(--sp-1); padding: var(--sp-2); border: 1px solid var(--stroke-1);
+  border-radius: var(--r-lg); background: var(--elev-1); align-self: start;
+}
+#homePage[data-discover-layout="b"] .anchor-chip {
+  justify-content: flex-start; border-color: transparent; background: none;
+  padding: var(--sp-2) var(--sp-3);
+}
+#homePage[data-discover-layout="b"] .anchor-chip.active {
+  background: var(--accent-soft); border-color: transparent; color: var(--fg-1);
+}
+#homePage[data-discover-layout="b"] .home-hero { grid-area: hero; }
+#homePage[data-discover-layout="b"] .home-stats { grid-area: stats; grid-template-columns: repeat(2, 1fr); }
+/* 首页榜单过滤行（a/b 布局显示；c 门户隐藏——单平台过滤在四平台同屏下语义错位）。
+   样式收编进类：曾写在行内 style 上，display:flex 以内联优先级压过了
+   布局变体的 display:none（实测 c 布局下过滤行隐不掉）。 */
+.home-filterrow { display: flex; justify-content: flex-end; margin: 6px 0; }
+#homePage[data-discover-layout="b"] .home-filterrow { grid-area: filter; }
+#homePage[data-discover-layout="b"] #homeBlocks { grid-area: blocks; }
+
+/* ── c · 音乐门户 ──
+   门户不是「默认页去掉 tab 条」：hero 与统计都要紧凑化，把首屏还给
+   四个平台带（2026-10-24 二轮：对照原型 C 补齐这层）。
+   过滤行在门户下隐藏——它过滤的是单平台榜单，四个平台同屏时语义错位。 */
+#homePage[data-discover-layout="c"] .home-anchors { display: none; }
+#homePage[data-discover-layout="c"] .home-hero {
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-lg);
+}
+#homePage[data-discover-layout="c"] .home-search-input,
+#homePage[data-discover-layout="c"] .home-search-btn { height: 38px; }
+#homePage[data-discover-layout="c"] .home-hero-tags { margin-top: var(--sp-2); }
+#homePage[data-discover-layout="c"] .home-stats { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+#homePage[data-discover-layout="c"] .home-stats .stat-card {
+  flex-direction: row; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md); background: var(--elev-1); border: 1px solid var(--stroke-1);
+  box-shadow: none;
+}
+#homePage[data-discover-layout="c"] .home-stats .stat-card:hover { transform: none; box-shadow: none; }
+#homePage[data-discover-layout="c"] .home-stats .stat-icon { display: none; }
+#homePage[data-discover-layout="c"] .home-stats .stat-num { font-size: var(--fs-md); }
+#homePage[data-discover-layout="c"] .home-filterrow { display: none; }
+#homePage[data-discover-layout="c"] .plat-block-head {
+  padding-bottom: var(--sp-2); border-bottom: 1px solid var(--stroke-1);
+}
+#homePage[data-discover-layout="c"] .plat-block[hidden] { display: flex !important; flex-direction: column; gap: var(--sp-3); }
+#homePage[data-discover-layout="c"] .plat-block { margin-bottom: var(--sp-5); }
+/* band 内容高度统一（2026-10-24）：榜单分区是竖排行、歌单分区是横向封面网格，
+   形态不同源，门户下同屏堆叠时 band 高度参差 —— 用统一的内容高度框住：
+   列表的「查看完整榜单」在 340px 内滚动可达，网格两行内不出现滚动条。
+   形态本身保留（榜单没有封面数据，强行统一成网格是造假）。 */
+/* band 内容高度统一（2026-10-24）：榜单分区是竖排行、歌单分区是横向封面网格，
+   形态不同源，门户下同屏堆叠时 band 高度参差 —— 用统一的内容高度框住：
+   列表的「查看完整榜单」在 340px 内滚动可达，网格两行内不出现滚动条。
+   形态本身保留（榜单没有封面数据，强行统一成网格是造假）。
+   min+max 同值 = 内容框精确等高：宽屏下封面网格只有一行时，band 也不会缩矮。 */
+#homePage[data-discover-layout="c"] .plat-block .home-sec {
+  min-height: 340px; max-height: 340px; overflow-y: auto;
+}
+
+/* ══════════════════════════════════════════════════════════
    首页 · 平台分区块（横向卡片流）
    ──────────────────────────────────────────────────────────
    改版前：三平台纵向堆叠成长页，单块 1156px，滚动比 2.23
@@ -300,13 +415,22 @@
 /* 分区内容容器：list / grid 两态 + 空态 */
 .home-sec { width: 100%; }
 .home-sec[hidden] { display: none !important; }
-.home-sec--list { display: flex; flex-direction: column; gap: 2px; }
-/* 歌单网格：132px 起填在 756px 内容区只有 3 列（实测），6 张卡吃掉 ~600px。
-   收到 104px 后约 6 列，同屏看到更多歌单、高度降到一半以下。 */
-.home-sec--grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+/* 榜单卡网格与歌单网格（2026-10-24 统一）：两种分区同屏/切换时形态一致 ——
+   同一套列宽（minmax(120px,1fr)）、同一间距、同一渲染上限（GRID_LIMIT =
+   SONG_CARD_LIMIT = 16，home.js）。旧版榜单是行列表（flex 纵排）、歌单
+   104px 起 12 张一行 —— 两个平台的 band 高低差一倍，用户实测反馈不统一。
+   min-height 340 是第二层统一：QQ 热推荐上游单页固定 12 个（无翻页参数，
+   数据量边界不可修），宽屏下一行封面时 band 也不缩矮 —— 框架等高，
+   空出的底部留白是「上游只给了这么多」的如实呈现。 */
+.home-sec--list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: var(--sp-3);
+  min-height: 340px;
+}
+.home-sec--grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--sp-3);
+  min-height: 340px;
 }
 .home-sec-msg {
   padding: var(--sp-4); text-align: center;
@@ -367,6 +491,58 @@
 .top-song-dur {
   font-size: var(--fs-xs); color: var(--fg-3); flex-shrink: 0;
   font-variant-numeric: tabular-nums; min-width: 32px; text-align: right;
+}
+
+/* ── 榜单封面卡（2026-10-24）──
+   榜单分区与歌单分区统一为封面网格形态（用户定向「都做成封面网格」）。
+   行模板 songRowsHtml 保留给「查看完整榜单」弹窗；卡片与行共享同一套
+   处理器（播放/下载/加歌/收藏 + 下标+id 双重校验）。名次角标前三名高亮，
+   操作按钮悬停/键盘聚焦显形 —— 与行的「常显半透明」策略不同：卡片场景
+   悬停面积小，常显会糊成一片。 */
+.home-sec--list .list-more-btn { grid-column: 1 / -1; justify-self: start; }
+.home-song-card { cursor: pointer; min-width: 0; }
+.home-song-cover {
+  aspect-ratio: 1; border-radius: var(--r-md); position: relative; overflow: hidden;
+  background: var(--bg-deep); border: 1px solid var(--stroke-1);
+  display: flex; align-items: center; justify-content: center;
+}
+.home-song-cover-img { position: relative; display: block; width: 100%; height: 100%; }
+.home-song-cover-img img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transition: opacity var(--dur-3) var(--ease);
+}
+.home-song-cover-img img.loaded { opacity: 1; }
+.home-song-cover-img .cover-ph-svg { width: 30%; height: 30%; }
+.home-song-rank {
+  position: absolute; top: 6px; left: 6px; z-index: 1;
+  min-width: 22px; height: 20px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm); background: color-mix(in srgb, var(--bg-deep) 68%, transparent); color: var(--text);
+  font-size: 11px; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums;
+}
+.home-song-rank.top3 { background: var(--accent-ui); color: var(--on-accent); }
+.home-song-hover {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  background: color-mix(in srgb, var(--bg-deep) 50%, transparent); opacity: 0;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.home-song-card:hover .home-song-hover,
+.home-song-card:focus-visible .home-song-hover { opacity: 1; }
+.home-song-hover .top-song-action {
+  width: 28px; height: 28px; background: color-mix(in srgb, var(--bg-deep) 35%, transparent); color: var(--text);
+}
+.home-song-hover .top-song-action:hover {
+  background: var(--accent-ui); color: var(--on-accent);
+}
+.home-song-title {
+  font-size: var(--fs-sm); font-weight: var(--fw-med); color: var(--fg-1); margin-top: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-song-artist {
+  font-size: var(--fs-xs); color: var(--fg-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* ── 操作按钮组 ──
@@ -495,7 +671,10 @@
    ⚠️ 必须写在这里（基类之后）——两者特异性相同（均为单类选择器），
    靠源码顺序决出胜负。曾写在基类之前，width:640px 被后面的 520px
    静默盖掉（实测宽度仍是 520），外观没有明显异常，只有量了才发现没生效。 */
-.home-chart-modal { width: 640px; max-height: 76vh; }
+/* 完整榜单弹窗：行左标题右操作，宽度随视口走——1920 最大化下 640px
+   只占三分之一屏（用户实测反馈「页面太小」），上限提到 920 并在小窗
+   收缩到视口内；高度仍是 76vh。 */
+.home-chart-modal { width: min(920px, calc(100vw - 48px)); max-height: 76vh; }
 .home-chart-modal .playlist-modal-body { padding: var(--sp-2) var(--sp-3) var(--sp-3); }
 /* 「N 首」计数推到标题右侧 */
 .home-chart-count {
@@ -507,6 +686,26 @@
   padding: 16px 18px; border-bottom: 1px solid var(--neon-blue-dim);
   flex-shrink: 0;
 }
+
+/* ── 歌单详情弹窗：布局收口（2026-10-24 真机视觉检查发现）────────────
+   头部一行塞了标题 + 10 个带 inline flex-shrink:0 的动作按钮，而弹窗壳宽
+   只有 520px：按钮把标题挤成竖排（CJK 逐字换行），自己在右缘被
+   overflow:hidden 截断。修复三件事：
+     1) 壳宽随视口 min(920px, 100vw-48px) —— 首轮收口 640px 后用户在
+        1920 最大化下仍反馈「还是很小」（多选工具栏 7 个按钮挤到换行），
+        与 .home-chart-modal 同一处方；内联 max-width 同步抬到 920；
+     2) 头部允许换行（row-gap 补行距），标题禁止折行 —— 换行后按钮不再
+        挤压标题，慢袋兜底；
+     3) 过滤行在多选模式显形 4 个额外按钮时会把 flex:1;min-width:0 的
+        输入框挤成不可用的窄条（实测渲染成黑块）—— 输入框给 180px 最小
+        可用宽度（写在 index.html 内联样式上，与该行其他内联样式同处）。 */
+#playlistDetailModal .playlist-modal { width: min(920px, calc(100vw - 48px)); }
+/* 平台歌单弹窗（首页歌单卡点入）：曾无覆盖、吃基类 520px —— 1920 最大化下
+   工具栏（播放全部/订阅/加入队列/存为歌单…）挤到换行（用户实测截图）。
+   与歌单详情弹窗同一处方。 */
+#playlistModal .playlist-modal { width: min(920px, calc(100vw - 48px)); }
+#playlistDetailModal .playlist-modal-header { flex-wrap: wrap; row-gap: var(--sp-2); }
+#playlistDetailModal .playlist-modal-title { white-space: nowrap; }
 .playlist-modal-title { font-size: 14px; font-weight: 600; }
 .playlist-modal-close {
   width: 26px; height: 26px; border-radius: var(--r-sm); border: none;
@@ -1165,6 +1364,22 @@
 .ai-workspace { display: flex; gap: var(--sp-4); height: 100%; min-height: 0; }
 .ai-sidebar { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: var(--sp-3); overflow-y: auto; padding-right: 4px; }
 .ai-main { flex: 1; display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+
+/* ── AI 创作页壳层（2026-10-24 无定义类审计补）──────────────────────
+   ai-header / ai-title / ai-tabs / ai-content 四个壳类全仓零样式定义。
+   该页当前被 FEATURES.ai=false 摘除入口（不可达），但代码在位 —— 这里
+   补上最小布局，特性恢复启用时页面结构不再散架。 */
+.ai-header { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.ai-title { font-size: var(--fs-md); font-weight: var(--fw-semi); color: var(--fg-1); }
+.ai-tabs { margin-left: auto; display: flex; gap: var(--sp-1); }
+.ai-content { width: 100%; display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* ── 面板徽标（下载页队列计数 / 历史页状态文本，2026-10-24 审计补）── */
+.panel-badge { font-size: var(--fs-xs); color: var(--fg-3); padding: 0 var(--sp-2); }
+
+/* ── 最常播放统计值（2026-10-24 审计补）：stat-most 是歌名（长文本），
+   此前无定义、跟随 stat-num 的 fs-xl 导致 ellipsis 极短；降一档字号。 */
+.stat-most { font-size: var(--fs-md); }
 
 /* 卡片 */
 .ai-card {

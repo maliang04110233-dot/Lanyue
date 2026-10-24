@@ -193,7 +193,7 @@ export function detectDuplicateSongs() {
   _dupState.selected.clear();
 
   if (!duplicates.length) {
-    showToast('🎉 没有发现重复歌曲', 'success');
+    showToast('没有发现重复歌曲', 'success');
     return;
   }
 
@@ -385,7 +385,7 @@ export async function detectContentDuplicates() {
   }
   if (!dir) { showToast('请先在本地库「扫描目录」选择一个音乐目录', 'warn'); return; }
 
-  showToast('🧬 正在按文件内容查重…', 'info', 2500);
+  showToast('正在按文件内容查重…', 'info', 2500);
   try {
     const r = await api.findContentDuplicates(dir);
     if (r.error) { showToast('内容查重失败: ' + r.error, 'error'); return; }
@@ -393,7 +393,7 @@ export async function detectContentDuplicates() {
     _dupState.groups = groups;
     _dupState.selected.clear();
     if (!groups.length) {
-      showToast(`🎉 内容级没有重复（扫描 ${r.scanned || 0} 个文件）`, 'success');
+      showToast(`内容级没有重复（扫描 ${r.scanned || 0} 个文件）`, 'success');
       return;
     }
     // 每组保留路径序第一份，其余预选待删（行内仍可反选）
@@ -401,7 +401,7 @@ export async function detectContentDuplicates() {
       for (let i = 1; i < group.length; i++) _dupState.selected.add(group[i].filePath);
     }
     renderDuplicateModal();
-    showToast(`🧬 发现 ${groups.length} 组内容完全相同，最多可释放 ${formatBytes(r.wasted || 0)}`, 'info', 4500);
+    showToast(`发现 ${groups.length} 组内容完全相同，最多可释放 ${formatBytes(r.wasted || 0)}`, 'info', 4500);
   } catch (e) {
     showToast('内容查重失败: ' + errBrief(e), 'error');
   }

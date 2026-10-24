@@ -46,7 +46,7 @@ function renderPlaylistList(playlists) {
   container.innerHTML = shown.map(pl => `
     <div class="playlist-card" data-id="${escAttr(pl.id)}" tabindex="0" role="button" onclick="openPlaylistDetail('${escQ(pl.id)}')">
       <div class="playlist-card-cover">
-        ${pl.cover ? `<img src="${escAttr(pl.cover)}" alt="${esc(pl.name)}" onerror="this.style.display='none'">` : `<div class="playlist-card-placeholder">${pl.system ? HEART_ON : '📋'}</div>`}
+        ${pl.cover ? `<img src="${escAttr(pl.cover)}" alt="${esc(pl.name)}" onerror="this.style.display='none'">` : `<div class="playlist-card-placeholder">${pl.system ? HEART_ON : '<span data-ico="music-list" data-ico-only></span>'}</div>`}
         <div class="playlist-card-overlay">
           <span class="playlist-card-count">${t('pl.count', { n: pl.songs?.length || 0 })}</span>
         </div>
@@ -58,8 +58,8 @@ function renderPlaylistList(playlists) {
       <div class="playlist-card-actions" onclick="event.stopPropagation()">
         ${pl.system
           ? ''
-          : `<button class="action-btn" onclick="editPlaylist('${escQ(pl.id)}')" title="${t('pl.card.edit')}">✏️</button>
-        <button class="action-btn" onclick="deletePlaylist('${escQ(pl.id)}')" title="${t('pl.card.delete')}">🗑️</button>`}
+          : `<button class="action-btn" onclick="editPlaylist('${escQ(pl.id)}')" title="${t('pl.card.edit')}" data-ico="pencil" data-ico-only></button>
+        <button class="action-btn" onclick="deletePlaylist('${escQ(pl.id)}')" title="${t('pl.card.delete')}" data-ico="trash" data-ico-only></button>`}
       </div>
     </div>
   `).join('');

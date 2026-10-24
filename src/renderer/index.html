@@ -65,14 +65,15 @@
      -webkit-app-region: drag 在 .topbar 上），窗口控制移到右端。） -->
 <div class="topbar">
   <div class="topbar-links">
-    <button class="nav-item active" data-tab="home" onclick="switchTab('home',this)">发现</button>
-    <button class="nav-item" data-tab="playlist" onclick="switchTab('playlist',this)">歌单</button>
-    <button class="nav-item" data-tab="local" onclick="switchTab('local',this)">本地曲库</button>
+    <button class="nav-item active" data-tab="home" onclick="switchTab('home',this)"><span data-i18n="nav.home">发现</span></button>
+    <button class="nav-item" data-tab="recent" onclick="switchTab('recent',this)"><span data-i18n="nav.recent">最近播放</span></button>
+    <button class="nav-item" data-tab="playlist" onclick="switchTab('playlist',this)"><span data-i18n="nav.playlist">歌单</span></button>
+    <button class="nav-item" data-tab="local" onclick="switchTab('local',this)"><span data-i18n="nav.local">本地曲库</span></button>
     <button class="nav-item" data-tab="aggregate" onclick="switchTab('aggregate',this)"><span data-i18n="nav.aggregate">跨源聚合</span></button>
-    <button class="nav-item" data-tab="subscription" onclick="switchTab('subscription',this)">订阅更新 <span class="nav-badge" id="subBadge" style="display:none;"></span></button>
-    <button class="nav-item" data-tab="download" onclick="switchTab('download',this)">下载管理</button>
-    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)">格式转换</button>
-    <button class="nav-item" data-tab="ai-music" data-feature="ai" onclick="switchTab('ai-music',this)">AI 创作</button>
+    <button class="nav-item" data-tab="subscription" onclick="switchTab('subscription',this)"><span data-i18n="nav.subscription">订阅更新</span> <span class="nav-badge" id="subBadge" style="display:none;"></span></button>
+    <button class="nav-item" data-tab="download" onclick="switchTab('download',this)"><span data-i18n="nav.download">下载管理</span></button>
+    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)"><span data-i18n="nav.converter">格式转换</span></button>
+    <button class="nav-item" data-tab="ai-music" data-feature="ai" onclick="switchTab('ai-music',this)"><span data-i18n="nav.aiMusic">AI 创作</span></button>
     <button class="nav-item" data-tab="assistant" onclick="switchTab('assistant',this)"><span data-i18n="nav.assistant">AI 助手</span></button>
   </div>
   <div class="topbar-right">
@@ -99,7 +100,9 @@
     <div class="content-main">
 
     <!-- 首页 -->
-    <div id="homePage">
+    <!-- data-discover-layout：发现页布局变体开关（a 内容优先 / b 双栏驾驶舱 / c 音乐门户），
+         偏好经 设置→外观 持久化（boot-restore 恢复），CSS 侧见 content.css 布局变体一节 -->
+    <div id="homePage" data-discover-layout="a">
       <!-- 顶部快捷搜索条 + 统计概览 -->
       <div class="home-hero">
         <div class="home-search-row">
@@ -143,14 +146,10 @@
         </div>
       </div>
 
-      <!-- 最近播放 -->
-      <div class="hot-section" id="recentlyPlayedSection" style="display:none;">
-        <div class="hot-section-title" data-ico="clock">最近播放 <button class="section-clear-btn" onclick="clearRecentlyPlayed()" data-i18n="home.clear">清空</button></div>
-        <div class="recent-list" id="recentlyPlayedList"></div>
-      </div>
+      <!-- 最近播放：已独立成导航页 #recentPage（2026-10-24），发现页不再重复展示 -->
 
       <!-- 首页榜单即时过滤：只影响渲染，不清数据（会话级） -->
-      <div style="display:flex;justify-content:flex-end;margin:6px 0;">
+      <div class="home-filterrow">
         <input class="search-input" id="homeFilterInput" placeholder="过滤本页榜单（歌名/歌手/歌单名）..." style="width:250px;">
       </div>
 
@@ -160,6 +159,16 @@
       <!-- 平台分区：由 home.js 的 HOME_PLATFORMS 注册表渲染 -->
       <div class="home-blocks" id="homeBlocks"></div>
 
+    </div>
+
+    <!-- 最近播放页：从发现页独立成导航项（2026-10-24）。元素 id（recentlyPlayedSection /
+         recentlyPlayedList）原样保留 —— home.js 的 renderRecentlyPlayed 与全部播放/清空
+         入口零改动即可继续工作，app.js switchTab 在进入本页时触发重渲染取最新数据。 -->
+    <div id="recentPage" style="display:none;flex-direction:column;">
+      <div class="hot-section" id="recentlyPlayedSection" style="display:none;">
+        <div class="hot-section-title" data-ico="clock">最近播放 <button class="section-clear-btn" onclick="clearRecentlyPlayed()" data-i18n="home.clear">清空</button></div>
+        <div class="recent-list" id="recentlyPlayedList"></div>
+      </div>
     </div>
 
     <!-- 搜索页面 -->
@@ -760,12 +769,8 @@
       </button>
     </header>
     <div class="imm-body">
-      <div class="imm-cover-wrap" id="immCoverWrap">
-        <img class="imm-cover" id="immCover" alt="" style="display:none;">
-        <div class="imm-cover-ph" id="immCoverPh">
-          <svg width="72" height="72" viewBox="0 0 24 24" fill="currentColor"><path d="M9 19a3 3 0 1 1-2-2.83V7l10-2v7.17A3 3 0 1 0 19 15V3L7 5v12.17Z"/></svg>
-        </div>
-      </div>
+      <!-- 封面已按需求移除（2026-10-24）：img 仅作取色载体喂氛围光，永不可见 -->
+      <img id="immCover" alt="" style="display:none;" aria-hidden="true">
       <div class="imm-info">
         <div class="imm-title" id="immTitle">未在播放</div>
         <div class="imm-artist" id="immArtist">—</div>
@@ -1086,6 +1091,35 @@
               <option value="sunset" data-i18n="settings.general.theme.sunset">Sunset 日落</option>
               <option value="forest" data-i18n="settings.general.theme.forest">Forest 森林</option>
               <option value="void" data-i18n="settings.general.theme.void">Void 深黑蓝</option>
+            </select>
+          </div>
+
+          <div class="settings-section-title" data-i18n="settings.general.layoutTitle">发现页布局</div>
+          <div class="settings-card">
+            <!-- 布局卡网格：与主题卡同一读写管道（点击写入隐藏的 #settingDiscoverLayout 并派发
+                 change），CSS 侧见 content.css「首页布局变体」。值 a/b/c 对应原型
+                 docs/design/prototype-discover-redesign.html 的三个定稿变体。 -->
+            <div class="theme-grid">
+              <button type="button" class="theme-card" data-layout-value="a" onclick="selectDiscoverLayout('a')" style="--sw-bg:#0b1220;--sw-card:#101b30;--sw-accent:#00e5ff">
+                <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-name" data-i18n="settings.general.layout.a">内容优先</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
+              </button>
+              <button type="button" class="theme-card" data-layout-value="b" onclick="selectDiscoverLayout('b')" style="--sw-bg:#141026;--sw-card:#1d1738;--sw-accent:#7c3aed">
+                <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-name" data-i18n="settings.general.layout.b">双栏驾驶舱</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
+              </button>
+              <button type="button" class="theme-card" data-layout-value="c" onclick="selectDiscoverLayout('c')" style="--sw-bg:#0a1a14;--sw-card:#10241b;--sw-accent:#00d68f">
+                <span class="theme-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-name" data-i18n="settings.general.layout.c">音乐门户</span>
+                <span class="theme-check" aria-hidden="true" data-ico="check" data-ico-only></span>
+              </button>
+            </div>
+            <select id="settingDiscoverLayout" class="visually-hidden" tabindex="-1" aria-hidden="true">
+              <option value="a" data-i18n="settings.general.layout.a">内容优先</option>
+              <option value="b" data-i18n="settings.general.layout.b">双栏驾驶舱</option>
+              <option value="c" data-i18n="settings.general.layout.c">音乐门户</option>
             </select>
           </div>
 
@@ -1521,7 +1555,7 @@
 
 <!-- 我的歌单：歌单详情弹窗 -->
 <div class="playlist-modal-overlay hidden" id="playlistDetailModal" onclick="event.target === this && closePlaylistDetail()" data-modal data-modal-close="closePlaylistDetail" data-modal-pri="88">
-  <div class="playlist-modal" style="min-width:420px;max-width:560px;max-height:80vh;display:flex;flex-direction:column;">
+  <div class="playlist-modal" style="min-width:420px;max-width:920px;max-height:80vh;display:flex;flex-direction:column;">
     <div class="playlist-modal-header">
       <span class="playlist-modal-title" id="playlistDetailTitle">歌单</span>
       <button class="btn-sm" style="margin-left:auto;flex-shrink:0;" title="整个歌单加入播放队列，从第一首开始播放" onclick="playAllPlaylist()" data-ico="play">播放全部</button>
@@ -1537,8 +1571,8 @@
       <button class="playlist-modal-close" onclick="closePlaylistDetail()" data-ico="x" data-ico-only aria-label="关闭"></button>
     </div>
     <div style="padding:4px 16px;font-size:12px;color:var(--neon-dim);" id="playlistDetailDesc">暂无描述</div>
-    <div style="display:flex;gap:8px;align-items:center;margin:4px 16px 0;">
-      <input type="text" class="setting-input" id="playlistSongFilter" placeholder="过滤本歌单歌曲（标题/歌手/专辑）" style="flex:1;min-width:0;box-sizing:border-box;" oninput="onPlaylistSongFilterInput(this.value)">
+    <div style="display:flex;gap:8px;align-items:center;margin:4px 16px 0;flex-wrap:wrap;row-gap:var(--sp-2);">
+      <input type="text" class="setting-input" id="playlistSongFilter" placeholder="过滤本歌单歌曲（标题/歌手/专辑）" style="flex:1;min-width:180px;box-sizing:border-box;" oninput="onPlaylistSongFilterInput(this.value)">
       <button class="btn-sm" id="playlistSortBtn" style="flex-shrink:0;" title="切换排序（仅视图，不改存储序；排序中拖拽停用）：默认 / 标题 / 歌手 / 添加时间" onclick="cyclePlaylistSort()" data-ico="sort">默认序</button>
       <button class="btn-sm" id="plDlFilterBtn" style="flex-shrink:0;" title="切换下载状态过滤（仅视图）：全部 / 只看未下载（顺手补下）/ 只看已下载（本地能播的）" onclick="cyclePlDlFilter()" data-ico="download">全部状态</button>
       <button class="btn-sm" id="plSelModeBtn" style="flex-shrink:0;" title="多选模式：行首出现勾选框，一次把多首歌移出本歌单（不影响歌曲本身）" onclick="togglePlBulkMode()" data-ico="check-square">多选</button>

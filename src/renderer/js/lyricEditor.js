@@ -61,7 +61,7 @@ function _modalEl() {
     + '<div style="font-weight:600">✏️ 编辑歌词 <span id="lyricEditorTarget" style="font-weight:400;opacity:.65;font-size:12px"></span></div>'
     + '<textarea id="lyricEditorText" spellcheck="false" style="flex:1;min-height:320px;resize:vertical;background:var(--bg-input);color:var(--fg-1);border:1px solid var(--stroke-2);border-radius:8px;padding:10px;font:13px/1.7 Consolas,monospace" placeholder="[00:12.30]歌词行格式，直接粘贴纯文本也可以（将静态显示）"></textarea>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end">'
-    + '<button class="btn-sm" id="lyricEditorClear">🗑 清除</button>'
+    + '<button class="btn-sm" id="lyricEditorClear">data-ico="trash">清除</button>'
     + '<button class="btn-sm" id="lyricEditorCancel">取消</button>'
     + '<button class="btn-sm" id="lyricEditorSave" style="font-weight:600">💾 保存</button>'
     + '</div></div>';

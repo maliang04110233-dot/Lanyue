@@ -94,9 +94,10 @@ test('两个入口都接 playAllHomeChart，且函数走共享计划器', () => 
   assert.ok(body.includes('await loadAndPlay(songs[0])'), '没有从第一首开始播放');
   assert.ok(body.includes('playAllToastText'), '提示文案未走共享函数');
   assert.ok(!/filterHomeSection/.test(body), '不该在视图里自己过滤一遍');
-  // 按钮文案：超过入队上限必须写「前 N 首」，不能谎报整榜都会播
-  const list = home.slice(home.indexOf('function listHtml'), home.indexOf('function songRowsHtml'));
-  assert.ok(list.includes('PLAY_ALL_LIMIT'), 'listHtml 未处理入队上限');
+  // 按钮文案：超过入队上限必须写「前 N 首」，不能谎报整榜都会播。
+  // 2026-10-24 榜单改封面卡：入队上限处理从 listHtml 迁到 chartPlayAllBtn。
+  const list = home.slice(home.indexOf('function chartPlayAllBtn'), home.indexOf('function chartMoreBtn'));
+  assert.ok(list.includes('PLAY_ALL_LIMIT'), 'chartPlayAllBtn 未处理入队上限');
   assert.ok(/前 \$\{PLAY_ALL_LIMIT\}/.test(list), '超限文案未区分「前 N 首」');
   // 最近播放的既有入口不能被顺手改掉
   const recent = home.slice(home.indexOf('async function playAllRecent'));

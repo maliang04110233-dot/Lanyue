@@ -253,7 +253,9 @@ function openPlaylistEditor(playlistId) {
     const playlists = getState('userPlaylists') || [];
     const pl = playlists.find(p => p.id === playlistId);
     if (pl) {
-      titleEl.textContent = '✏️ 编辑歌单';
+      titleEl.textContent = '编辑歌单';
+      // 标题 span 的 data-ico 随模式切换：编辑用铅笔，新建保持 list（见 HTML 默认值）
+      titleEl.dataset.ico = 'pencil';
       nameInput.value = pl.name;
       descInput.value = pl.desc || '';
       if (coverInput) coverInput.value = pl.cover || '';
@@ -262,7 +264,8 @@ function openPlaylistEditor(playlistId) {
       modal.dataset.editId = playlistId;
     }
   } else {
-    titleEl.textContent = '📋 新建歌单';
+    titleEl.textContent = '新建歌单';
+    titleEl.dataset.ico = 'list';
     nameInput.value = '';
     descInput.value = '';
     if (coverInput) coverInput.value = '';
@@ -955,10 +958,10 @@ function showDedupeModal(groups) {
               <div style="font-size:12px;color:var(--neon-dim);">${g.where.map(w => esc(w)).join('、')}</div>
             </div>
             <span style="flex:none;font-size:12px;color:var(--neon-dim);">×${g.where.length}</span>
-            <button class="tab" style="flex:none;" title="保留在首见歌单，从其余歌单移出这一首（不删文件）" onclick="consolidateDup(${i})">🧲 收拢</button>
+            <button class="tab" style="flex:none;" title="保留在首见歌单，从其余歌单移出这一首（不删文件）" onclick="consolidateDup(${i})" data-ico="dedupe">收拢</button>
           </div>`).join('')}
         <div style="margin-top:12px;">
-          <button class="btn-primary" onclick="copyDedupeScanReport()">📋 复制报告</button>
+          <button class="btn-primary" onclick="copyDedupeScanReport()" data-ico="export">复制报告</button>
         </div>
       </div>
     </div>`;

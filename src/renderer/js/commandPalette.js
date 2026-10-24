@@ -81,6 +81,7 @@ function _call(name, ...args) {
 
 const COMMANDS = [
   { id: 'nav-home', icon: 'search', group: '导航', label: '前往 搜歌（发现）', keywords: ['home', '首页', '发现', '推荐'], run: () => _goto('home') },
+  { id: 'nav-recent', icon: 'history', group: '导航', label: '前往 最近播放', keywords: ['recent', '最近播放', '播放记录'], run: () => _goto('recent') },
   { id: 'nav-search', icon: 'search', group: '导航', label: '前往 搜歌（结果）', keywords: ['search', '搜索'], run: () => _goto('search') },
   { id: 'nav-download', icon: 'download', group: '导航', label: '前往 下载', keywords: ['download', '队列'], run: () => _goto('download') },
   { id: 'nav-local', icon: 'folder-open', group: '导航', label: '前往 本地曲库', keywords: ['local', '本地'], run: () => _goto('local') },

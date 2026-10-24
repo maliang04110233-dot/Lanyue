@@ -214,7 +214,7 @@ function applyPlatformBadgeTheme(list) {
 const srcLabel = platformName;
 
 function statusLabel(s) {
-  return { pending: '⏳ 等待', downloading: '⬇ 下载中', done: '✅ 完成', error: '❌ 失败' }[s] || s;
+  return { pending: '等待', downloading: '下载中', done: '完成', error: '失败' }[s] || s;
 }
 
 // ── 播放次数格式化 ────────────────────────────────────

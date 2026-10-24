@@ -26,6 +26,13 @@ const ALLOWED_PREF_KEYS = new Set([
   // 目录 / 通用
   'saveDir', 'localDirPath', 'theme', 'language',
   'quality', 'concurrency', 'speedLimit', 'notifications',
+  // 发现页布局（2026-10-24）：a 内容优先 / b 双栏驾驶舱 / c 音乐门户，
+  // 设置页写、boot-restore 与 views/settings/general.js 的 applyDiscoverLayout 读
+  'discoverLayout',
+  // 首次下载庆祝只弹一次的标记（firstDownloadCelebration.js 写，
+  // 键名经常量 WELCOME_PREF_KEY 传入——prefs-whitelist 守卫的字面量扫描
+  // 看不见这类动态键，2026-10-24 由运行时拒绝日志抓到后补登记）
+  'firstDownloadCelebrated',
   // 命名模板（统一键名：下载页与设置页共用 namingTemplate）
   'namingTemplate',
   // 分平台音质覆盖表：平台 id → standard/hq/lossless，未列出的平台沿用 quality

@@ -202,7 +202,7 @@ let _lyricRequestId = 0;
 // player.js 顶层依赖 audioPlayer 元素和十余个 import，测试里拉不起来。
 const _resumeSeeker = createResumeSeeker({
   onSeek: (_audio, t) => {
-    showToast(`📍 从 ${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')} 继续播放`, 'info', 2000);
+    showToast(`从 ${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')} 继续播放`, 'info', 2000);
   },
 });
 
@@ -272,7 +272,7 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
     // 而 _resumeSeeker 本来就监听 loadedmetadata / readyState 两个时机做 seek
     // （见 player/resumeSeek.js 与上方「根因 2」注释）—— 晚一点拿到进度完全来得及。
     audio.play().catch(() => {
-      showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
+      showToast('自动播放被拦截，请点击播放按钮', 'warn', 3000);
     });
     restorePlayProgress(song).then((savedTime) => {
       if (seq !== _loadSeq) return; // 已切歌，这份进度属于上一首
@@ -344,7 +344,7 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
     audio.src = localUrl;
     // 与上面同一处修正：播放先发起，进度恢复并行（少两个 IPC 往返的首播延迟）
     audio.play().catch(() => {
-      showToast('⚠️ 自动播放被拦截，请点击播放按钮', 'warn', 3000);
+      showToast('自动播放被拦截，请点击播放按钮', 'warn', 3000);
     });
     restorePlayProgress(song).then((savedTime) => {
       if (seq !== _loadSeq) return; // 已切歌，这份进度属于上一首
@@ -443,7 +443,7 @@ async function playSongByIdx(idx, song) {
       await loadAndPlay(song, song._blobUrl, true);
       return;
     }
-    showToast('⚠️ 拖放歌曲已失效，请重新拖入文件', 'warn', 2600);
+    showToast('拖放歌曲已失效，请重新拖入文件', 'warn', 2600);
     return;
   }
   const pkey = prefetchKeyOf(song);
@@ -487,7 +487,7 @@ async function playSongByIdx(idx, song) {
     });
     if (reqId !== _playRequestId) return;
     if (!proxied || !proxied.fileUrl) {
-      showToast('⚠️ 音源获取失败', 'error', 3000);
+      showToast('音源获取失败', 'error', 3000);
       return;
     }
     setState('currentPlaying', song);

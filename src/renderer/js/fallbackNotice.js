@@ -29,11 +29,13 @@ function buildFallbackNotice(result, ownSource, nameOf) {
   if (result.fromAltMemory) {
     const from = result.matchedFrom || ownSource;
     if (to === from) return null;
-    return `🔁 沿用上次的换源结果，正在播放${name(to)}音源（原源${name(from)}暂不可用）`;
+    return `沿用上次的换源结果，正在播放${name(to)}音源（原源${name(from)}暂不可用）`;
   }
   if (result.matchedSong) {
     const from = result.matchedFrom || ownSource;
-    return `🎵 ${name(from)}源不可用，已切换到${name(to)}音源`;
+    // 2026-10-24 emoji 清理：原句「🎵 {from}源不可用，已切换到…」剥掉前缀字符，
+    // 语义（哪个源挂了、切到了谁）由文字完整承载
+    return `${name(from)}源不可用，已切换到${name(to)}音源`;
   }
   return null;
 }

@@ -417,6 +417,38 @@
   0%, 10% { transform: translateX(0); }
   90%, 100% { transform: translateX(var(--marquee-shift)); }
 }
+/* 「讲讲这首歌」：内联小图标钮（歌手行里）。2026-10-24 全视图扫描抓到它
+   从无样式定义——`story-btn` 类在全仓 styles 里零命中，一直渲染成 UA 默认
+   灰块（与 .btn-primary/.btn-secondary 当年的病同源）。样式契约跟随播放条
+   既有 .icon-btn（透明底 / fg-3 / hover 提亮），尺寸压到 22px 匹配小字行高；
+   图标本身走 data-ico（sparkle），这里只管壳。 */
+.story-btn {
+  width: 22px; height: 22px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: var(--r-sm);
+  color: var(--fg-3); font-size: var(--fs-sm); cursor: pointer; padding: 0;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.story-btn:hover { color: var(--fg-1); background: var(--elev-1); }
+.story-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* 歌曲讲解卡（「讲讲这首歌」点开的内容卡，songStory.js 以 display:block 显隐）。
+   2026-10-24 无定义类审计：song-story-card/title/body 三个类全仓零样式定义，
+   讲解内容一直以裸文本形态糊在播放条里 —— 与 .story-btn 同一轮抓到的缺样式。 */
+.song-story-card {
+  background: var(--elev-1); border: 1px solid var(--stroke-1);
+  border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+  margin-top: var(--sp-2); max-height: 220px; overflow-y: auto;
+}
+.song-story-title {
+  font-size: var(--fs-sm); font-weight: var(--fw-semi); color: var(--fg-1);
+  margin-bottom: var(--sp-2);
+}
+.song-story-body {
+  font-size: var(--fs-sm); color: var(--fg-2); line-height: 1.7;
+  white-space: pre-wrap; word-break: break-word;
+}
+
 .pc-sub-row {
   display: flex;
   align-items: center;
@@ -1751,25 +1783,8 @@ audio { display: none; }
   gap: var(--sp-5);
   padding: 0 var(--sp-6);
 }
-.imm-cover-wrap {
-  position: relative;
-  width: min(46vh, 340px);
-  aspect-ratio: 1 / 1;
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  background: var(--bg-deep);
-  border: 1px solid var(--stroke-1);
-  box-shadow:
-    var(--shadow-lg),
-    0 0 60px 10px color-mix(in srgb, var(--cover-color) 26%, transparent);
-  transition: box-shadow var(--dur-3) var(--ease-out);
-}
-.imm-cover { width: 100%; height: 100%; object-fit: cover; display: block; }
-.imm-cover-ph {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--fg-3); opacity: .45;
-}
+/* 封面已按需求移除（2026-10-24）：#immCover 只是隐藏取色载体，无可见样式。
+   布局重心交给歌词区 —— 无封面后歌词即视觉主角。 */
 .imm-info { text-align: center; min-width: 0; max-width: 70vw; }
 .imm-title {
   font-size: var(--fs-3xl);
@@ -1787,8 +1802,10 @@ audio { display: none; }
 
 /* 歌词区：当前行放大高亮，相邻行淡出（Void Glass 规格） */
 .imm-lyrics {
-  width: min(680px, 86vw);
-  max-height: 132px;
+  width: min(760px, 88vw);
+  max-height: min(46vh, 380px);
+  /* 取色光斑正罩本区，靠文字投影保对比（scrim 只保顶/底，不保中段） */
+  text-shadow: 0 1px 10px color-mix(in srgb, var(--bg-deep) 62%, transparent);
   overflow-y: auto;
   text-align: center;
   scrollbar-width: none;
@@ -1798,17 +1815,17 @@ audio { display: none; }
 }
 .imm-lyrics::-webkit-scrollbar { display: none; }
 .imm-lyric-line {
-  padding: 5px 0;
-  font-size: var(--fs-md);
-  color: var(--fg-3);
-  opacity: .5;
+  padding: var(--sp-2) 0;
+  font-size: var(--fs-xl);
+  color: var(--fg-2);
+  opacity: .78;
   cursor: pointer;
   transition: opacity var(--dur-2) var(--ease), color var(--dur-2) var(--ease),
               transform var(--dur-2) var(--ease-out);
 }
-.imm-lyric-line:hover { opacity: .85; }
+.imm-lyric-line:hover { opacity: .92; }
 .imm-lyric-line.active {
-  font-size: var(--fs-xl);
+  font-size: var(--fs-2xl);
   font-weight: var(--fw-semi);
   color: var(--fg-1);
   opacity: 1;

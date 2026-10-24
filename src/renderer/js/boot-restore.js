@@ -14,13 +14,14 @@ import { logger } from './logger.js';
 export async function restoreStartupPrefs(api) {
   // 无相互依赖的启动 IPC 并发拉取：弱机上首屏不再被十几次
   // 串行 round-trip 拖慢。下面的消费顺序保持不变。
-  const [savedSaveDir, savedQuality, savedTheme, savedTemplate, savedLocalDir] =
+  const [savedSaveDir, savedQuality, savedTheme, savedTemplate, savedLocalDir, savedDiscoverLayout] =
     await Promise.all([
       api.getPref('saveDir'),
       api.getPref('quality').catch(() => null),
       api.getPref('theme').catch(() => null),
       api.getPref('namingTemplate'),
       api.getPref('localDirPath'),
+      api.getPref('discoverLayout').catch(() => null),
     ]);
 
   if (savedSaveDir) setState('saveDir', savedSaveDir);
@@ -36,6 +37,10 @@ export async function restoreStartupPrefs(api) {
 
   // 恢复主题（尽早应用，避免闪烁）
   if (savedTheme && typeof applyTheme === 'function') applyTheme(savedTheme);
+
+  // 恢复发现页布局（a/b/c；缺省 a。门户布局的预加载由 applyDiscoverLayout 触发，
+  // 但此刻分区块骨架尚未渲染 —— renderHomeBlocks 尾部会按 dataset 再补一次）
+  if (typeof applyDiscoverLayout === 'function') applyDiscoverLayout(savedDiscoverLayout || 'a');
 
   // 平台清单（v3）：源下拉 / 平台名 / 徽标配色的唯一来源，来自主进程 registry。
   // ⚠️ 必须在 applyTranslations() **之前** —— 本步会重建源下拉 DOM，

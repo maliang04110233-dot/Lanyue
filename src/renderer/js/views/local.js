@@ -177,7 +177,7 @@ async function _doScanLocalDir() {
       setState('localDirPath', null);
       await api.setPref('localDirPath', null);
       list.innerHTML = `<div class="empty-state" style="flex:1">
-        <div class="empty-icon">📂</div>
+        <div class="empty-icon"><span data-ico="folder-open" data-ico-only></span></div>
         <div class="empty-text">目录不存在</div>
         <div class="empty-hint">请重新选择音乐文件夹</div>
       </div>`;
@@ -469,7 +469,7 @@ function _renderLocalRow(s, i) {
     ${s.cover
       ? `<img class="local-row-cover" src="${escAttr(s.cover)}" alt="" style="width:40px;height:40px;border-radius:4px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       : ''}
-    <div class="local-row-cover-ph" style="width:40px;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:var(--elev-2);font-size:18px;${s.cover ? 'display:none' : ''}">🎵</div>
+    <div class="local-row-cover-ph" style="width:40px;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;background:var(--elev-2);${s.cover ? 'display:none' : ''}"><span data-ico="music" data-ico-only></span></div>
     <div class="local-row-info" style="flex:1;min-width:0;">
       <div class="local-row-title" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.title)}</div>
       <div class="local-row-artist" style="font-size:11px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.artist || '未知艺术家')}${s.album ? ' · ' + esc(s.album) : ''}</div>
@@ -479,10 +479,10 @@ function _renderLocalRow(s, i) {
     <span class="local-row-size" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${formatBytes(s.fileSize)}</span>
     <div class="local-row-actions" style="display:flex;gap:4px;">
       ${(() => { const favs = localFavSong(s); return favs ? heartBtnHtml(favs, 'action-btn') : ''; })()}
-      <button class="action-btn" title="播放" onclick="event.stopPropagation();playLocalSong(${i})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:4px;">▶</button>
-      <button class="action-btn" title="编辑" onclick="event.stopPropagation();openEdit(${i})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:4px;">✏️</button>
-      <button class="action-btn" title="拉取在线封面" onclick="event.stopPropagation();refetchCover(${i})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:4px;">🖼️</button>
-      <button class="action-btn download-btn" title="打开文件夹" data-action="open-folder" data-path="${encodedPath}" style="background:none;border:none;cursor:pointer;font-size:14px;padding:4px;">📂</button>
+      <button class="action-btn" title="播放" onclick="event.stopPropagation();playLocalSong(${i})" style="background:none;border:none;cursor:pointer;padding:4px;" data-ico="play" data-ico-only></button>
+      <button class="action-btn" title="编辑" onclick="event.stopPropagation();openEdit(${i})" style="background:none;border:none;cursor:pointer;padding:4px;" data-ico="pencil" data-ico-only></button>
+      <button class="action-btn" title="拉取在线封面" onclick="event.stopPropagation();refetchCover(${i})" style="background:none;border:none;cursor:pointer;padding:4px;" data-ico="image" data-ico-only></button>
+      <button class="action-btn download-btn" title="打开文件夹" data-action="open-folder" data-path="${encodedPath}" style="background:none;border:none;cursor:pointer;padding:4px;" data-ico="folder-open" data-ico-only></button>
     </div>
   </div>`;
 }
@@ -493,7 +493,7 @@ function renderLocalSongs() {
 
   if (!localFiltered || !localFiltered.length) {
     list.innerHTML = `<div class="empty-state" style="flex:1">
-      <div class="empty-icon">📂</div>
+      <div class="empty-icon"><span data-ico="folder-open" data-ico-only></span></div>
       <div class="empty-text">暂无本地歌曲</div>
       <div class="empty-hint">点击"扫描目录"选择音乐文件夹</div>
     </div>`;
@@ -910,7 +910,7 @@ function renderLocalGrid() {
   if (!localFiltered || !localFiltered.length) {
     _localGridInvalidate(); // 空态时作废进行中的分片，避免被后续片覆盖
     grid.innerHTML = `<div class="empty-state" style="flex:1;width:100%">
-      <div class="empty-icon">📂</div>
+      <div class="empty-icon"><span data-ico="folder-open" data-ico-only></span></div>
       <div class="empty-text">暂无本地歌曲</div>
       <div class="empty-hint">点击"扫描目录"选择音乐文件夹</div>
     </div>`;
@@ -922,7 +922,7 @@ function renderLocalGrid() {
         ${s.cover
           ? `<img src="${escAttr(s.cover)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
           : ''}
-        <div class="grid-cover-ph" ${s.cover ? 'style="display:none"' : ''}>🎵</div>
+        <div class="grid-cover-ph" ${s.cover ? 'style="display:none"' : ''}><span data-ico="music" data-ico-only></span></div>
         <div class="grid-play-overlay">▶</div>
       </div>
       <div class="grid-info">

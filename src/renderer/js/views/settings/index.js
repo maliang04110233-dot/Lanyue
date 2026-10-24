@@ -55,6 +55,8 @@ import {
   loadGeneralSettings,
   applyTheme,
   selectTheme,
+  applyDiscoverLayout,
+  selectDiscoverLayout,
   setupGeneralSettingListeners,
 } from './general.js';
 
@@ -351,6 +353,8 @@ export {
   onFallbackDisabledToggle,
   resetFallbackDisabled,
   selectTheme,
+  applyDiscoverLayout,
+  selectDiscoverLayout,
   loadDownloadTemplates,
   openDlTemplateEditor,
   closeDlTemplateEditor,
@@ -388,6 +392,8 @@ window.removeQualityPolicy = removeQualityPolicy;
 window.addQualityPolicy = addQualityPolicy;
 window.resetQualityPolicy = resetQualityPolicy;
 window.selectTheme = selectTheme;
+window.applyDiscoverLayout = applyDiscoverLayout;
+window.selectDiscoverLayout = selectDiscoverLayout;
 window.loadCookieStatus = loadCookieStatus;
 window.loadAccountPlatforms = loadAccountPlatforms;
 window.saveCookie = saveCookie;
