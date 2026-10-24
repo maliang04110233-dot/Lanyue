@@ -125,8 +125,8 @@ test('IPC 聚合 handler 把拉取上限登记给聚合层（且不写死数字�
   const body = IPC.slice(i, i + 4000);
   assert.match(body, /fetched\s*\[\s*src\s*\]\s*=\s*SOURCE_FETCH_LIMIT/,
     '平台歌单拉取成功后要登记上限，否则聚合层无从判断触顶');
-  assert.match(body, /aggregateAcrossSources\(\s*groups\s*,\s*\{[^}]*fetched/s,
-    'fetched 必须传给聚合器');
+  assert.match(body, /aggregateAcrossSources\(\s*(?:localGroup \? \[localGroup, \.\.\.groups\] : groups|groups)\s*,\s*\{[^}]*fetched/s,
+    'fetched 必须传给聚合器（005 后 groups 实参可能带本地组拼接，语义不变）');
   assert.ok(!/fetched\s*\[\s*src\s*\]\s*=\s*2000/.test(body), '不要在 handler 里写死 2000');
 });
 
@@ -209,6 +209,12 @@ async function renderStatBar(state, lang) {
     console,
     logger: { warn() {} },
     platformName: (x) => x,
+    // 005「我的歌」后视图行渲染新增依赖（徽标类名/时长格式/全局状态桥），
+    // 统计栏用例不触达其行为，桩成恒等/空实现即可
+    badgeCls: (x) => x,
+    fmtDuration: () => '0:00',
+    setState: () => {},
+    getState: () => null,
     esc: (x) => String(x == null ? '' : x),
     escAttr: (x) => String(x == null ? '' : x),
     t: (k, vars) => {
