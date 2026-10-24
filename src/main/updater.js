@@ -244,6 +244,19 @@ handle('restart-and-install', async () => {
  * 启动时检查一次（不自动下载），后续用户手动触发
  */
 function initUpdater() {
+  // 冒烟包（build/smoke.config.cjs 的 publish: null）与开发态产物里没有
+  // resources/app-update.yml —— electron-updater 读不到就抛 ENOENT，套上
+  // withRetry 后一次启动连刷 4 条 WARN（3 次重试 + Initial check failed）。
+  // 这不是网络故障：配置文件根本不存在，重试没有意义。启动前先探测，
+  // 缺失即一行 info 静默跳过。正式发布包（build/config.cjs 有 publish 段）
+  // 始终携带该文件，不受影响。
+  const fs = require('fs');
+  const path = require('path');
+  const feedConfig = path.join(process.resourcesPath, 'app-update.yml');
+  if (!fs.existsSync(feedConfig)) {
+    logger.log('[Updater] app-update.yml 缺失（开发/冒烟包），跳过自动更新检查');
+    return;
+  }
   checkForUpdatesWithRetry().catch((err) => {
     logger.warn('[Updater] Initial check failed:', err.message);
   });

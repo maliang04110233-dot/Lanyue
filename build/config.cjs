@@ -148,7 +148,16 @@ module.exports = {
     shortcutName: '揽乐',
     allowElevation: true,
     runAfterFinish: true,
-    deleteAppDataOnUninstall: true,
+    // 2026-10-24：由 true 改为 false（3cfc2aa 打包初期的随手默认，从未被决策）。
+    // userData（%APPDATA%\Lanyue）里是 DPAPI 加密的登录 Cookie（cookies.json）与
+    // prefs.json（歌单/播放统计/AI key/全部设置）——assisted 安装器的更新流程是
+    // 「卸旧装新」，true 时卸载器把 userData 连根删掉 ⇒ 每次装更新后全平台登录、
+    // 歌单、设置全部归零（用户实测反馈「每次安装更新后都需要登录」）。
+    // false 后卸载不动用户数据；确要清空的用户手动删 %APPDATA%\Lanyue 即可。
+    // ⚠️ 时序提醒：本修复生效的前提是「新版本的卸载器」在跑——从旧版本
+    // （1.0.36 及更早，仍是 true）升级到本版本的最后一次更新仍会清一次数据，
+    // 从本版本起之后的更新不再清。
+    deleteAppDataOnUninstall: false,
     installerHeaderIcon: 'assets/icon.ico',
     installerIcon: 'assets/icon.ico',
     uninstallerIcon: 'assets/icon.ico',
