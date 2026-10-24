@@ -338,9 +338,65 @@ async function init() {
 // search 是「搜歌」入口的第二个视图、history 是「下载」页的历史子 tab。
 // 高亮归属集中在 NAV_ALIAS 一处映射（默认值只许有一个家），
 // 调用方一律 switchTab(tab) 即可，不再各自摸 .nav-item[data-tab=...] 是否存在。
-const NAV_ALIAS = { search: 'home', history: 'download' };
+const NAV_ALIAS = { search: 'home', history: 'download', recent: 'library', playlist: 'library', local: 'library', aggregate: 'library' };
 // 3-B：聚合视图首次进入才拉数据，避免反复切页反复打 IPC
 let _aggLoaded = false;
+// 010 音乐库：当前子页（all=我的歌聚合 / playlists / files / recent）。
+// 四页容器保留原 id 与布局，路由层并入「音乐库」——外部调用 switchTab('recent')
+// 等旧 tab 名仍有效（走 _enterLibrary 进对应子页），键盘/面板/首页链接零改动。
+let _libSub = 'all';
+const LIB_SUB_OF_TAB = { library: 'all', aggregate: 'all', playlist: 'playlists', local: 'files', recent: 'recent' };
+
+/**
+ * 进入音乐库的某个子页（010 信息架构收拢）。
+ * 子页签条 #libraryTabsBar 动态挂到「当前可见子页」之前——四个页面容器
+ * 在 DOM 里分属不同层级（历史遗留），静态放一个位置总有一页够不着，
+ * 跟随可见页重挂是唯一对拓扑免疫的做法。
+ */
+function _enterLibrary(sub) {
+  // 守卫域 = 子页名（all/playlists/files/recent）。写成 LIB_SUB_OF_TAB[sub]（tab 名域）
+  // 会把所有合法子页判为未知并重置回 'all'——调用方传对了也白传（实测踩过）。
+  _libSub = (sub === 'all' || sub === 'playlists' || sub === 'files' || sub === 'recent') ? sub : 'all';
+  const pages = {
+    all: document.getElementById('aggregatePage'),
+    playlists: document.getElementById('playlistPage'),
+    files: document.getElementById('localPage'),
+    recent: document.getElementById('recentPage'),
+  };
+  const bar = document.getElementById('libraryTabsBar');
+  const page = pages[_libSub];
+  if (!page) return;
+  if (bar) {
+    page.parentNode.insertBefore(bar, page);
+    bar.style.display = 'flex';
+    bar.querySelectorAll('.lib-subtab').forEach(b => b.classList.toggle('active', b.dataset.lib === _libSub));
+  }
+  if (_libSub === 'all') {
+    page.style.display = 'flex';
+    // 首次进入才拉数据：反复切页不该反复打 IPC（原 aggregate 分支原样迁入）
+    if (!_aggLoaded) { _aggLoaded = true; if (typeof loadAggregated === 'function') loadAggregated(); }
+  } else if (_libSub === 'playlists') {
+    page.style.display = 'flex';
+    if (typeof initPlaylistView === 'function') initPlaylistView();
+  } else if (_libSub === 'files') {
+    page.classList.add('active');
+    const localSongs = getState('localSongs');
+    if (!localSongs || !localSongs.length) scanLocalDir();
+  } else if (_libSub === 'recent') {
+    // 最近播放（2026-10-24 从发现页独立）：进页即重渲染，取最新播放记录
+    page.style.display = 'flex';
+    if (typeof window.renderRecentlyPlayed === 'function') window.renderRecentlyPlayed();
+  }
+}
+
+/** 音乐库子页签（inline onclick）：预置目标子页后走 library 漏斗，
+ *  复用 switchTab 的显隐与准入逻辑，不绕过它。
+ *  域注意：这里收的是**子页名**（all/playlists/files/recent），不是 tab 名——
+ *  拿 LIB_SUB_OF_TAB（tab 名域）校验会只剩 'recent' 一个撞名键通过。 */
+function switchLibrarySub(sub) {
+  if (sub === 'all' || sub === 'playlists' || sub === 'files' || sub === 'recent') _libSub = sub;
+  switchTab('library');
+}
 
 // 「用户当前看着哪个视图」的唯一真相源：switchTab 用行内 display 控制显隐，
 // 隐藏页 style 已写上 none，未访问过的初始态由 index.html 行内样式给出。
@@ -389,40 +445,29 @@ function switchTab(tab, btn) {
   if (subscriptionPage) subscriptionPage.style.display = 'none';
   if (aggregatePage) aggregatePage.style.display = 'none';
   if (aiAssistantPage) aiAssistantPage.style.display = 'none';
+  // 010：音乐库子页签条只在 library 模式显示（_enterLibrary 负责再点亮）
+  const libBar = document.getElementById('libraryTabsBar');
+  if (libBar) libBar.style.display = 'none';
 
   if (tab === 'home') {
     homePage.style.display = 'flex';
     if (!getState('homeRecommendations')) loadHomeRecommendations();
-  } else if (tab === 'recent') {
-    // 最近播放页（2026-10-24 从发现页独立）：进页即重渲染，取最新播放记录
-    if (recentPage) {
-      recentPage.style.display = 'flex';
-      if (typeof window.renderRecentlyPlayed === 'function') window.renderRecentlyPlayed();
-    }
+  } else if (tab === 'library' || tab === 'recent' || tab === 'playlist' || tab === 'local' || tab === 'aggregate') {
+    // 010 信息架构收拢：四页并入音乐库；旧 tab 名继续可路由（键盘/面板/首页链接零改动）。
+    // 显式旧名定位到对应子页；'library' 停留在上次子页（switchLibrarySub 预置 _libSub 后走这里，
+    // 不能查 LIB_SUB_OF_TAB['library']——它恒为 'all'，会把子页签点击全部吞回「全部」）。
+    _enterLibrary(tab === 'library' ? _libSub : (LIB_SUB_OF_TAB[tab] || _libSub));
   } else if (tab === 'search') {
     searchPage.style.display = 'flex';
   } else if (tab === 'download' || tab === 'history') {
     downloadPage.style.display = 'flex';
     // 合并页：download → 队列子页；history → 历史子页（Ctrl+H 等旧入口兼容）
     switchDlSubTab(tab === 'history' ? 'history' : 'queue');
-  } else if (tab === 'local') {
-    localPage.classList.add('active');
-    const localSongs = getState('localSongs');
-    if (!localSongs || !localSongs.length) scanLocalDir();
-  } else if (tab === 'playlist') {
-    if (playlistPage) {
-      playlistPage.style.display = 'flex';
-      if (typeof initPlaylistView === 'function') initPlaylistView();
-    }
   } else if (tab === 'subscription') {
     if (subscriptionPage) {
       subscriptionPage.style.display = 'flex';
       if (typeof initSubscriptionView === 'function') initSubscriptionView();
     }
-  } else if (tab === 'aggregate' && aggregatePage) {
-    aggregatePage.style.display = 'flex';
-    // 首次进入才拉数据：反复切页不该反复打 IPC
-    if (!_aggLoaded) { _aggLoaded = true; loadAggregated(); }
   } else if (tab === 'assistant') {
     if (aiAssistantPage) {
       aiAssistantPage.style.display = 'flex';
@@ -958,6 +1003,7 @@ window.onAggFilter = onAggFilter;
 window.onAggKeyword = onAggKeyword;
 window.getAggregatedState = getAggregatedState;
 window.switchTab = switchTab;
+window.switchLibrarySub = switchLibrarySub;
 window.isTabPageVisible = isTabPageVisible;
 window.switchDlSubTab = switchDlSubTab;
 window.changeSaveDir = changeSaveDir;

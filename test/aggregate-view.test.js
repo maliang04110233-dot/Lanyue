@@ -30,18 +30,27 @@ function sidebarTabs() {
   return [...sb.matchAll(/data-tab="([^"]+)"/g)].map((m) => m[1]);
 }
 
-// ── 1. 侧栏入口 ───────────────────────────────────────
+// ── 1. 入口（010 收拢后 aggregate 是「音乐库」的子页，不再是独立导航项）──
 
-test('侧栏：aggregate 入口存在', () => {
-  assert.ok(sidebarTabs().includes('aggregate'), '侧栏应有 aggregate 入口');
+test('入口：音乐库（library）导航项存在，aggregate 作为其默认子页', () => {
+  assert.ok(sidebarTabs().includes('library'), '顶栏应有 library（音乐库）入口');
+  assert.ok(!sidebarTabs().includes('aggregate'), 'aggregate 已收进音乐库子页签，不得再占一级导航');
 });
 
-test('侧栏：入口带 switchTab onclick（否则 ⌘K 反查与高亮都会漂）', () => {
-  assert.match(HTML, /onclick="switchTab\('aggregate',this\)"/, '入口缺 switchTab onclick');
+test('入口：library 带 switchTab onclick（否则 ⌘K 反查与高亮都会漂）', () => {
+  assert.match(HTML, /onclick="switchTab\('library',this\)"/, '入口缺 switchTab onclick');
 });
 
-test('侧栏：入口带 i18n 键（标题不许硬编码）', () => {
-  assert.match(HTML, /data-i18n="nav\.aggregate"/, '入口标题应走 data-i18n');
+test('入口：library 与子页签带 i18n 键（标题不许硬编码）', () => {
+  assert.match(HTML, /data-i18n="nav\.library"/, '入口标题应走 data-i18n');
+  assert.match(HTML, /data-i18n="library\.tabAll"/, '子页签「全部」应走 data-i18n');
+});
+
+test('子页签条：libraryTabsBar 存在且四子页齐（all/playlists/files/recent）', () => {
+  assert.match(HTML, /id="libraryTabsBar"/, '缺子页签条容器');
+  for (const sub of ['all', 'playlists', 'files', 'recent']) {
+    assert.match(HTML, new RegExp(`data-lib="${sub}"`), `缺子页签 ${sub}`);
+  }
 });
 
 // ── 2. switchTab 接线 ─────────────────────────────────
@@ -49,7 +58,9 @@ test('侧栏：入口带 i18n 键（标题不许硬编码）', () => {
 test('switchTab：认得 aggregatePage（取出、隐藏、显示三处齐全）', () => {
   assert.match(APP, /getElementById\('aggregatePage'\)/, '未取 aggregatePage');
   assert.match(APP, /aggregatePage\.style\.display\s*=\s*'none'/, '切页时未隐藏聚合页');
-  assert.match(APP, /aggregatePage\.style\.display\s*=\s*'flex'/, '未显示聚合页');
+  // 010 起 aggregate 是音乐库子页：显示逻辑在 _enterLibrary 的 all 分支（page 为局部变量）
+  assert.match(APP, /_libSub === 'all'\) \{\s*\n\s*page\.style\.display = 'flex';/,
+    '音乐库「全部」子页未显示聚合页');
 });
 
 test('switchTab：首次进入才拉数据（反复切页不该反复打 IPC）', () => {
@@ -66,7 +77,7 @@ test('switchTab：首次进入才拉数据（反复切页不该反复打 IPC）'
  */
 test('switchTab：侧栏每个 tab 都有顶层分支（分支嵌进别的分支里=页面不可达）', () => {
   const tabs = [...new Set([...HTML.matchAll(/class="nav-item" data-tab="([^"]+)"/g)].map(m => m[1]))];
-  assert.ok(tabs.includes('aggregate'), '侧栏聚合入口没了，本钉就失效了');
+  assert.ok(tabs.includes('library'), '音乐库入口没了，本钉就失效了（010 起 aggregate 是 library 的子页）');
 
   const start = APP.indexOf('function switchTab(tab, btn)');
   assert.ok(start > 0, 'switchTab 找不到');

@@ -66,13 +66,10 @@
 <div class="topbar">
   <div class="topbar-links">
     <button class="nav-item active" data-tab="home" onclick="switchTab('home',this)"><span data-i18n="nav.home">发现</span></button>
-    <button class="nav-item" data-tab="recent" onclick="switchTab('recent',this)"><span data-i18n="nav.recent">最近播放</span></button>
-    <button class="nav-item" data-tab="playlist" onclick="switchTab('playlist',this)"><span data-i18n="nav.playlist">歌单</span></button>
-    <button class="nav-item" data-tab="local" onclick="switchTab('local',this)"><span data-i18n="nav.local">本地曲库</span></button>
-    <button class="nav-item" data-tab="aggregate" onclick="switchTab('aggregate',this)"><span data-i18n="nav.aggregate">跨源聚合</span></button>
+    <button class="nav-item" data-tab="library" onclick="switchTab('library',this)"><span data-i18n="nav.library">曲库</span></button>
     <button class="nav-item" data-tab="subscription" onclick="switchTab('subscription',this)"><span data-i18n="nav.subscription">订阅更新</span> <span class="nav-badge" id="subBadge" style="display:none;"></span></button>
     <button class="nav-item" data-tab="download" onclick="switchTab('download',this)"><span data-i18n="nav.download">下载管理</span></button>
-    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)"><span data-i18n="nav.converter">格式转换</span></button>
+    <button class="nav-item" data-tab="converter" onclick="switchTab('converter',this)"><span data-i18n="nav.converter">工具</span></button>
     <button class="nav-item" data-tab="ai-music" data-feature="ai" onclick="switchTab('ai-music',this)"><span data-i18n="nav.aiMusic">AI 创作</span></button>
     <button class="nav-item" data-tab="assistant" onclick="switchTab('assistant',this)"><span data-i18n="nav.assistant">AI 助手</span></button>
   </div>
@@ -540,6 +537,15 @@
     <textarea class="asst-input" id="assistantInput" rows="2" data-i18n="assistant.placeholder" placeholder="例：把周杰伦的晴天加进「通勤」歌单" aria-label="AI 助手输入框"></textarea>
     <button class="btn-primary" id="assistantSendBtn" onclick="sendAssistant()" data-i18n="assistant.send">发送</button>
   </div>
+</div>
+
+<!-- 010 曲库子页签条：由 app.js 的 _enterLibrary 动态挂到当前可见子页之前，
+     只在 library 模式显示（recent/playlist/local/aggregate 四页并入曲库） -->
+<div id="libraryTabsBar" style="display:none;align-items:center;gap:8px;padding:4px 16px 12px;flex-shrink:0;">
+  <button class="lib-subtab active" data-lib="all" onclick="switchLibrarySub('all')" data-i18n="library.tabAll">全部</button>
+  <button class="lib-subtab" data-lib="playlists" onclick="switchLibrarySub('playlists')" data-i18n="library.tabPlaylists">歌单</button>
+  <button class="lib-subtab" data-lib="files" onclick="switchLibrarySub('files')" data-i18n="library.tabFiles">本地曲库</button>
+  <button class="lib-subtab" data-lib="recent" onclick="switchLibrarySub('recent')" data-i18n="library.tabRecent">最近播放</button>
 </div>
 
 <!-- 3-B 跨源聚合视图：把多份来源合并成一份，并标出跨源同曲 -->

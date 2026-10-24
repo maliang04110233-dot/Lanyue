@@ -527,29 +527,34 @@ test('顶栏 D6：侧栏已退役，导航链接在 .topbar 内按播放器优�
     '侧栏分组 i18n 键已随竖栏退役，顶栏不挂分组标题');
 });
 
-test('顶栏条目：十个 data-tab（2026-10-24 增「最近播放」），其余顺序沿用 D1/D6', () => {
+test('顶栏条目：七个 data-tab（010 音乐库收拢 10→7，recent/playlist/local/aggregate 并入 library），顺序沿用 D1/D6', () => {
   const html = read('index.html');
   const tb = html.slice(html.indexOf('<div class="topbar">'), html.indexOf('<div class="main">'));
   const tabs = [...tb.matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]);
-  // D1 定的顺序在 D6 原样搬进顶栏：home 打头，歌单在本地曲库前，下载在工具段。
-  // 2026-10-24 用户定向：最近播放从发现页区块独立成导航页，插在 home 之后 —— 首次增页，
-  // 其余九个的相对顺序不变；switchTab/⌘K/快捷键的反查契约对新条目同样成立（recent 已接线）。
-  assert.deepStrictEqual(tabs, ['home', 'recent', 'playlist', 'local', 'aggregate', 'subscription', 'download', 'converter', 'ai-music', 'assistant'],
+  // D1 定的顺序在 D6 原样搬进顶栏：home 打头，订阅在下载前。
+  // 2026-10-24 晚 010 信息架构收拢（原型 docs/design/prototype-music-library.html 定稿）：
+  // recent/playlist/local/aggregate 四个音乐类入口收进「音乐库」子页签，
+  // converter 文案改「工具」但 data-tab 不变（路由零改动）；ai-music 保留特性门控。
+  // 旧 tab 名在 app.js 路由层仍可解析（switchTab('recent') → library 子页），键盘/⌘K/首页链接零改动。
+  assert.deepStrictEqual(tabs, ['home', 'library', 'subscription', 'download', 'converter', 'ai-music', 'assistant'],
     '条目增删/换序会破坏 switchTab 兜底查询与 ⌘K/快捷键的 data-tab 反查 —— 增删须连同本钉一起改');
   for (const t of tabs) {
     assert.ok(tb.includes(`onclick="switchTab('${t}',this)"`), `${t} 的 onclick 形状被改，切换链路可能断`);
   }
   assert.ok(!tb.includes('data-tab="search"'),
     '搜索不再是导航条目 —— 它是「搜歌」入口的第二个视图，高亮归属走 app.js 的 NAV_ALIAS');
-  assert.ok(tb.includes('发现'), '合并后的入口叫「发现」（播放器语义，替代下载器时代的「搜歌」）');
+  assert.ok(tb.includes('曲库'), '收拢后的库入口叫「曲库」（四合一，原型 010 定稿；词汇遵循 167/168 命名收口案）');
   assert.ok(!tb.includes('首页'), '导航条目退役后顶栏不许残留「首页」叫法（发现视图的说法留在 ⌘K 括注里）');
 });
 
 test('顶栏条目叫法统一：本地曲库 / 歌单（与首页统计、⌘K、快捷键浮层同一词汇）', () => {
   const html = read('index.html');
+  // 010 收拢后「本地曲库/歌单/最近播放」住进音乐库子页签条（libraryTabsBar），
+  // 词汇统一的地标从顶栏段迁到子页签段；顶栏段反而不该再出现这些词（出现=收拢回潮）
   const tb = html.slice(html.indexOf('<div class="topbar">'), html.indexOf('<div class="main">'));
-  assert.ok(tb.includes('本地曲库'), '顶栏本地条目应与全站通用叫法「本地曲库」一致');
-  assert.ok(!tb.includes('本地歌曲'), '「本地歌曲」是第二套叫法（首页统计标签/排序按钮/⌘K 都叫本地曲库），不许复活');
+  const lib = html.slice(html.indexOf('id="libraryTabsBar"'), html.indexOf('id="libraryTabsBar"') + 700);
+  assert.ok(lib.includes('本地曲库'), '音乐库子页签应与全站通用叫法「本地曲库」一致');
+  assert.ok(!lib.includes('本地歌曲'), '「本地歌曲」是第二套叫法（首页统计标签/排序按钮/⌘K 都叫本地曲库），不许复活');
   assert.ok(!tb.includes('我的歌单'), '顶栏条目精简为「歌单」（页面内大标题保留「我的歌单」不在此段）');
   const sc = read('js', 'shortcuts.js');
   assert.ok(sc.includes('跳到本地曲库'), '快捷键浮层文案跟着统一');
@@ -560,8 +565,8 @@ test('顶栏条目叫法统一：本地曲库 / 歌单（与首页统计、⌘K�
 
 test('app.js：NAV_ALIAS 是高亮归属的唯一映射（search/history 都归到宿主条目），视图在场判定有唯一真相源', () => {
   const src = read('js', 'app.js');
-  assert.ok(src.includes("const NAV_ALIAS = { search: 'home', history: 'download' };"),
-    '页面路由→导航条目的归属集中在这一个映射 —— focusTab/命令面板不许再各自摸按钮存在性（映射的默认值只许有一个家）');
+  assert.ok(src.includes("const NAV_ALIAS = { search: 'home', history: 'download', recent: 'library', playlist: 'library', local: 'library', aggregate: 'library' };"),
+    '页面路由→导航条目的归属集中在这一个映射 —— focusTab/命令面板不许再各自摸按钮存在性（映射的默认值只许有一个家；010 起四个旧 tab 名归 library）');
   assert.ok(src.includes('.nav-item[data-tab="${NAV_ALIAS[tab] || tab}"]'),
     'switchTab 兜底查询必须过别名 —— 裸查 search 会因条目退役找不到按钮，侧栏从此不高亮、也无报错');
   assert.ok(src.includes('function isTabPageVisible('), '视图在场判定函数必须存在');

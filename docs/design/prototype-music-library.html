@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>原型 · 音乐库收拢（① 信息架构升级）— 揽乐</title>
+<style>
+/* ══ 令牌（从 src/renderer/styles/base.css 极夜玻璃 Plus 摘录）══ */
+:root {
+  --bg-deep:#0b0c0e; --bg-card:#131417; --bg-hover:#1b1d21; --bg-input:#16171b;
+  --accent:#00ffc8; --text:#ecedef;
+  --green:#4ade80; --red:#f87171; --gold:#fbbf24; --orange:#fb923c;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;
+  --r-xs:4px;--r-sm:6px;--r-md:10px;--r-lg:14px;--r-xl:20px;--r-full:999px;
+  --fs-xs:11px;--fs-sm:12px;--fs-md:13px;--fs-lg:15px;--fs-xl:17px;--fs-2xl:22px;
+  --fw-med:500;--fw-semi:600;--fw-bold:700;
+  --dur-2:.2s;--dur-3:.32s;--ease:cubic-bezier(.4,0,.2,1);--ease-out:cubic-bezier(.16,1,.3,1);
+  --elev-1:color-mix(in srgb,var(--bg-card) 94%,var(--text) 6%);
+  --elev-2:color-mix(in srgb,var(--bg-card) 86%,var(--text) 14%);
+  --glass:color-mix(in srgb,var(--bg-card) 80%,transparent);
+  --stroke-1:color-mix(in srgb,var(--text) 9%,transparent);
+  --stroke-2:color-mix(in srgb,var(--text) 17%,transparent);
+  --fg-1:var(--text);
+  --fg-2:color-mix(in srgb,var(--text) 62%,var(--bg-deep));
+  --fg-3:color-mix(in srgb,var(--text) 42%,var(--bg-deep));
+  --scrim:color-mix(in srgb,var(--bg-deep) 68%,transparent);
+  --row-h:44px; /* 舒适；紧凑 34px */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--bg-deep);color:var(--fg-1);font-size:var(--fs-md);
+  height:100vh;overflow:hidden;
+  display:flex;flex-direction:column;
+}
+body.compact{--row-h:34px}
+
+/* ══ 原型工具条（非产品 UI）══ */
+.proto-bar{
+  display:flex;align-items:center;gap:var(--sp-3);flex-shrink:0;
+  padding:var(--sp-2) var(--sp-4);
+  background:color-mix(in srgb,var(--accent) 6%,var(--bg-card));
+  border-bottom:1px solid var(--stroke-1);
+  font-size:var(--fs-sm);color:var(--fg-2);z-index:50;
+}
+.proto-bar b{color:var(--accent)}
+.seg{display:flex;border:1px solid var(--stroke-2);border-radius:var(--r-full);overflow:hidden}
+.seg button{
+  border:none;background:transparent;color:var(--fg-2);cursor:pointer;
+  padding:var(--sp-1) var(--sp-4);font-size:var(--fs-sm);transition:all var(--dur-2) var(--ease);
+}
+.seg button.on{background:var(--accent);color:var(--bg-deep);font-weight:var(--fw-semi)}
+.proto-note{margin-left:auto;color:var(--fg-3)}
+
+/* ══ 顶栏 ══ */
+.topbar{
+  display:flex;align-items:center;gap:var(--sp-4);flex-shrink:0;
+  padding:0 var(--sp-5);height:50px;
+  background:var(--glass);backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--stroke-1);
+}
+.brand{font-weight:var(--fw-bold);font-size:var(--fs-lg);letter-spacing:.02em}
+.brand i{color:var(--accent);font-style:normal}
+.topbar-links{display:flex;align-items:center;gap:var(--sp-1);flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.topbar-links::-webkit-scrollbar{display:none}
+.nav-item{
+  border:none;background:transparent;color:var(--fg-2);cursor:pointer;
+  padding:var(--sp-1) var(--sp-3);border-radius:var(--r-sm);
+  font-size:var(--fs-md);white-space:nowrap;transition:all var(--dur-2) var(--ease);
+}
+.nav-item:hover{color:var(--fg-1);background:var(--elev-1)}
+.nav-item.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);font-weight:var(--fw-semi)}
+.nav-item .caret{font-size:9px;margin-left:3px;color:var(--fg-3)}
+.topbar-right{display:flex;gap:var(--sp-2);color:var(--fg-3)}
+.icon-btn{
+  width:30px;height:30px;display:grid;place-items:center;border-radius:var(--r-sm);
+  border:none;background:transparent;color:var(--fg-2);cursor:pointer;font-size:14px;
+}
+.icon-btn:hover{background:var(--elev-1);color:var(--fg-1)}
+/* 现状模式：挤压感是论据本身 */
+body.mode-old .nav-item.warn{color:var(--fg-3)}
+.crowd-hint{
+  font-size:var(--fs-xs);color:var(--gold);white-space:nowrap;
+  padding:2px var(--sp-2);border:1px solid color-mix(in srgb,var(--gold) 35%,transparent);
+  border-radius:var(--r-full);background:color-mix(in srgb,var(--gold) 8%,transparent);
+}
+
+/* ══ 主区 ══ */
+.main{flex:1;min-height:0;display:flex}
+.page{flex:1;min-width:0;overflow-y:auto;padding:var(--sp-6)}
+.page::-webkit-scrollbar{width:8px}
+.page::-webkit-scrollbar-thumb{background:var(--stroke-2);border-radius:4px}
+
+/* 子页签 */
+.subtabs{display:flex;gap:var(--sp-2);margin-bottom:var(--sp-5)}
+.subtab{
+  border:none;background:transparent;color:var(--fg-2);cursor:pointer;
+  padding:var(--sp-2) var(--sp-4);border-radius:var(--r-md);font-size:var(--fs-md);
+  border:1px solid transparent;transition:all var(--dur-2) var(--ease);
+}
+.subtab:hover{color:var(--fg-1)}
+.subtab.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);border-color:color-mix(in srgb,var(--accent) 25%,transparent);font-weight:var(--fw-semi)}
+.subtab small{color:var(--fg-3);font-size:var(--fs-xs);margin-left:4px}
+
+/* 库头：统计 + 密度开关 */
+.lib-head{display:flex;align-items:center;gap:var(--sp-4);margin-bottom:var(--sp-4)}
+.lib-head h2{font-size:var(--fs-2xl);font-weight:var(--fw-bold)}
+.lib-stats{color:var(--fg-3);font-size:var(--fs-sm)}
+.density{
+  margin-left:auto;display:flex;align-items:center;gap:var(--sp-2);
+  font-size:var(--fs-sm);color:var(--fg-3);
+}
+
+/* ══ 行（全部/最近共用）══ */
+.rows{display:flex;flex-direction:column;gap:2px}
+.row{
+  display:flex;align-items:center;gap:var(--sp-3);min-height:var(--row-h);
+  padding:0 var(--sp-3);border-radius:var(--r-md);cursor:pointer;
+  transition:background var(--dur-2) var(--ease);
+}
+.row:hover{background:var(--elev-1)}
+.row.merged-alt{opacity:.6}
+.row.merged-alt:hover{opacity:1}
+.row .idx{width:20px;text-align:right;color:var(--fg-3);font-size:var(--fs-sm);flex-shrink:0}
+.row .cov{
+  width:32px;height:32px;border-radius:var(--r-sm);flex-shrink:0;
+  background:linear-gradient(135deg,var(--elev-2),var(--elev-1));
+  display:grid;place-items:center;color:var(--fg-3);font-size:12px;
+}
+.row .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .t small{color:var(--fg-3);margin-left:var(--sp-2);font-size:var(--fs-xs)}
+.row .dur{color:var(--fg-3);font-size:var(--fs-sm);flex-shrink:0;width:44px;text-align:right}
+.row .act{display:flex;gap:var(--sp-1);flex-shrink:0;opacity:0;transition:opacity var(--dur-2)}
+.row:hover .act{opacity:1}
+.badge{
+  flex-shrink:0;font-size:var(--fs-xs);padding:1px var(--sp-2);
+  border-radius:var(--r-full);line-height:1.5;white-space:nowrap;
+}
+.b-src{border:1px solid var(--stroke-2);color:var(--fg-2);background:color-mix(in srgb,var(--text) 6%,transparent)}
+.b-local{border:1px solid color-mix(in srgb,var(--green) 35%,transparent);color:var(--green);background:color-mix(in srgb,var(--green) 8%,transparent)}
+.b-dup{border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.b-haslocal{border:1px solid color-mix(in srgb,var(--gold) 30%,transparent);color:var(--gold);background:color-mix(in srgb,var(--gold) 8%,transparent)}
+.b-time{color:var(--fg-3);font-size:var(--fs-xs);flex-shrink:0}
+
+/* ══ 歌单网格 ══ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--sp-5)}
+.pl-card{cursor:pointer;border-radius:var(--r-lg);padding:var(--sp-3);transition:background var(--dur-2) var(--ease)}
+.pl-card:hover{background:var(--elev-1)}
+.pl-cov{
+  aspect-ratio:1;border-radius:var(--r-md);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 30%,var(--elev-2)),var(--elev-2));
+  display:grid;place-items:center;font-size:30px;margin-bottom:var(--sp-2);position:relative;
+}
+.pl-cov.n2{background:linear-gradient(135deg,color-mix(in srgb,var(--text) 25%,var(--elev-2)),var(--elev-1))}
+.pl-cov.n3{background:linear-gradient(135deg,color-mix(in srgb,#a78bfa 35%,var(--elev-2)),var(--elev-1))}
+.pl-cov .cnt{
+  position:absolute;right:var(--sp-2);bottom:var(--sp-2);font-size:var(--fs-xs);
+  background:color-mix(in srgb,var(--bg-deep) 70%,transparent);padding:1px 8px;border-radius:var(--r-full);
+}
+.pl-name{font-weight:var(--fw-med);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-meta{color:var(--fg-3);font-size:var(--fs-xs);margin-top:2px}
+
+/* ══ 本地文件表 ══ */
+.file-row .cov{border-radius:var(--r-xs)}
+.file-row .path{color:var(--fg-3);font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.file-row .br{flex-shrink:0;color:var(--green);font-size:var(--fs-xs)}
+
+/* ══ 右侧抽屉（② 的形态）══ */
+.drawer-wrap{position:relative;flex-shrink:0;width:0;transition:width var(--dur-3) var(--ease-out)}
+.drawer-wrap.open{width:380px}
+.drawer{
+  position:absolute;inset:0;overflow-y:auto;
+  background:var(--glass);backdrop-filter:blur(22px);
+  border-left:1px solid var(--stroke-1);padding:var(--sp-5);
+  opacity:0;transition:opacity var(--dur-3) var(--ease-out);
+}
+.drawer-wrap.open .drawer{opacity:1}
+.drawer::-webkit-scrollbar{width:8px}
+.drawer::-webkit-scrollbar-thumb{background:var(--stroke-2);border-radius:4px}
+.dr-head{display:flex;align-items:flex-start;gap:var(--sp-4);margin-bottom:var(--sp-4)}
+.dr-cov{width:88px;height:88px;border-radius:var(--r-md);flex-shrink:0;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 30%,var(--elev-2)),var(--elev-2));display:grid;place-items:center;font-size:32px}
+.dr-info{flex:1;min-width:0}
+.dr-title{font-size:var(--fs-xl);font-weight:var(--fw-bold);margin-bottom:var(--sp-1)}
+.dr-meta{color:var(--fg-3);font-size:var(--fs-sm)}
+.dr-actions{display:flex;gap:var(--sp-2);margin:var(--sp-2) 0 var(--sp-5)}
+.btn-p{
+  border:none;cursor:pointer;border-radius:var(--r-full);
+  padding:var(--sp-2) var(--sp-5);font-size:var(--fs-md);font-weight:var(--fw-semi);
+  background:var(--accent);color:var(--bg-deep);transition:transform var(--dur-2) var(--ease);
+}
+.btn-p:hover{transform:scale(1.03)}
+.btn-g{
+  border:1px solid var(--stroke-2);cursor:pointer;border-radius:var(--r-full);
+  padding:var(--sp-2) var(--sp-5);font-size:var(--fs-md);color:var(--fg-2);
+  background:transparent;transition:all var(--dur-2) var(--ease);
+}
+.btn-g:hover{color:var(--fg-1);border-color:var(--fg-2)}
+.dr-close{
+  position:absolute;top:var(--sp-4);right:var(--sp-4);z-index:2;
+}
+
+/* ══ 底部播放条（静态示意）══ */
+.pbar{
+  flex-shrink:0;height:64px;display:flex;align-items:center;gap:var(--sp-4);
+  padding:0 var(--sp-5);background:var(--glass);backdrop-filter:blur(18px);
+  border-top:1px solid var(--stroke-1);
+}
+.pbar .pc{width:40px;height:40px;border-radius:var(--r-sm);background:linear-gradient(135deg,var(--elev-2),var(--elev-1));display:grid;place-items:center;color:var(--fg-3)}
+.pbar .info{width:200px;min-width:0}
+.pbar .info .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-md);font-weight:var(--fw-med)}
+.pbar .info .a{color:var(--fg-3);font-size:var(--fs-xs)}
+.pbar .ctrl{flex:1;display:flex;align-items:center;justify-content:center;gap:var(--sp-3);color:var(--fg-2)}
+.pbar .ctrl .big{width:38px;height:38px;border-radius:50%;background:var(--accent);color:var(--bg-deep);display:grid;place-items:center;font-size:15px}
+.pbar .prog{width:260px;display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-xs);color:var(--fg-3)}
+.pbar .prog .bar{flex:1;height:4px;border-radius:2px;background:var(--stroke-2);position:relative;cursor:pointer}
+.pbar .prog .bar i{position:absolute;left:0;top:0;bottom:0;width:38%;background:var(--accent);border-radius:2px}
+.pbar .mode{color:var(--fg-3);display:flex;gap:var(--sp-2)}
+
+/* 发现页示意（现状模式下点「发现」给个占位，方案模式同样） */
+.hero{
+  border-radius:var(--r-xl);padding:var(--sp-8);margin-bottom:var(--sp-6);
+  background:
+    radial-gradient(120% 90% at 20% 0%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 60%),
+    var(--bg-card);
+  border:1px solid var(--stroke-1);
+}
+.hero h3{font-size:var(--fs-2xl);margin-bottom:var(--sp-2)}
+.hero p{color:var(--fg-2);font-size:var(--fs-sm)}
+.empty-hint{color:var(--fg-3);padding:var(--sp-8);text-align:center}
+kbd{
+  font-family:inherit;font-size:var(--fs-xs);padding:1px 6px;border-radius:var(--r-xs);
+  border:1px solid var(--stroke-2);background:var(--elev-1);color:var(--fg-2);
+}
+</style>
+</head>
+<body class="mode-new compact">
+
+<!-- 原型工具条 -->
+<div class="proto-bar">
+  <b>原型 · ①音乐库收拢</b>
+  <div class="seg">
+    <button id="btn-old" onclick="setMode('old')">现状（10 项导航）</button>
+    <button id="btn-new" class="on" onclick="setMode('new')">收拢方案（6 项）</button>
+  </div>
+  <div class="seg">
+    <button id="btn-comfy" onclick="setDensity('comfy')">舒适</button>
+    <button id="btn-cpt" class="on" onclick="setDensity('compact')">紧凑</button>
+  </div>
+  <span class="proto-note">收拢方案里点「歌单」卡片试右侧抽屉 · 点子页签切换 · 徽标含义与「我的歌」一致</span>
+</div>
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <div class="brand">揽<i>乐</i></div>
+  <div class="topbar-links" id="navlinks"></div>
+  <div class="topbar-right">
+    <button class="icon-btn">⌕</button>
+    <button class="icon-btn">⚙</button>
+  </div>
+</div>
+
+<!-- 主区 -->
+<div class="main">
+  <div class="page" id="page"></div>
+  <div class="drawer-wrap" id="drawerWrap">
+    <div class="drawer">
+      <button class="icon-btn dr-close" onclick="closeDrawer()">✕</button>
+      <div id="drawerBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部播放条 -->
+<div class="pbar">
+  <div class="pc">♪</div>
+  <div class="info"><div class="n">渡口</div><div class="a">张艾嘉 · 良友</div></div>
+  <div class="ctrl"><button class="icon-btn">⟲</button><button class="icon-btn">◀◀</button><div class="big">▶</div><button class="icon-btn">▶▶</button><button class="icon-btn">☰</button></div>
+  <div class="prog"><span>1:42</span><div class="bar"><i></i></div><span>4:29</span></div>
+  <div class="mode"><button class="icon-btn">词</button><button class="icon-btn">⤢</button></div>
+</div>
+
+<script>
+/* ══ 数据（取自当天真机会话的真实曲目，便于对照）══ */
+const LIB = [
+  { t:'晴天', a:'周杰伦', d:'4:29', src:'local',  dup:3, primary:true,  extra:'FLAC · 2112kbps' },
+  { t:'晴天', a:'周杰伦', d:'4:29', src:'QQ音乐', dup:3, alt:true },
+  { t:'晴天', a:'网易云音乐', d:'4:29', a2:'周杰伦', src:'网易', dup:3, alt:true },
+  { t:'渡口', a:'张艾嘉', d:'4:29', src:'local', extra:'MP3 · 320kbps' },
+  { t:'不知道说什么', a:'张靓颖', d:'3:52', src:'QQ音乐', hasLocal:true },
+  { t:'晴天 (Live)', a:'周杰伦', d:'5:01', src:'B站', variant:true },
+  { t:'童话镇', a:'陈一发儿', d:'4:23', src:'local', extra:'FLAC · 986kbps' },
+  { t:'MISS ME', a:'TizzyT', d:'3:31', src:'网易' },
+];
+const RECENT = [
+  { t:'不知道说什么', a:'张靓颖', src:'QQ音乐', when:'2 小时前' },
+  { t:'渡口', a:'张艾嘉', src:'本地', when:'3 小时前' },
+  { t:'晴天', a:'周杰伦', src:'本地', when:'昨天' },
+  { t:'童话镇', a:'陈一发儿', src:'本地', when:'昨天' },
+  { t:'七里香', a:'周杰伦', src:'网易', when:'前天' },
+];
+const FILES = [
+  { t:'晴天(深情版)', p:'C:/Users/admin/Desktop/新建文件夹/晴天(深情版).flac', br:'2112kbps', d:'4:31' },
+  { t:'渡口', p:'C:/Users/admin/Desktop/新建文件夹/渡口.flac', br:'986kbps', d:'4:29' },
+  { t:'童话镇', p:'C:/Users/admin/Desktop/新建文件夹/童话镇.flac', br:'986kbps', d:'4:23' },
+  { t:'不知道说什么', p:'C:/Users/admin/Desktop/新建文件夹/不知道说什么.mp3', br:'320kbps', d:'3:52' },
+];
+const PLAYLISTS = [
+  { n:'深夜写代码', c:42, m:'18 首 · 你', ic:'☾' },
+  { n:'通勤快节奏', c:36, m:'36 首 · 你', ic:'⚡', v:2 },
+  { n:'周杰伦全集', c:120, m:'120 首 · 你', ic:'♫', v:3 },
+  { n:'雨天', c:24, m:'24 首 · 你', ic:'☂' },
+  { n:'粤语经典', c:55, m:'55 首 · 你', ic:'◈', v:2 },
+  { n:'跑步 BPM>160', c:30, m:'30 首 · 你', ic:'▲', v:3 },
+];
+
+/* ══ 顶栏：现状 vs 方案 ══ */
+const NAV_OLD = ['发现','最近播放','歌单','本地曲库','跨源聚合','订阅更新','下载管理','格式转换','AI 创作','AI 助手'];
+const NAV_NEW = [
+  { n:'发现', page:'discover' },
+  { n:'音乐库', page:'library' },
+  { n:'订阅更新', page:'stub' },
+  { n:'下载管理', page:'stub' },
+  { n:'工具 ▾', page:'stub', tip:'格式转换 / 更多' },
+  { n:'AI 助手', page:'stub' },
+];
+
+let mode = 'new', tab = 'all', density = 'compact';
+
+function setMode(m){ mode = m; if(m==='old'){ tab='all'; closeDrawer(); } render(); }
+function setDensity(d){ density = d; render(); }
+function setTab(t){ tab = t; render(); }
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderNav(){
+  const el = document.getElementById('navlinks');
+  if(mode==='old'){
+    el.innerHTML = NAV_OLD.map((n,i)=>
+      `<button class="nav-item ${i===0?'active':''} ${i>=1&&i<=4?'warn':''}">${esc(n)}</button>`
+    ).join('') + `<span class="crowd-hint">现状：10 项 · 音乐类入口占了 4 个（后 4 个渐弱项）</span>`;
+  } else {
+    el.innerHTML = NAV_NEW.map((x,i)=>
+      `<button class="nav-item ${x.page==='library'&&tab?'':''} ${ (mode==='new'&&i===1)?'active':''}" ${x.tip?`title="${esc(x.tip)}"`:''} onclick="goPage('${x.page}')">${esc(x.n)}</button>`
+    ).join('');
+  }
+}
+
+let curPage = 'library';
+function goPage(p){ curPage = p; if(p!=='library') closeDrawer(); render(); }
+
+function badge(src){ return `<span class="badge ${src==='本地'?'b-local':'b-src'}">${esc(src)}</span>`; }
+
+function renderLibrary(){
+  const stats = `共 ${LIB.length+FILES.length} 首 · ${new Set(LIB.map(s=>s.src)).size+1} 个来源 · 1 组跨源同曲`;
+  let body = `
+    <div class="lib-head">
+      <h2>音乐库</h2><span class="lib-stats">${stats}</span>
+    </div>
+    <div class="subtabs">
+      <button class="subtab ${tab==='all'?'on':''}" onclick="setTab('all')">全部<small>本地+红心</small></button>
+      <button class="subtab ${tab==='playlists'?'on':''}" onclick="setTab('playlists')">歌单<small>6</small></button>
+      <button class="subtab ${tab==='files'?'on':''}" onclick="setTab('files')">本地文件<small>4</small></button>
+      <button class="subtab ${tab==='recent'?'on':''}" onclick="setTab('recent')">最近播放</button>
+    </div>`;
+  if(tab==='all'){
+    body += `<div class="rows">` + LIB.map((s,i)=>{
+      const dupB = s.dup?`<span class="badge b-dup" title="同曲多源并组，组首优先本地副本">同曲×${s.dup}</span>`:'';
+      const hasL = s.hasLocal?`<span class="badge b-haslocal" title="断网也能播">已有本地版</span>`:'';
+      const varB = s.variant?`<span class="badge b-src" title="同名同歌手但时长不同">版别</span>`:'';
+      return `<div class="row ${s.alt?'merged-alt':''}">
+        <span class="idx">${i+1}</span><div class="cov">♪</div>
+        <div class="t">${esc(s.t)}<small>${esc(s.a)}${s.extra?' · '+esc(s.extra):''}</small></div>
+        ${dupB}${varB}${badge(s.src)}${hasL}
+        <span class="dur">${esc(s.d)}</span>
+        <div class="act"><button class="icon-btn">▶</button>${s.src!=='本地'?'<button class="icon-btn">⬇</button>':''}</div>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+  if(tab==='playlists'){
+    body += `<div class="grid">` + PLAYLISTS.map((p,i)=>
+      `<div class="pl-card" onclick="openDrawer(${i})">
+        <div class="pl-cov ${p.v?'n'+p.v:''}">${p.ic}<span class="cnt">${p.c}</span></div>
+        <div class="pl-name">${esc(p.n)}</div><div class="pl-meta">${esc(p.m)}</div>
+      </div>`).join('') + `</div>
+      <p class="empty-hint" style="padding-top:24px">↖ 点任意歌单卡片：详情从右侧滑出，列表不被遮挡（升级点 ②）</p>`;
+  }
+  if(tab==='files'){
+    body += `<div class="rows">` + FILES.map((f,i)=>
+      `<div class="row file-row">
+        <span class="idx">${i+1}</span><div class="cov">▤</div>
+        <div class="t">${esc(f.t)}</div>
+        <div class="path" title="${esc(f.p)}">${esc(f.p)}</div>
+        <span class="badge br">${esc(f.br)}</span><span class="dur">${esc(f.d)}</span>
+        <div class="act"><button class="icon-btn">▶</button><button class="icon-btn">⌂</button></div>
+      </div>`).join('') + `</div>`;
+  }
+  if(tab==='recent'){
+    body += `<div class="rows">` + RECENT.map((r,i)=>
+      `<div class="row">
+        <span class="idx">${i+1}</span><div class="cov">♪</div>
+        <div class="t">${esc(r.t)}<small>${esc(r.a)}</small></div>
+        ${badge(r.src)}<span class="b-time">${esc(r.when)}</span>
+        <div class="act"><button class="icon-btn">▶</button></div>
+      </div>`).join('') + `</div>`;
+  }
+  return body;
+}
+
+function renderDiscover(){
+  return `
+    <div class="hero">
+      <h3>发现</h3>
+      <p>三布局（内容优先 / 双栏驾驶舱 / 音乐门户）保持不变——本原型只动信息架构，不动发现页本身。</p>
+    </div>
+    <p class="empty-hint">发现页内容此处省略（见三布局原型）</p>`;
+}
+
+function renderStub(name){
+  return `<p class="empty-hint">「${esc(name)}」页保持现状，本原型不涉及</p>`;
+}
+
+function render(){
+  document.body.className = `mode-${mode} ${density==='compact'?'compact':''}`;
+  document.getElementById('btn-old').className = mode==='old'?'on':'';
+  document.getElementById('btn-new').className = mode==='new'?'on':'';
+  document.getElementById('btn-comfy').className = density==='comfy'?'on':'';
+  document.getElementById('btn-cpt').className = density==='compact'?'on':'';
+  renderNav();
+  const page = document.getElementById('page');
+  if(mode==='old'){ page.innerHTML = renderStub('现状顶栏 · 10 项导航（顶部可切换回方案）'); return; }
+  if(curPage==='library') page.innerHTML = renderLibrary();
+  else if(curPage==='discover') page.innerHTML = renderDiscover();
+  else page.innerHTML = renderStub(NAV_NEW.find(x=>x.page===curPage)?.n || curPage);
+}
+
+/* ══ 抽屉 ══ */
+function openDrawer(i){
+  const p = PLAYLISTS[i];
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="dr-head">
+      <div class="dr-cov">${p.ic}</div>
+      <div class="dr-info">
+        <div class="dr-title">${esc(p.n)}</div>
+        <div class="dr-meta">${esc(p.m)} · 播放 ${p.c*3} 次</div>
+      </div>
+    </div>
+    <div class="dr-actions"><button class="btn-p">▶ 播放全部</button><button class="btn-g">⬇ 下载</button></div>
+    <div class="rows">` + LIB.slice(0,5).map((s,j)=>
+      `<div class="row"><span class="idx">${j+1}</span><div class="cov">♪</div>
+       <div class="t">${esc(s.t)}<small>${esc(s.a)}</small></div>
+       ${badge(s.src)}<span class="dur">${esc(s.d)}</span></div>`).join('') + `</div>`;
+  document.getElementById('drawerWrap').classList.add('open');
+}
+function closeDrawer(){ document.getElementById('drawerWrap').classList.remove('open'); }
+
+/* URL 参数：?mode=old|new & ?density=compact|comfy & ?tab=...（便于无头截图与分享定稿） */
+(function(){
+  const q = new URLSearchParams(location.search);
+  if(q.get('mode')) mode = q.get('mode');
+  if(q.get('density')) density = q.get('density');
+  if(q.get('tab')) tab = q.get('tab');
+})();
+
+render();
+</script>
+</body>
+</html>

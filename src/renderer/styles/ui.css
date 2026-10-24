@@ -724,6 +724,28 @@
 .song-row.merged-alt { opacity: .62; }
 .song-row.merged-alt:hover, .song-row.merged-alt.playing { opacity: 1; }
 
+/* ── 010 音乐库子页签（全部/歌单/本地文件/最近播放）──────────── */
+/* 条子本体由 app.js 动态挂到可见子页之前；这里只管形态 */
+#libraryTabsBar { border-bottom: 1px solid var(--stroke-1); }
+.lib-subtab {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-md);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: color var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease);
+}
+.lib-subtab:hover { color: var(--fg-1); background: var(--elev-1); }
+.lib-subtab.active {
+  color: var(--accent-ui);
+  background: color-mix(in srgb, var(--accent-ui) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-ui) 25%, transparent);
+  font-weight: var(--fw-semi);
+}
+
 /* ── 005「我的歌」（跨源聚合页升级）：本地+红心同库可播行 ────────── */
 /* 本地源徽标（manifest 平台清单里没有 'local'，样式在此显式给） */
 .badge-local {
