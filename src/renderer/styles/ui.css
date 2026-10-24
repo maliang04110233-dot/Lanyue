@@ -697,6 +697,33 @@
 }
 .agg-row:hover { background: var(--surface-2); }
 
+/* 跨源同曲 / 判据不全 / 版别徽标（聚合页行 + 搜索合并行共用；
+   此前 .agg-dup-badge/.agg-undecidable-badge 在聚合页被渲染但从未定义——裸 span） */
+.agg-dup-badge,
+.agg-undecidable-badge,
+.variant-badge {
+  flex-shrink: 0;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.agg-dup-badge {
+  color: var(--accent-ui);
+  background: color-mix(in srgb, var(--accent-ui) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-ui) 30%, transparent);
+}
+.agg-undecidable-badge,
+.variant-badge {
+  color: var(--fg-3);
+  background: color-mix(in srgb, var(--fg-3) 10%, transparent);
+  border: 1px solid var(--stroke-1);
+}
+/* 006 搜索合并：同曲组内非代表行整体降透明（信息保留，优先级让位组首） */
+.song-row.merged-alt { opacity: .62; }
+.song-row.merged-alt:hover, .song-row.merged-alt.playing { opacity: 1; }
+
 /* ── 3a-6 小按钮（.btn-sm 全站 5 个视图在用）────────────────────── */
 .btn-sm {
   height: 28px;

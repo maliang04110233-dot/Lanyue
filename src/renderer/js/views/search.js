@@ -209,6 +209,12 @@ let _typeSearchReqId = 0;
  *   这样并发的两次搜索由「谁后发起」决定谁赢，而不是「谁的响应先回来」。
  */
 async function doSearchByType(type, page, keyword, source, reqId = ++_typeSearchReqId) {
+  /** 006：跨源合并时点名未返回的源——不说「结果可能不全」，说清是谁挂了 */
+  const announceFailed = (failed) => {
+    if (source !== 'all' || !Array.isArray(failed) || !failed.length) return;
+    const names = failed.map((x) => srcLabel(x) || x).join('、');
+    showToast(t('search.someFailed', { names }), 'warn', 4000);
+  };
   const cacheKey = searchCacheKey(type, page, keyword, source);
   const cached = searchCacheGet(cacheKey);
   if (cached) {
@@ -218,6 +224,7 @@ async function doSearchByType(type, page, keyword, source, reqId = ++_typeSearch
     setState(stateKey[type], cached.items);
     renderMap[type](cached.items);
     if (paginationMap[type]) paginationMap[type](page, cached.items.length, cached.total);
+    if (type === 'song') announceFailed(cached.failed);
     if (type === 'song' && cached.items.length > 0 && _searchBatchMode) {
       if (_dom.batchToolbar) _dom.batchToolbar.style.display = 'flex';
       updateBatchInfo();
@@ -237,15 +244,16 @@ async function doSearchByType(type, page, keyword, source, reqId = ++_typeSearch
   try {
     const result = await apiMap[type]();
     const items = (result && result[type === 'song' ? 'songs' : type + 's']) || [];
-    // 存入缓存
+    // 存入缓存（failed 随行：命中缓存时同样点名未返回的源）
     if (!result?.error) {
-      searchCacheSet(cacheKey, { items, total: result?.total || 0 });
+      searchCacheSet(cacheKey, { items, total: result?.total || 0, failed: result?.failed });
     }
     // 迟到的旧请求结果只进缓存，不再覆盖界面（新搜索已在途时序号已变）
     if (reqId !== _typeSearchReqId) return [];
     setState(stateKey[type], items);
     if (result && result.error) showToast('搜索出错：' + result.error, 'warn', 3500);
     renderMap[type](items);
+    if (type === 'song') announceFailed(result && result.failed);
     if (paginationMap[type]) {
       paginationMap[type](page, items.length, result.total);
     }
@@ -551,8 +559,14 @@ function renderSongList(list, targetEl = null) {
   const _kw = getState('currentKeyword') || ''; // 关键词高亮：只按已提交的搜索词
   el.innerHTML = pairs.map(([s, i]) => {
     const checked = selected.has(i) ? 'checked' : '';
+    // 006 跨源合并标记（仅 source='all' 的结果带这些字段，单源搜索不受影响）：
+    //   _crossSource 同曲多源成组（组首=已登录/信息更全的代表）
+    //   _variant     同名同歌手但时长不同（Live/伴奏/变速）——版别，不并组
+    //   _primary===false 组内非代表行降透明度，提示优先用组首
+    const mergedAlt = s._primary === false;
+    const rowTitle = mergedAlt ? ` title="${escAttr(t('search.preferPrimary'))}"` : '';
     return `
-    <div class="song-row" data-skey="${escAttr(s.source + ':' + s.id)}" ondblclick="playSong(${i})">
+    <div class="song-row${mergedAlt ? ' merged-alt' : ''}"${rowTitle} data-skey="${escAttr(s.source + ':' + s.id)}" ondblclick="playSong(${i})">
       <input type="checkbox" class="song-checkbox" data-idx="${i}" ${checked}
         onchange="toggleSongSelect(${i}, this.checked)">
       ${s.cover
@@ -567,6 +581,8 @@ function renderSongList(list, targetEl = null) {
       </div>
       <span class="song-duration">${fmtDuration(s.duration)}</span>
       <span class="source-badge badge-${badgeCls(s.source)}">${esc(srcLabel(s.source))}</span>
+      ${s._crossSource ? `<span class="agg-dup-badge" title="${escAttr(t('search.multiSourceTip', { count: s._dupCount }))}">${esc(t('search.multiSource', { count: s._dupCount }))}</span>` : ''}
+      ${s._variant ? `<span class="variant-badge" title="${escAttr(t('search.variantTip'))}">${esc(t('search.variant'))}</span>` : ''}
       ${isLowYield(s.source) ? `<span class="source-hint" title="${esc(t('badge.lowYield'))}">⚠️ ${esc(t('badge.lowYield'))}</span>` : ''}
       ${dlBadgeHtml(s, _dlQueue)}
       <div class="song-actions">

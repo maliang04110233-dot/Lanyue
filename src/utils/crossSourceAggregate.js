@@ -394,6 +394,112 @@ function pickRepresentative(members, loggedIn) {
   return ranked[0].s;
 }
 
+/**
+ * 合并结果排序（006 跨源搜索合并）
+ *
+ * 聚合标记（_crossSource/_dupOf）只说明"这几条是同曲"，不改变顺序——
+ * 搜索结果里同曲多源仍按各源返回顺序散落。本函数把每个跨源簇重排成
+ * 「代表优先、其余成员紧随」的一块，并打 _primary 标记：
+ *   代表 = pickRepresentative（已登录源 > 时长已知 > 原序）
+ * 非代表成员**保留在列表里**（降透明度由界面处理），与"只标记不删除"同一纪律：
+ * 同名不同曲的误判代价是用户找不到想要的版本，删错一条比多看一条糟。
+ *
+ * 纯函数：会原地给成员补 _primary 布尔（代表 true / 非代表 false），返回新数组。
+ *
+ * @param {Array} songs 已跑过 aggregateAcrossSources 的列表
+ * @param {Set<string>|string[]} [loggedIn] 已登录平台集合
+ * @returns {Array} 重排后的新数组（成员对象为原引用）
+ */
+function orderMergedResults(songs, loggedIn) {
+  const list = (Array.isArray(songs) ? songs : []).filter(Boolean);
+
+  // 由 _dupOf 邻接重建簇（aggregateAcrossSources 已保证簇内成员互指）
+  const byKey = new Map();
+  for (const s of list) {
+    const k = songKey(s);
+    if (k && !byKey.has(k)) byKey.set(k, s);
+  }
+  const clusterFirstKey = new Map(); // 成员 key -> 簇首 key（首见即建，簇内共享）
+  for (const s of list) {
+    if (!s._crossSource) continue;
+    const keys = [songKey(s), ...(Array.isArray(s._dupOf) ? s._dupOf : [])];
+    for (const k of keys) if (!clusterFirstKey.has(k)) clusterFirstKey.set(k, keys[0]);
+  }
+
+  // 簇成员表（簇首 key -> 按原序的成员对象），避免代表处再扫全表
+  const membersByFirst = new Map();
+  for (const s of list) {
+    const first = clusterFirstKey.get(songKey(s));
+    if (first == null) continue;
+    let arr = membersByFirst.get(first);
+    if (!arr) { arr = []; membersByFirst.set(first, arr); }
+    arr.push(s);
+  }
+
+  // 每簇选代表并打 _primary
+  const repByFirst = new Map(); // 簇首 key -> 代表对象
+  for (const [first, members] of membersByFirst) {
+    if (members.length < 2) continue;
+    const rep = pickRepresentative(members, loggedIn);
+    for (const m of members) m._primary = m === rep;
+    repByFirst.set(first, rep);
+  }
+
+  // 按原顺序输出；非簇成员原位，簇在代表首次出现处整块输出（代表最前）
+  const out = [];
+  const emittedClusters = new Set();
+  for (const s of list) {
+    const first = clusterFirstKey.get(songKey(s));
+    if (first == null) { out.push(s); continue; }         // 非簇成员
+    if (emittedClusters.has(first)) continue;             // 已随本簇代表块输出
+    emittedClusters.add(first);
+    const members = membersByFirst.get(first) || [];
+    const rep = repByFirst.get(first);
+    if (rep) out.push(rep);                                // 代表置首
+    for (const m of members) if (m !== rep) out.push(m);   // 其余保持原相对序
+  }
+  return out;
+}
+
+/**
+ * 版别变体标记（006 判据③）
+ *
+ * 「版别」= 归一歌名（剥版本词）与歌手都相同、但没并进同曲簇的条目——
+ * 按同曲判定口径，只剩一种可能：时长对不上（live / 伴奏 / 变速），或两侧
+ * 判据齐全却各自成簇。家族里只要存在并簇的"正主"，其余已知时长的成员
+ * 就是它的版别变体；家族无正主但多条已知时长互不并簇时，互为版别。
+ *
+ * 判据不全（缺时长/缺歌手）的条目不标版别：它们已有 _undecidable 通道，
+ * 再叠一层「版别」会把「不知道」伪装成「另一种版本」。
+ *
+ * 纯函数：原地补 _variant 布尔。
+ *
+ * @param {Array} songs 已跑过 aggregateAcrossSources 的列表
+ */
+function markVariants(songs) {
+  const list = (Array.isArray(songs) ? songs : []).filter(Boolean);
+  const families = new Map(); // clusterKey -> 成员数组
+  for (const s of list) {
+    const k = clusterKey(s);
+    if (!k) continue;
+    let arr = families.get(k);
+    if (!arr) { arr = []; families.set(k, arr); }
+    arr.push(s);
+  }
+  for (const arr of families.values()) {
+    if (arr.length < 2) continue;
+    const clustered = arr.filter((s) => s._crossSource);
+    const rest = arr.filter((s) => !s._crossSource);
+    if (clustered.length) {
+      for (const s of rest) if (hasKnownDuration(s)) s._variant = true;
+      continue;
+    }
+    // 无正主：已知时长的成员 ≥2 时互为版别（缺时长的不掺和，理由见上）
+    const known = rest.filter(hasKnownDuration);
+    if (known.length >= 2) for (const s of known) s._variant = true;
+  }
+}
+
 module.exports = {
   DURATION_TOLERANCE_MS,
   SOURCE_FETCH_LIMIT,
@@ -403,6 +509,8 @@ module.exports = {
   VERSION_MODIFIERS,
   aggregateAcrossSources,
   pickRepresentative,
+  orderMergedResults,
+  markVariants,
   isCrossSourceSameSong,
   sameTitle,
   sameArtist,

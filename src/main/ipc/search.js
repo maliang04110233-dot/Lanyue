@@ -10,15 +10,25 @@
 const api = require('../../api');
 const logger = require('../../utils/logger');
 const prefs = require('../../utils/prefs');
+const cookieStore = require('../../utils/cookieStore');
 const { rewriteSearchQueries } = require('../../api/ai-music');
 const { chatConfigFrom } = require('../../api/aiProviders');
 const { searchByPhrase } = require('../../api/services/nlSearchService');
 const { handle } = require('./register');
 
+/** 已登录平台集合：与 aggregate-cross-source 同一权威来源（cookieStore）。
+ *  跨源合并的择优排序靠它——漏传则已登录源可能排在未登录源之后，
+ *  用户点了下载才在取流阶段失败（见 crossSourceAggregate.pickRepresentative）。 */
+function _loggedInSources() {
+  return Object.entries(cookieStore.getAll())
+    .filter(([, v]) => !!v)
+    .map(([k]) => String(k).trim().toLowerCase());
+}
+
 function register() {
   handle('search-music', async (_, keyword, source, page) => {
     try {
-      return await api.searchMusic(keyword, source, page);
+      return await api.searchMusic(keyword, source, page, { loggedIn: _loggedInSources() });
     } catch (e) {
       return { error: e.message, songs: [] };
     }

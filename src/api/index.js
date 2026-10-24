@@ -20,6 +20,7 @@ const recommendations = require('./recommendations');
 const logger = require('../utils/logger');
 const { normalizeQQCookie, detectQQCookieType, extractQQUin, extractQQMusickey } = require('../utils/cookie');
 const sourceHealth = require('../utils/sourceHealth');
+const crossSourceAggregate = require('../utils/crossSourceAggregate');
 
 // ── 注册平台插件（v3：registry 自动发现 platforms/ 目录）──────
 // 平台顺序与各派生清单（探针 / 换源候选 / CORS 白名单 / 链接模式 /
@@ -70,24 +71,40 @@ function updateCookie(platform, cookie) {
 }
 
 // ─── 搜索聚合（插件架构版）─────────────────────────────────
-async function searchMusic(keyword, source, page = 1) {
+// opts.loggedIn: string[] 已登录平台 id（跨源合并的择优排序用；
+//   由 IPC handler 从 cookieStore 取出传入——api 层不直接读登录态，
+//   与 aggregate-cross-source 的权威来源约定一致）
+async function searchMusic(keyword, source, page = 1, opts) {
   if (!keyword || typeof keyword !== 'string' || !keyword.trim()) {
     return { songs: [], source: source || 'all', error: '搜索关键词不能为空' };
   }
   // M11: gateway.search 内部 safeRun 已吞异常并回退 []，永不 throw——
   // 原先这里的 try/catch 与 errors 收集是死代码，删除后行为不变
   if (source === 'all') {
-    // all: 并行搜索所有平台，按 manifest 的 policies.aggregateLimit 截断
+    // all: 并行搜索所有平台，按 manifest 的 policies.aggregateLimit 截断，
+    // 再走跨源同曲合并（006）：同曲多源成块、代表优先（已登录源 > 时长已知），
+    // 时长对不上的同歌名标「版别」。只标记不删除——同名不同曲的误判代价
+    // 是用户找不到想要的版本，删错一条比多看一条糟。
     const allPlugins = _registry.getAll();
     const results = await gateway.fanOut(allPlugins.map(p => p.id), (id) => gateway.search(id, keyword, 1));
-    // 聚合条数由 manifest 的 policies.aggregateLimit 显式声明。
-    // 原先是按数组下标硬编码 10/10/5 —— 在中间插入新平台会静默改变
-    // 后面所有平台的聚合条数，且没有任何测试盯着。
-    const songs = results.flatMap((r, i) => {
-      if (!r.ok) return [];
-      return (r.value || []).slice(0, allPlugins[i]._policies.aggregateLimit);
+    const failed = [];
+    const groups = results.map((r, i) => {
+      if (!r.ok) {
+        failed.push(allPlugins[i].id);
+        return { source: allPlugins[i].id, songs: [] };
+      }
+      // 聚合条数由 manifest 的 policies.aggregateLimit 显式声明。
+      // 原先是按数组下标硬编码 10/10/5 —— 在中间插入新平台会静默改变
+      // 后面所有平台的聚合条数，且没有任何测试盯着。
+      return { source: allPlugins[i].id, songs: (r.value || []).slice(0, allPlugins[i]._policies.aggregateLimit) };
     });
-    return { songs, source: 'all', error: null };
+    const merged = crossSourceAggregate.aggregateAcrossSources(groups);
+    crossSourceAggregate.markVariants(merged.songs);
+    const songs = crossSourceAggregate.orderMergedResults(
+      merged.songs,
+      (opts && opts.loggedIn) || []
+    );
+    return { songs, source: 'all', error: null, stats: merged.stats, failed };
   }
   if (!_registry.has(source)) return { songs: [], source, error: `未知平台: ${source}` };
   const songs = await gateway.search(source, keyword, page);
