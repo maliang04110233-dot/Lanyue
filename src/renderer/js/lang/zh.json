@@ -825,6 +825,7 @@
   "mine.local": "本地",
   "mine.hasLocal": "已有本地版",
   "mine.hasLocalTip": "这首歌已有本地文件副本，断网也可播放（点行即播本地版所在组）",
+  "mine.degradedLocal": "在线源取流失败，已切换本地文件播放：{title}",
   "aggregate.play": "播放",
   "aggregate.download": "下载",
   "aggregate.allSources": "全部来源",

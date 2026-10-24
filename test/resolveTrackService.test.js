@@ -912,3 +912,85 @@ test('总开关 getter 抛错：按开启处理，取流不被偏好读盘故障
   const r = await svc.resolve(SONG, 'standard');
   assert.strictEqual(r.url, okResult().url);
 });
+
+// ══════════════════════════════════════════════════════════
+// 005 判据②：本地同曲回退（findLocalMatch）
+// ══════════════════════════════════════════════════════════
+
+/** 本地匹配桩：默认命中一首 file:///D:/music/测试曲.flac */
+function localHit() {
+  return { filePath: 'D:/music/测试曲.flac', title: '测试曲', artist: '歌手A', duration: 200000, ext: 'flac' };
+}
+
+function buildLocal(map, opts = {}) {
+  const health = makeHealth();
+  const svc = createResolveTrackService({
+    getUrl: makeGetUrl(map),
+    searchFn: async () => [],
+    hasCookie: () => false,
+    findCandidates: opts.findCandidates || (async () => []),
+    sourceHealth: health,
+    findLocalMatch: opts.findLocalMatch,
+    ...(opts.fallbackEnabled ? { fallbackEnabled: opts.fallbackEnabled } : {}),
+  });
+  return { svc, health };
+}
+
+test('005 本地回退：本源与候选全败 ⇒ 返回 file:// 直链并带 degradedLocal', async () => {
+  // NO_AUDIO_STREAM 在换源白名单内 ⇒ 走候选链；候选也空 ⇒ 落到本地回退
+  const { svc } = buildLocal(
+    { 'netease:1': { error: '无音源', code: 'NO_AUDIO_STREAM' } },
+    { findLocalMatch: async () => localHit() },
+  );
+  const r = await svc.resolve(SONG, 'standard');
+  assert.strictEqual(r.url, 'file://D:/music/测试曲.flac', '应回退到本地文件直链');
+  assert.strictEqual(r.source, 'local');
+  assert.strictEqual(r.ext, 'flac', '扩展名随文件而非默认 mp3');
+  assert.strictEqual(r.degradedLocal, true, '降级标记必须带——渲染层靠它绕开代理层并明示');
+  assert.strictEqual(r.matchedSong, undefined, '不得写 matchedSong：会把 local 记进 _altSource 记忆，下次 gateway.getUrl(local) 进死胡同');
+});
+
+test('005 本地回退：跨源总开关关闭 ⇒ 候选链跳过，本地副本仍生效（用户自己的文件不是别家冒充）', async () => {
+  const toggled = [];
+  const { svc } = buildLocal(
+    { 'netease:1': { error: '无音源', code: 'NO_AUDIO_STREAM' } },
+    {
+      fallbackEnabled: () => false,
+      findLocalMatch: async () => localHit(),
+      findCandidates: async () => { throw new Error('候选链不应被触达'); },
+    },
+  );
+  const r = await svc.resolve(SONG, 'standard', { onToggleSource: (e) => toggled.push(e) });
+  assert.strictEqual(r.degradedLocal, true, '开关关闭时本地回退依然成立');
+  assert.ok(toggled.some((e) => e.to === 'local'), '换源回调应通知切到 local');
+});
+
+test('005 本地回退：无本地副本 ⇒ 返回本源原始错误（文案与未回退时一致）', async () => {
+  const { svc } = buildLocal(
+    { 'netease:1': { error: '无音源', code: 'NO_AUDIO_STREAM' } },
+    { findLocalMatch: async () => null },
+  );
+  const r = await svc.resolve(SONG, 'standard');
+  assert.strictEqual(r.url, undefined);
+  assert.strictEqual(r.error, '无音源');
+});
+
+test('005 本地回退：findLocalMatch 抛错 ⇒ 吞掉并按无副本处理（回退自身不得砸主流程）', async () => {
+  const { svc } = buildLocal(
+    { 'netease:1': { error: '无音源', code: 'NO_AUDIO_STREAM' } },
+    { findLocalMatch: async () => { throw new Error('索引读盘炸了'); } },
+  );
+  const r = await svc.resolve(SONG, 'standard');
+  assert.strictEqual(r.error, '无音源', '匹配故障不改变对外错误');
+});
+
+test('005 本地回退：本源成功 ⇒ 不触达本地匹配（happy path 零额外开销）', async () => {
+  let localAsked = 0;
+  const { svc } = buildLocal(
+    { 'netease:1': okResult() },
+    { findLocalMatch: async () => { localAsked += 1; return localHit(); } },
+  );
+  const r = await svc.resolve(SONG, 'standard');
+  assert.strictEqual(r.url, okResult().url);
+  assert.strictEqual(localAsked, 0, '成功路径不得调用 findLocalMatch');
+});

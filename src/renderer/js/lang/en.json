@@ -825,6 +825,7 @@
   "mine.local": "Local",
   "mine.hasLocal": "Local copy",
   "mine.hasLocalTip": "A local file copy exists for this track — playable offline",
+  "mine.degradedLocal": "Online source failed — playing your local copy: {title}",
   "aggregate.play": "Play",
   "aggregate.download": "Download",
   "aggregate.allSources": "All sources",

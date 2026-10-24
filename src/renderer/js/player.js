@@ -476,6 +476,14 @@ async function playSongByIdx(idx, song) {
       song._altSource = { source: result.matchedSong.source, id: String(result.matchedSong.id) };
       updatePlayerCard(song); // 音质等徽标随实际取流结果刷新
     }
+    // 005 判据②：在线取流全败，主进程回退到本地同曲文件——file:// 不过
+    // proxyPlay（代理层只吃远端直链），直接开播并明示降级来源。
+    if (result.degradedLocal) {
+      showToast(window.t('mine.degradedLocal', { title: song.title }), 'info', 3500);
+      setState('currentPlaying', song);
+      await loadAndPlay(song, result.url, true);
+      return;
+    }
     const playSource = result.source || song.source;
     const referer = playReferer(playSource, result);
     // D-35：把实际取流的 (source,id) 带回主进程，签名链接过期时据此同源重取。
@@ -521,6 +529,12 @@ function _startPrefetch() {
   const quality = resolveQuality(song.source);
   api.getDownloadUrlSmart(song, quality).then(async (result) => {
     if (!result || !result.url) { markFail(); return; }
+    // 005：本地回退的 file:// 直链不过代理层，直接入预取缓存
+    if (result.degradedLocal) {
+      _prefetch.put(key, { fileUrl: result.url, quality, altSource: null });
+      _prefetchFail = null;
+      return;
+    }
     const playSource = result.source || song.source;
     const referer = playReferer(playSource, result);
     const proxied = await api.proxyPlay(result.url, referer, {

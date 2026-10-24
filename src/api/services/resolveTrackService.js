@@ -150,6 +150,12 @@ function isPreviewClip(result, durationMs) {
  * @param {(url:string, result:Object) => Promise<Object>} [deps.probeUrl] 候选直链预检（缺省不探测）
  * @param {() => unknown} [deps.getDisabledPlatforms] 换源禁用平台清单（prefs 原始值，每次解析至多读一次）
  * @param {() => boolean} [deps.fallbackEnabled] 跨源换源总开关（每次解析至多读一次；缺省=开）
+ * @param {(song:Object) => Promise<{filePath:string,title?,artist?,duration?,ext?}|null>}
+ *        [deps.findLocalMatch] 本地同曲回退（005 判据②）：本源与候选全败后，
+ *        用用户自己下载过的文件续播（file:// 零网络）。返回 null = 无本地副本。
+ *        匹配口径由注入方决定（api 层用跨源同曲严格判定：歌名+歌手+时长 5s 容差）。
+ *        **与跨源总开关的关系**：本地文件不是「别家平台冒充」，是用户自己的副本，
+ *        总开关关闭时依然生效——断网/下架时能听比诚实失败更重要（产品语义见台账 005）。
  * @returns {Object} 冻结的服务实例
  */
 function createResolveTrackService({
@@ -161,6 +167,7 @@ function createResolveTrackService({
   probeUrl,
   getDisabledPlatforms,
   fallbackEnabled,
+  findLocalMatch,
 } = {}) {
   if (typeof getUrl !== 'function') throw new Error('[ResolveTrack] 必须注入 getUrl');
   if (typeof findCandidates !== 'function') throw new Error('[ResolveTrack] 必须注入 findCandidates');
@@ -321,6 +328,33 @@ function createResolveTrackService({
       return isPreviewClip(r, song.duration) ? PREVIEW_REJECT : null;
     }
 
+    /**
+     * 本地同曲回退（005 判据②）。刻意**不写** matchedSong 字段——渲染层把它
+     * 记进 `_altSource` 换源记忆，而记忆路径会拿 (id,source) 去 gateway.getUrl
+     * 取流，'local' 不是平台 id，记忆会把下一次播放带进死胡同。
+     */
+    async function tryLocalFallback() {
+      if (typeof findLocalMatch !== 'function') return null;
+      let match = null;
+      try {
+        match = await findLocalMatch(song);
+      } catch (e) {
+        logger.warn('[ResolveTrack] 本地回退匹配失败（已忽略）:', (e && e.message) || e);
+        return null;
+      }
+      if (!match || !match.filePath) return null;
+      logger.log(`[ResolveTrack] 本地回退: "${song.title}" ${song.source} → ${match.filePath}`);
+      notifyToggled(song.source, 'local', match);
+      return normalizeTrackResult({
+        url: 'file://' + match.filePath,
+        source: 'local',
+        ext: match.ext || 'mp3',
+        degradedLocal: true,
+        localFile: match,
+        matchedFrom: song.source,
+      });
+    }
+
     // 1. _altSource 记忆：上次换源成功的源先试。
     //    但本源已配置 Cookie 时跳过记忆、优先回试本源 —— 否则用户补了
     //    登录/Cookie 后，队列里带着旧换源记忆的歌（_altSource 随 play-queue
@@ -356,7 +390,11 @@ function createResolveTrackService({
     // 3. 失败且可换源 ⇒ 跨源候选逐个尝试
     //    总开关关闭时这一步整体跳过：用户诉求是「播放即本源，本源没有音源就诚实失败」，
     //    宁可少播一首，也不要拿别家平台的版本冒充这首歌。
+    //    本地回退（005）例外于这条诉求：本地文件是用户自己下载的副本，不是别家冒充，
+    //    总开关关闭时依然尝试——断网/下架时能听比诚实失败更重要。
     if (!allowToggle || !shouldFallbackToOtherSource(result)) {
+      const localHit = await tryLocalFallback();
+      if (isTrackSuccess(localHit)) return localHit;
       return normalizeTrackResult(result);
     }
 
@@ -402,7 +440,9 @@ function createResolveTrackService({
       }
     }
 
-    // 4. 全失败：返回本源原始错误（UI 文案与未换源时一致）
+    // 4. 全失败：本地同曲回退（005）→ 仍无则返回本源原始错误（UI 文案与未换源时一致）
+    const localHit = await tryLocalFallback();
+    if (isTrackSuccess(localHit)) return localHit;
     return normalizeTrackResult(result);
   }
 

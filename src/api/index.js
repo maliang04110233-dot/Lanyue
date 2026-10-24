@@ -173,6 +173,30 @@ const resolveTrack = createResolveTrackService({
   // 跨源换源总开关：产品口径见 fallbackPolicy.crossSourceEnabled ——
   // 搜索结果里的歌只播它自己平台的音源，拿不到就诚实失败，不拿别家整曲冒充。
   fallbackEnabled: crossSourceEnabled,
+  // 005 判据②：取流全败后的本地同曲回退。懒 require——本模块被大量测试 require，
+  // 不在初始化期拖入 libraryIndex 的磁盘依赖。匹配用跨源同曲的严格口径
+  // （歌名+歌手+时长 5s 容差）：防「晴天(伴奏)」顶替「晴天」；所请求歌缺时长
+  // 或缺歌手则不回退（判据不全宁可漏判，与聚合层同一条纪律）。
+  findLocalMatch: async (song) => {
+    if (!song || !song.title || !song.artist || !(Number(song.duration) > 0)) return null;
+    let files;
+    try {
+      const { loadIndex } = require('../utils/libraryIndex');
+      const index = await loadIndex();
+      files = (index && Array.isArray(index.songs)) ? index.songs : [];
+    } catch (_e) { return null; /* 索引不可读=没有可回退的本地副本 */ }
+    for (const f of files) {
+      if (!f || !f.filePath || !(Number(f.durationMs) > 0)) continue;
+      const hit = crossSourceAggregate.isCrossSourceSameSong(song, {
+        title: f.title, artist: f.artist, duration: Number(f.durationMs),
+      });
+      if (hit) {
+        const ext = (/\.(\w{2,4})$/.exec(String(f.filePath)) || [])[1];
+        return { filePath: f.filePath, title: f.title, artist: f.artist, duration: Number(f.durationMs), ext };
+      }
+    }
+    return null;
+  },
 });
 
 /**
