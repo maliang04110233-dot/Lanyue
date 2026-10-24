@@ -8,13 +8,15 @@ let _aggLoading = false;
 let _aggFilter = 'all';    // all | dup | <source>
 let _aggKeyword = '';
 
-/** 拉一次聚合并渲染。opts: {sources?, playlists?, markDuplicates?} */
+/** 拉一次聚合并渲染。opts: {sources?, playlists?, markDuplicates?, includeLocal?, orderMerged?}
+ *  005「我的歌」默认开 includeLocal + orderMerged：本地曲库与红心同库混排，
+ *  同曲簇代表优先本地副本（断网可播），成块相邻。 */
 async function loadAggregated(opts = {}) {
   if (_aggLoading) return;
   _aggLoading = true;
   renderAggregated();
   try {
-    const r = await api.aggregateCrossSource(opts);
+    const r = await api.aggregateCrossSource({ includeLocal: true, orderMerged: true, ...opts });
     _aggState = {
       songs: Array.isArray(r && r.songs) ? r.songs : [],
       stats: (r && r.stats) || { total: 0, sources: 0, duplicates: 0, groups: 0, undecidable: 0 },
@@ -35,16 +37,19 @@ async function loadAggregated(opts = {}) {
   }
 }
 
-/** 当前筛选条件下可见的曲目 */
+/** 当前筛选条件下可见的曲目（带原始下标——行内播放/下载经它回查，
+ *  过滤后重排下标会点 A 播 B，与 songRowsHtml 同一条纪律） */
 function _aggVisible() {
   const all = (_aggState && _aggState.songs) || [];
   const kw = _aggKeyword.trim().toLowerCase();
-  return all.filter((s) => {
-    if (_aggFilter === 'dup' && !s._crossSource) return false;
-    if (_aggFilter !== 'all' && _aggFilter !== 'dup' && s.source !== _aggFilter) return false;
-    if (!kw) return true;
-    return (String(s.title || '') + ' ' + String(s.artist || '')).toLowerCase().includes(kw);
-  });
+  return all
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => {
+      if (_aggFilter === 'dup' && !s._crossSource) return false;
+      if (_aggFilter !== 'all' && _aggFilter !== 'dup' && s.source !== _aggFilter) return false;
+      if (!kw) return true;
+      return (String(s.title || '') + ' ' + String(s.artist || '')).toLowerCase().includes(kw);
+    });
 }
 
 function _aggSourceOptions() {
@@ -56,7 +61,8 @@ function _aggSourceOptions() {
     '<option value="dup"' + (_aggFilter === 'dup' ? ' selected' : '') + '>'
       + esc(t('aggregate.onlyDup')) + '</option>',
     ...ids.map((id) => '<option value="' + escAttr(id) + '"'
-      + (_aggFilter === id ? ' selected' : '') + '>' + esc(platformName(id) || id) + '</option>'),
+      + (_aggFilter === id ? ' selected' : '') + '>'
+      + esc(id === 'local' ? t('mine.local') : (platformName(id) || id)) + '</option>'),
   ].join('');
 }
 
@@ -95,8 +101,10 @@ function _aggStatBar() {
   return html;
 }
 
-/** 单曲一行 */
-function _aggRowHtml(s) {
+/** 单曲一行（i 为原始下标：行内播放/下载经 aggPlay/aggDownload 回查原数组） */
+function _aggRowHtml({ s, i }) {
+  const isLocal = s.source === 'local';
+  const srcName = isLocal ? t('mine.local') : (platformName(s.source) || s.source || '');
   const badge = s._crossSource
     ? '<span class="agg-dup-badge" title="' + escAttr(t('aggregate.dupBadgeTitle', { count: s._dupCount })) + '">'
       + esc(t('aggregate.dupBadge', { count: s._dupCount })) + '</span>'
@@ -106,16 +114,52 @@ function _aggRowHtml(s) {
     ? '<span class="agg-undecidable-badge" title="' + escAttr(t('aggregate.undecidableRowHint')) + '">'
       + esc(t('aggregate.undecidableBadge')) + '</span>'
     : '';
+  // 在线条目但同簇里有本地副本：明示「已有本地版」（断网也能播的就是它）
+  const hasLocalTip = (!isLocal && s._hasLocal)
+    ? '<span class="variant-badge" title="' + escAttr(t('mine.hasLocalTip')) + '">'
+      + esc(t('mine.hasLocal')) + '</span>'
+    : '';
   // 只在跨源簇里的非代表条目上提示"优先用另一条"，避免用户下到取不到流的那条
   const primaryTip = (s._crossSource && s._primary === false)
     ? ' title="' + escAttr(t('aggregate.preferPrimary')) + '"' : '';
-  return '<div class="agg-row"' + primaryTip + '>'
-    + '<span class="agg-src">' + esc(platformName(s.source) || s.source || '') + '</span>'
+  // 本地文件没有"再下载"的意义；在线条目才给下载钮
+  const dlBtn = isLocal ? '' :
+    '<button class="btn-sm" title="' + escAttr(t('aggregate.download')) + '" data-ico="download" data-ico-only'
+    + ' onclick="event.stopPropagation();aggDownload(' + i + ')"></button>';
+  return '<div class="agg-row agg-song-row' + (s._primary === false ? ' merged-alt' : '') + '"' + primaryTip
+    + ' onclick="aggPlay(' + i + ')" role="button" tabindex="0">'
+    + '<span class="agg-src source-badge badge-' + (isLocal ? 'local' : badgeCls(s.source)) + '">' + esc(srcName) + '</span>'
     + '<span class="agg-title">' + esc(s.title || '') + '</span>'
     + '<span class="agg-artist">' + esc(s.artist || '') + '</span>'
     + badge
+    + hasLocalTip
     + undecidableTip
+    + '<span class="agg-dur">' + esc(fmtDuration(s.duration)) + '</span>'
+    + '<span class="agg-actions">'
+    + '<button class="btn-sm" title="' + escAttr(t('aggregate.play')) + '" data-ico="play" data-ico-only'
+    + ' onclick="event.stopPropagation();aggPlay(' + i + ')"></button>'
+    + dlBtn
+    + '</span>'
     + '</div>';
+}
+
+/** 行内播放：本地文件直接 loadAndPlay（file:// 永远可播）；
+ *  在线歌复用搜索页同一播放管线——playSong 按下标读 state.songs，
+ *  所以先把本列表挂进去（切回搜索页时它自己的渲染链路会重写该键）。 */
+async function aggPlay(i) {
+  const s = _aggState && _aggState.songs[i];
+  if (!s) return;
+  if (s.filePath) { window.loadAndPlay(s); return; }
+  setState('songs', _aggState.songs);
+  if (typeof window.playSong === 'function') window.playSong(i);
+}
+
+/** 行内下载：本地条目无下载语义（本身就是文件），直接忽略 */
+function aggDownload(i) {
+  const s = _aggState && _aggState.songs[i];
+  if (!s || s.source === 'local') return;
+  setState('songs', _aggState.songs);
+  if (typeof window.addDownload === 'function') window.addDownload(i);
 }
 
 function renderAggregated() {
@@ -170,6 +214,8 @@ if (typeof window !== 'undefined') {
   window.onAggFilter = onAggFilter;
   window.onAggKeyword = onAggKeyword;
   window.getAggregatedState = getAggregatedState;
+  window.aggPlay = aggPlay;
+  window.aggDownload = aggDownload;
 }
 
 /** 供诊断页/测试读取当前聚合快照 */

@@ -724,6 +724,31 @@
 .song-row.merged-alt { opacity: .62; }
 .song-row.merged-alt:hover, .song-row.merged-alt.playing { opacity: 1; }
 
+/* ── 005「我的歌」（跨源聚合页升级）：本地+红心同库可播行 ────────── */
+/* 本地源徽标（manifest 平台清单里没有 'local'，样式在此显式给） */
+.badge-local {
+  --badge-bg: color-mix(in srgb, var(--fg-2) 10%, transparent);
+  --badge-fg: var(--fg-2);
+  --badge-border: var(--stroke-1);
+}
+.agg-song-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-3);
+  cursor: pointer;
+}
+.agg-song-row .agg-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agg-song-row .agg-artist {
+  flex-shrink: 0; max-width: 26%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--fg-3); font-size: var(--fs-sm);
+}
+.agg-song-row .agg-dur { flex-shrink: 0; font-size: var(--fs-xs); color: var(--fg-3); }
+.agg-song-row .agg-actions { flex-shrink: 0; display: flex; gap: var(--sp-1); }
+.agg-song-row.merged-alt { opacity: .62; }
+.agg-song-row.merged-alt:hover { opacity: 1; }
+
 /* ── 3a-6 小按钮（.btn-sm 全站 5 个视图在用）────────────────────── */
 .btn-sm {
   height: 28px;

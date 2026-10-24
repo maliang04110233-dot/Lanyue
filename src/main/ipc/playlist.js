@@ -9,7 +9,7 @@
 
 const prefs = require('../../utils/prefs');
 const logger = require('../../utils/logger');
-const { aggregateAcrossSources, pickRepresentative, songKey: aggSongKey, SOURCE_FETCH_LIMIT } = require('../../utils/crossSourceAggregate');
+const { aggregateAcrossSources, pickRepresentative, orderMergedResults, songKey: aggSongKey, SOURCE_FETCH_LIMIT } = require('../../utils/crossSourceAggregate');
 const cookieStore = require('../../utils/cookieStore');
 const { handle } = require('./register');
 const { trashRemove, trashRestore, purgeExpired, trashView, trashPurge } = require('../../utils/playlistTrash');
@@ -71,6 +71,11 @@ function ensureFavorites() {
 handle('aggregate-cross-source', async (_, opts) => {
   const o = (opts && typeof opts === 'object' && !Array.isArray(opts)) ? opts : {};
   const mark = o.markDuplicates !== false;
+  // 005 统一歌曲库（「我的歌」）：includeLocal 把本地曲库并进同一份列表；
+  // orderMerged 把同曲簇重排成「代表优先成块」。两者默认关——既有调用方
+  // （聚合页旧行为、诊断）行为零变化，只有「我的歌」视图显式打开。
+  const includeLocal = o.includeLocal === true;
+  const orderMerged = o.orderMerged === true;
 
   // 只读：直接读 prefs，不用 ensureFavorites()——后者会在红心单缺失时
   // prefs.set 建单，那是写操作，与「聚合不改数据」相悖。
@@ -118,7 +123,39 @@ handle('aggregate-cross-source', async (_, opts) => {
     for (const [src, songs] of bySource) groups.push({ source: src, songs });
   }
 
-  const merged = aggregateAcrossSources(groups, { markDuplicates: mark, fetched });
+  // 005：「我的歌」把本地曲库并进同一份列表（零网络，读缓存索引）。
+  // id = filePath（同曲去重与播放寻址都用它）；durationMs→duration 对齐聚合层口径。
+  // 索引读失败不阻塞聚合——本地组缺席时其余源照常，failed 点名。
+  // 注意：本地组用「新数组拼接」并入（不是对 groups unshift）——只读纪律
+  // 钉的是「不改动任何传入的歌单数组」，拼新数组让这条纪律在字面上也成立。
+  let localGroup = null;
+  if (includeLocal) {
+    try {
+      const { loadIndex } = require('../../utils/libraryIndex');
+      const idx = await loadIndex();
+      const localSongs = ((idx && Array.isArray(idx.songs)) ? idx.songs : [])
+        .filter((f) => f && f.filePath)
+        .map((f) => ({
+          source: 'local',
+          id: f.filePath,
+          filePath: f.filePath,
+          title: f.title || f.fileName || '',
+          artist: f.artist || '',
+          album: f.album || '',
+          cover: f.cover || undefined,
+          duration: Number(f.durationMs) > 0 ? Number(f.durationMs) : 0,
+        }));
+      localGroup = { source: 'local', songs: localSongs };
+    } catch (e) {
+      logger.warn('[aggregate] 本地曲库组加载失败，跳过:', e && e.message);
+      failed.push('local');
+    }
+  }
+
+  const merged = aggregateAcrossSources(
+    localGroup ? [localGroup, ...groups] : groups,
+    { markDuplicates: mark, fetched }
+  );
 
   // 给每个跨源簇算出「下载优先选哪一条」
   const clusters = new Map();
@@ -139,13 +176,26 @@ handle('aggregate-cross-source', async (_, opts) => {
       .map(([k]) => String(k).trim().toLowerCase())
   );
 
+  // includeLocal 时本地副本无条件最优先：它永远可播（断网也行），
+  // 「我的歌」的降级语义靠它成立——同曲有本地版，代表就落在本地上。
+  const prefer = includeLocal ? ['local'] : null;
+
   for (const members of clusters.values()) {
-    const rep = pickRepresentative(members, loggedIn);
+    const rep = pickRepresentative(members, loggedIn, prefer);
     if (!rep) continue;
     const repKey = aggSongKey(rep);
     for (const s of members) {
       s._primary = aggSongKey(s) === repKey;
     }
+    // 簇里有本地成员 ⇒ 全簇标 _hasLocal（在线条目据此显示「已有本地版」）
+    if (members.some((m) => m.source === 'local')) {
+      for (const m of members) m._hasLocal = true;
+    }
+  }
+
+  // orderMerged：同曲簇重排成「代表优先成块」（内部与上面同一套择优口径）
+  if (orderMerged) {
+    merged.songs = orderMergedResults(merged.songs, loggedIn, prefer);
   }
 
   return { ...merged, failed };

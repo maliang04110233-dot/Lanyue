@@ -114,3 +114,31 @@ test('版别标记：无正主但多条已知时长互不并簇 ⇒ 互为版别
   markVariants(r.songs);
   assert.ok(r.songs.every((s) => s._variant === true), '无正主时已知时长成员互为版别');
 });
+
+// ── 005 统一歌曲库：本地副本无条件最优先 ────────────────────
+
+test('005 择优：preferSources=["local"] 压过已登录平台——本地副本永远可播', () => {
+  const { pickRepresentative } = require('../src/utils/crossSourceAggregate');
+  const local = song('local', 'C:/x/晴天.mp3', '晴天', '周杰伦', 269000);
+  const qq = song('qq', 'a', '晴天', '周杰伦', 269000);
+  const rep = pickRepresentative([qq, local], ['qq'], ['local']);
+  assert.strictEqual(rep, local, 'prefer 级在 auth 级之前');
+  // 不传 prefer 时行为与原版一致（向后兼容）
+  const rep2 = pickRepresentative([qq, local], ['qq']);
+  assert.strictEqual(rep2, qq, '无 prefer 时已登录源仍最优先');
+});
+
+test('005 合并排序：同曲簇里有本地成员 ⇒ 代表与块首都是本地条目', () => {
+  const groups = [
+    // 本地组排最后也不影响：representative 由 prefer 决定，不由出现顺序决定
+    { source: 'nc', songs: [song('nc', 1, '晴天', '周杰伦', 269000)] },
+    { source: 'qq', songs: [song('qq', 'a', '晴天', '周杰伦', 269000)] },
+    { source: 'local', songs: [song('local', 'C:/x/晴天.mp3', '晴天', '周杰伦', 269000)] },
+  ];
+  const r = aggregateAcrossSources(groups);
+  const songs = orderMergedResults(r.songs, [], ['local']);
+  assert.strictEqual(songs[0].source, 'local', '块首应为本地副本（断网可播的降级语义）');
+  assert.strictEqual(songs[0]._primary, true);
+  assert.ok(songs.slice(0, 3).every((s) => s.source === 'local' || s._primary === false),
+    '簇成员成块相邻且非代表降位');
+});

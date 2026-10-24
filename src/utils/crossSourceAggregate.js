@@ -369,28 +369,34 @@ function aggregateAcrossSources(groups, opts = {}) {
  * 挑一个「代表条目」：同曲多源时，下载优先选它
  *
  * 排序依据（依次）：
+ *   0. preferSources 命中的源优先 —— 「我的歌」（005）传 ['local']：
+ *      本地副本永远可播（离线也行），统一曲库场景它是最高优先级；
+ *      不传则该级不存在，行为与原版完全一致（向后兼容）
  *   1. 已登录的平台优先 —— 未登录时会员资源取不到流
  *   2. 时长已知且非零的优先 —— 时长是同曲判定的必要条件之一
  *   3. 其余保持原顺序（Array#sort 在 V8 上稳定）
  *
  * @param {Array} members 同一簇的曲目
  * @param {Set<string>|string[]} [loggedIn] 已登录平台集合
+ * @param {Set<string>|string[]} [preferSources] 无条件最优先的源（如 'local'）
  * @returns {Object|null} 代表条目（members 为空则 null）
  */
-function pickRepresentative(members, loggedIn) {
+function pickRepresentative(members, loggedIn, preferSources) {
   const list = (Array.isArray(members) ? members : []).filter(Boolean);
   if (!list.length) return null;
   if (list.length === 1) return list[0];
 
   const auth = loggedIn instanceof Set ? loggedIn : new Set(loggedIn || []);
+  const prefer = preferSources instanceof Set ? preferSources : new Set(preferSources || []);
   const hasDur = (s) => Number.isFinite(Number(s && s.duration)) && Number(s.duration) > 0;
 
   const ranked = list.map((s, i) => ({
     s, i,
+    pref: prefer.has(s.source) ? 1 : 0,
     auth: auth.has(s.source) ? 1 : 0,
     dur: hasDur(s) ? 1 : 0,
   }));
-  ranked.sort((a, b) => (b.auth - a.auth) || (b.dur - a.dur) || (a.i - b.i));
+  ranked.sort((a, b) => (b.pref - a.pref) || (b.auth - a.auth) || (b.dur - a.dur) || (a.i - b.i));
   return ranked[0].s;
 }
 
@@ -408,9 +414,10 @@ function pickRepresentative(members, loggedIn) {
  *
  * @param {Array} songs 已跑过 aggregateAcrossSources 的列表
  * @param {Set<string>|string[]} [loggedIn] 已登录平台集合
+ * @param {Set<string>|string[]} [preferSources] 无条件最优先的源（如 'local'，005）
  * @returns {Array} 重排后的新数组（成员对象为原引用）
  */
-function orderMergedResults(songs, loggedIn) {
+function orderMergedResults(songs, loggedIn, preferSources) {
   const list = (Array.isArray(songs) ? songs : []).filter(Boolean);
 
   // 由 _dupOf 邻接重建簇（aggregateAcrossSources 已保证簇内成员互指）
@@ -436,11 +443,11 @@ function orderMergedResults(songs, loggedIn) {
     arr.push(s);
   }
 
-  // 每簇选代表并打 _primary
+  // 每簇选代表并打 _primary（preferSources 级最优先，见 pickRepresentative）
   const repByFirst = new Map(); // 簇首 key -> 代表对象
   for (const [first, members] of membersByFirst) {
     if (members.length < 2) continue;
-    const rep = pickRepresentative(members, loggedIn);
+    const rep = pickRepresentative(members, loggedIn, preferSources);
     for (const m of members) m._primary = m === rep;
     repByFirst.set(first, rep);
   }
