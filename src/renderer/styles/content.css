@@ -735,6 +735,37 @@
 #playlistModal .playlist-modal { width: min(920px, calc(100vw - 48px)); }
 #playlistDetailModal .playlist-modal-header { flex-wrap: wrap; row-gap: var(--sp-2); }
 #playlistDetailModal .playlist-modal-title { white-space: nowrap; }
+
+/* ── ② 歌单详情右侧抽屉（升级清单 010 原型定稿方向）───────────────
+   从居中弹窗改右滑抽屉：点开歌单时列表上下文保留（010 原型已预演）。
+   几何全在此一处（index.html 行内样式已移除，避免第二真相源）；
+   modal 契约属性（data-modal / data-modal-close / 背景点击关闭）原样
+   保留——Esc 与注册表行为零改动。遮罩减淡：抽屉语义下背景仍可见，
+   全屏压暗反而破坏「列表还在」的感知。 */
+#playlistDetailModal {
+  align-items: stretch;
+  justify-content: flex-end;
+  background: color-mix(in srgb, var(--bg-deep) 30%, transparent);
+  backdrop-filter: none;
+}
+.playlist-detail-drawer {
+  width: min(420px, calc(100vw - 32px));
+  height: 100%;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  border-right: none;
+  border-radius: var(--r-lg) 0 0 var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  animation: pl-drawer-in var(--dur-3) var(--ease-out);
+}
+@keyframes pl-drawer-in {
+  from { transform: translateX(48px); opacity: .35; }
+  to   { transform: none; opacity: 1; }
+}
+/* 上方 #playlistDetailModal .playlist-modal { width: min(920px…) } 是
+   居中时代的宽度覆盖；抽屉类以双类特异性压回，不再动那条历史规则 */
+#playlistDetailModal .playlist-detail-drawer { width: min(420px, calc(100vw - 32px)); }
 .playlist-modal-title { font-size: 14px; font-weight: 600; }
 .playlist-modal-close {
   width: 26px; height: 26px; border-radius: var(--r-sm); border: none;

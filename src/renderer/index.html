@@ -1569,7 +1569,9 @@
 
 <!-- 我的歌单：歌单详情弹窗 -->
 <div class="playlist-modal-overlay hidden" id="playlistDetailModal" onclick="event.target === this && closePlaylistDetail()" data-modal data-modal-close="closePlaylistDetail" data-modal-pri="88">
-  <div class="playlist-modal" style="min-width:420px;max-width:920px;max-height:80vh;display:flex;flex-direction:column;">
+  <!-- ② 右侧抽屉：几何全部收在 .playlist-detail-drawer（content.css），
+       行内样式会被 CSS 追认成「第二真相源」故移除；modal 契约属性原样保留 -->
+  <div class="playlist-modal playlist-detail-drawer">
     <div class="playlist-modal-header">
       <span class="playlist-modal-title" id="playlistDetailTitle">歌单</span>
       <button class="btn-sm" style="margin-left:auto;flex-shrink:0;" title="整个歌单加入播放队列，从第一首开始播放" onclick="playAllPlaylist()" data-ico="play">播放全部</button>
