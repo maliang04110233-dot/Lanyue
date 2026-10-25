@@ -140,6 +140,10 @@ export function applyDiscoverLayout(val) {
   const layout = LAYOUT_VALUES.includes(val) ? val : 'a';
   const hp = document.getElementById('homePage');
   if (hp) hp.dataset.discoverLayout = layout;
+  // 高亮同步收在这一处单一源头：boot 恢复 / 设置页卡片 / 首页快切三入口
+  // 都经过本函数，任何入口改布局后设置页布局卡与首页 A/B/C 都自动对齐
+  // （否则 boot 恢复只改 dataset 不改高亮，首页快切会显示上一次的布局）。
+  syncLayoutCards(layout);
   // 门户布局无 tab，全平台同屏：进该布局即幂等拉齐各平台首分区，
   // 否则被 CSS 强制显形的块停留在「待加载」骨架（loadPlatform 重复调用直接返回）
   if (layout === 'c' && typeof window.loadAllHomePlatforms === 'function') window.loadAllHomePlatforms();

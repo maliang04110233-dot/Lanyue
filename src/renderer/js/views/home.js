@@ -29,6 +29,15 @@ import { buildFallbackNotice, triggerSourceScan } from '../fallbackNotice.js';
 import { sourceErrorText } from '../sourceError.js';
 import { PLAY_ALL_LIMIT, planSectionPlay, playAllToastText } from '../homePlayAll.js';
 import { noCoverSvgHtml, svgIcon, fmtDuration, coverThumbHtml } from '../homeFormat.js';
+// ③ 布局快切：复用设置→外观的读写管道（general.js 不反向依赖 home.js，无环）；
+// 高亮同步在 applyDiscoverLayout 单一源头，home 侧只调切换
+import { selectDiscoverLayout } from './settings/general.js';
+
+/** 首页布局快切（inline onclick 入口）：与设置页布局卡完全同一条管道 */
+function homeSwitchDiscoverLayout(v) {
+  selectDiscoverLayout(v);
+}
+window.homeSwitchDiscoverLayout = homeSwitchDiscoverLayout;
 
 // 首页榜单过滤词（会话级；小写化在 filterHomeSection 内统一处理）
 let _homeFilterStr = '';

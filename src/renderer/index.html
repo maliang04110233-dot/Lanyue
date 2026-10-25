@@ -107,6 +107,14 @@
             placeholder="搜索歌曲、歌手、专辑…（支持直接粘贴各平台歌曲/歌单/专辑链接）"
             onkeydown="if(event.key==='Enter')homeHeroSearch(this.value)">
           <button class="home-search-btn" onclick="homeHeroSearch(document.getElementById('homeSearchInput').value)" data-ico="search">搜索</button>
+          <!-- ③ 布局快切：设置→外观同一条管道（selectDiscoverLayout），data-layout-value
+               复用 syncLayoutCards 高亮；hero 在 a/b/c 三布局均可见，filterrow 在 c 隐藏故不放那。
+               按钮 A/B/C 语言中性；title 走静态中文（i18n 只翻 data-i18n 文本，属性变体不认） -->
+          <div class="home-layout-switch" id="homeLayoutSwitch" role="group" aria-label="布局切换">
+            <button type="button" class="hls-btn" data-layout-value="a" onclick="homeSwitchDiscoverLayout('a')" title="内容优先（A）">A</button>
+            <button type="button" class="hls-btn" data-layout-value="b" onclick="homeSwitchDiscoverLayout('b')" title="双栏驾驶舱（B）">B</button>
+            <button type="button" class="hls-btn" data-layout-value="c" onclick="homeSwitchDiscoverLayout('c')" title="音乐门户（C）">C</button>
+          </div>
         </div>
         <div class="home-hero-tags" id="homeHeroTags"></div>
       </div>

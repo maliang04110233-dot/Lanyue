@@ -113,6 +113,35 @@
   pointer-events: none;
 }
 .home-search-row { display: flex; gap: var(--sp-2); position: relative; z-index: 1; }
+
+/* ③ 发现页布局快切（A/B/C）：与设置→外观同管道；hero 在 a/b/c 三布局均可见，
+   filterrow 在门户布局隐藏，所以放这里不放那边 */
+.home-layout-switch {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  align-self: flex-start;
+  padding: 2px;
+  border: 1px solid var(--stroke-1);
+  border-radius: var(--r-md);
+  background: var(--glass);
+}
+.hls-btn {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border: none; border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-med);
+  cursor: pointer;
+  transition: color var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease);
+}
+.hls-btn:hover { color: var(--fg-1); background: var(--elev-1); }
+.hls-btn.active {
+  color: var(--accent-ui);
+  background: color-mix(in srgb, var(--accent-ui) 14%, transparent);
+}
 .home-search-input {
   flex: 1; height: 44px; padding: 0 var(--sp-4);
   border-radius: var(--r-full); border: 1px solid var(--stroke-1);
