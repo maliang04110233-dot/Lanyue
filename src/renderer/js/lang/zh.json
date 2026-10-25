@@ -4,6 +4,7 @@
   "nav.home": "发现",
   "nav.library": "曲库",
   "library.tabAll": "全部",
+  "playback.sessionRestored": "已恢复上次播放现场：{title}（点播放继续）",
   "library.tabPlaylists": "歌单",
   "library.tabFiles": "本地曲库",
   "library.tabRecent": "最近播放",

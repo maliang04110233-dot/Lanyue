@@ -177,6 +177,52 @@ function savePlayProgress(song, time) {
   return _progressWriter.save(_playProgressKey(song), time);
 }
 
+// ── 播放会话快照（007 判据②：崩溃/重启后恢复播放现场）─────────────
+// progressStore 是单曲级秒数记忆；这里补队列级现场：queue/playIdx/currentPlaying。
+// 秒级进度刻意不存（恢复播放时 restorePlayProgress 会取单曲记忆，两家职责不叠）。
+// 队列与当前曲都过 _slimSessionSong：本地歌的 coverBase64 若入库会把 prefs 撑爆。
+const SESSION_PREF_KEY = 'lastSession';
+const SESSION_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+
+function _slimSessionSong(s) {
+  if (!s || typeof s !== 'object' || s.id == null || !s.source) return null;
+  return {
+    id: s.id, source: s.source, title: s.title || '', artist: s.artist || '',
+    album: s.album || '', duration: s.duration || 0, filePath: s.filePath || undefined,
+  };
+}
+
+/** 快照可用性（纯函数，供 boot 侧与单测共用同一口径） */
+export function sessionSnapshotUsable(sess, now = Date.now()) {
+  if (!sess || typeof sess !== 'object') return false;
+  if (!Array.isArray(sess.queue) || sess.queue.length === 0) return false;
+  const idx = Number(sess.idx);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= sess.queue.length) return false;
+  const at = Number(sess.at);
+  if (!Number.isFinite(at) || now - at > SESSION_MAX_AGE_MS) return false;
+  return !!sess.queue[idx];
+}
+
+let _sessionSig = '';
+function saveSessionSnapshot() {
+  const queue = getState('playQueue');
+  const song = getState('currentPlaying');
+  const idx = getState('playIdx');
+  if (!Array.isArray(queue) || !queue.length || !song) return;
+  // 签名去重：状态没变不写盘（timeupdate 级高频调用零成本跳过）
+  const sig = `${queue.length}:${idx}:${song.source}:${song.id}:${audio.paused ? 1 : 0}`;
+  if (sig === _sessionSig) return;
+  _sessionSig = sig;
+  const slimQueue = queue.map(_slimSessionSong).filter(Boolean);
+  if (!slimQueue.length) return;
+  const safeIdx = Math.min(Number(idx) || 0, slimQueue.length - 1);
+  api.setPref(SESSION_PREF_KEY, {
+    queue: slimQueue, idx: safeIdx, at: Date.now(),
+  }).catch(() => { /* 快照失败不影响播放 */ });
+}
+window.saveSessionSnapshot = saveSessionSnapshot;
+window.sessionSnapshotUsable = sessionSnapshotUsable;
+
 async function restorePlayProgress(song) {
   try {
     const enabled = await api.getPref('playProgressMemory');
@@ -218,6 +264,8 @@ export async function loadAndPlay(song, prefetchedUrl, isNetworkSong = false) {
   addToRecentlyPlayed(song);
   updatePlayStatsOnStart();
   recordPlay(song);
+  // 007 会话快照：换歌即存（崩溃/重启后 boot-restore 恢复队列现场）
+  saveSessionSnapshot();
 
   const localUrl = prefetchedUrl || (song.filePath ? 'file://' + song.filePath : null);
 
@@ -590,10 +638,12 @@ export function togglePlay() {
   }
   if (audio.paused) {
     audio.play().then(() => {}).catch(() => {});
+    saveSessionSnapshot(); // 恢复播放也是现场变化（paused 态翻转）
   } else {
     // 暂停时保存播放进度
     const curSong = getState('currentPlaying');
     if (curSong && audio.currentTime > 0) { savePlayProgress(curSong, audio.currentTime); }
+    saveSessionSnapshot(); // 007：暂停态入快照（重启后停在暂停位）
     updatePlayStatsOnStop();
     // 淡出档位开着时交给缓停收尾（音量降到 0 才真 pause），否则立即停
     if (typeof window.fadeOutPause === 'function' && window.fadeOutPause(audio)) return;
@@ -709,6 +759,8 @@ export function cycleCoverAnimation() {
 
 // ── 应用关闭时释放 AudioContext ────────────────────
 window.addEventListener('beforeunload', () => {
+  // 007 会话快照：正常关窗也存（崩溃场景靠周期写点兜住；两路殊途同归）
+  try { saveSessionSnapshot(); } catch (_e) { /* 关窗路径不抛 */ }
   if (audioCtx) {
     audioCtx.close().catch(() => {});
     audioCtx = null;

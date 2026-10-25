@@ -4,6 +4,7 @@
   "nav.home": "Discover",
   "nav.library": "Library",
   "library.tabAll": "All",
+  "playback.sessionRestored": "Restored last session: {title} — press play to continue",
   "library.tabPlaylists": "Playlists",
   "library.tabFiles": "Local Library",
   "library.tabRecent": "Recent",

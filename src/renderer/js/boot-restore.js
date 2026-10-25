@@ -93,4 +93,25 @@ export async function restoreStartupPrefs(api) {
   }
 
   if (savedLocalDir) setState('localDirPath', savedLocalDir);
+
+  // ── 恢复播放现场（007 判据②：崩溃/重启后回到暂停位的队列）────────
+  // 只布状态不发声：用户按播放时 togglePlay 的「无源有队」分支从 playIdx
+  // 续播；秒级断点由 restorePlayProgress 按用户偏好（playProgressMemory）决定。
+  // 队列面板 UI 不在此刷新——它开面板时自渲染（renderPlayQueueUI）。
+  try {
+    const sess = await api.getPref('lastSession');
+    const usable = window.sessionSnapshotUsable
+      ? window.sessionSnapshotUsable(sess)
+      : (sess && Array.isArray(sess.queue) && sess.queue.length && Number.isInteger(sess.idx) && sess.idx >= 0 && sess.idx < sess.queue.length);
+    if (usable) {
+      setState('playQueue', sess.queue);
+      setState('playIdx', sess.idx);
+      const song = sess.queue[sess.idx];
+      setState('currentPlaying', song);
+      if (typeof window.updatePlayerCard === 'function') window.updatePlayerCard(song);
+      if (typeof showToast === 'function' && window.t) {
+        showToast(window.t('playback.sessionRestored', { title: song.title || '' }), 'info', 4000);
+      }
+    }
+  } catch (_e) { /* 现场恢复失败不阻断启动 */ }
 }

@@ -44,6 +44,10 @@ const ALLOWED_PREF_KEYS = new Set([
   'fallbackDisabledPlatforms',
   // 自动换源总开关（S1 改版：默认开，设置页可关；fallbackPolicy 每次解析时懒读）
   'crossSourceAutoFallback',
+  // 播放会话快照（007 判据② 崩溃/重启恢复）：player.js 写（换歌/暂停/beforeunload，
+  // 队列与条目都瘦身过——本地歌的 coverBase64 不入 prefs），boot-restore 读回
+  // 队列+当前曲为暂停态；秒级进度不存这里，恢复播放时走 progressStore
+  'lastSession',
   // 单平台并发上限 / 单曲失败尝试次数（设置页 GENERAL_PREFS 写，主进程 downloadQueue 读）
   'perSourceConcurrency', 'maxAttempts',
   // 下载完成钩子开关（autoLyric/autoCoverOnDone.js 读，设置页写）
